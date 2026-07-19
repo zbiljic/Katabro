@@ -4,6 +4,7 @@ import KatabroCore
 struct AppDependencies {
     let browserDiscovery: any BrowserDiscovering
     let browserLauncher: any BrowserLaunching
+    let preferencesStore: PreferencesStore
 
     static let live = Self(
         browserDiscovery: WorkspaceBrowserDiscovery(
@@ -11,6 +12,7 @@ struct AppDependencies {
                 appBundleIdentifier: AppMetadata.bundleIdentifier
             )
         ),
-        browserLauncher: WorkspaceBrowserLauncher()
+        browserLauncher: WorkspaceBrowserLauncher(),
+        preferencesStore: .live()
     )
 }

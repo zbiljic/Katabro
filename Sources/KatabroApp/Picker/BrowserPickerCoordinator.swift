@@ -14,9 +14,14 @@ final class BrowserPickerCoordinator: NSObject {
     private var launchTask: Task<Void, Never>?
     private var panel: BrowserPickerPanel?
     private var request: RoutingRequest?
+    private var requestQueue = RoutingRequestQueue()
     private var routingTask: Task<Void, Never>?
 
     private(set) var lastError: String?
+    var pendingRequestCount: Int {
+        requestQueue.count
+    }
+
     private(set) var presentedStore: BrowserPickerStore?
 
     init(
@@ -72,9 +77,28 @@ final class BrowserPickerCoordinator: NSObject {
         _ request: RoutingRequest
     ) {
         guard self.request == nil else {
+            requestQueue.enqueue(request)
             return
         }
 
+        start(request)
+    }
+
+    func cancel() {
+        finishCurrentRequest()
+    }
+
+    func waitForPendingOperations() async {
+        let pendingRoutingTask = routingTask
+        await pendingRoutingTask?.value
+
+        let pendingLaunchTask = launchTask
+        await pendingLaunchTask?.value
+    }
+
+    private func start(
+        _ request: RoutingRequest
+    ) {
         self.request = request
         lastError = nil
 
@@ -84,8 +108,11 @@ final class BrowserPickerCoordinator: NSObject {
             }
 
             do {
-                let browsers = try await dependencies.browserDiscovery.browsers(
+                let discoveredBrowsers = try await dependencies.browserDiscovery.browsers(
                     for: request.destination
+                )
+                let browsers = dependencies.preferencesStore.orderedBrowsers(
+                    discoveredBrowsers
                 )
 
                 guard
@@ -99,25 +126,19 @@ final class BrowserPickerCoordinator: NSObject {
                     request: request,
                     browsers: browsers
                 )
+                routingTask = nil
             } catch {
+                guard self.request?.id == request.id else {
+                    return
+                }
+
                 lastError = String(describing: error)
-                self.request = nil
+                routingTask = nil
+                finishCurrentRequest(
+                    id: request.id
+                )
             }
-
-            routingTask = nil
         }
-    }
-
-    func cancel() {
-        dismiss()
-    }
-
-    func waitForPendingOperations() async {
-        let pendingRoutingTask = routingTask
-        await pendingRoutingTask?.value
-
-        let pendingLaunchTask = launchTask
-        await pendingLaunchTask?.value
     }
 
     private func present(
@@ -153,11 +174,11 @@ final class BrowserPickerCoordinator: NSObject {
         _ browser: BrowserApplication
     ) {
         guard let request else {
-            dismiss()
+            finishCurrentRequest()
             return
         }
 
-        dismiss()
+        hidePanel()
 
         launchTask = Task { [weak self] in
             guard let self else {
@@ -174,13 +195,37 @@ final class BrowserPickerCoordinator: NSObject {
             }
 
             launchTask = nil
+            finishCurrentRequest(
+                id: request.id
+            )
         }
     }
 
-    private func dismiss() {
+    private func finishCurrentRequest(
+        id: UUID? = nil,
+        closePanel: Bool = true
+    ) {
+        guard id == nil || request?.id == id else {
+            return
+        }
+
         routingTask?.cancel()
         routingTask = nil
         request = nil
+
+        if closePanel {
+            hidePanel()
+        } else {
+            presentedStore = nil
+            panel = nil
+        }
+
+        if let nextRequest = requestQueue.dequeue() {
+            start(nextRequest)
+        }
+    }
+
+    private func hidePanel() {
         presentedStore = nil
 
         panel?.delegate = nil
@@ -197,7 +242,7 @@ extension BrowserPickerCoordinator: NSWindowDelegate {
             return
         }
 
-        dismiss()
+        finishCurrentRequest()
     }
 
     func windowWillClose(
@@ -207,8 +252,8 @@ extension BrowserPickerCoordinator: NSWindowDelegate {
             return
         }
 
-        request = nil
-        presentedStore = nil
-        panel = nil
+        finishCurrentRequest(
+            closePanel: false
+        )
     }
 }

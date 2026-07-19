@@ -128,8 +128,8 @@ struct BrowserPickerCoordinatorTests {
         #expect(coordinator.lastError == "expected")
     }
 
-    @Test("ignores a second request while the picker is active")
-    func ignoresConcurrentRequest() async throws {
+    @Test("queues a second request while the picker is active")
+    func queuesConcurrentRequest() async throws {
         let discovery = BrowserDiscoveryFake(
             browsers: [makeBrowser()]
         )
@@ -153,6 +153,93 @@ struct BrowserPickerCoordinatorTests {
 
         #expect(discovery.destinations == [firstRequest.destination])
         #expect(coordinator.presentedStore?.destination == firstRequest.destination)
+        #expect(coordinator.pendingRequestCount == 1)
+
+        coordinator.cancel()
+        await coordinator.waitForPendingOperations()
+
+        #expect(
+            discovery.destinations == [
+                firstRequest.destination,
+                secondRequest.destination,
+            ]
+        )
+        #expect(coordinator.presentedStore?.destination == secondRequest.destination)
+        #expect(coordinator.pendingRequestCount == 0)
+    }
+
+    @Test("queues every URL delivered in a single application event")
+    func queuesURLBatch() async throws {
+        let discovery = BrowserDiscoveryFake(
+            browsers: [makeBrowser()]
+        )
+        let coordinator = makeCoordinator(
+            discovery: discovery,
+            launcher: BrowserLauncherFake()
+        )
+        let firstURL = try #require(URL(string: "https://one.example"))
+        let secondURL = try #require(URL(string: "https://two.example"))
+
+        coordinator.handle([firstURL, secondURL])
+        await coordinator.waitForPendingOperations()
+
+        #expect(
+            try discovery.destinations == [
+                IncomingURL(firstURL),
+            ]
+        )
+        #expect(coordinator.pendingRequestCount == 1)
+
+        coordinator.cancel()
+        await coordinator.waitForPendingOperations()
+
+        #expect(
+            try discovery.destinations == [
+                IncomingURL(firstURL),
+                IncomingURL(secondURL),
+            ]
+        )
+        #expect(coordinator.pendingRequestCount == 0)
+    }
+
+    @Test("a canceled discovery cannot overwrite the next request")
+    func ignoresStaleDiscoveryFailure() async throws {
+        let browser = makeBrowser()
+        let discovery = CancellationRacingDiscovery(
+            browsers: [browser]
+        )
+        let coordinator = makeCoordinator(
+            discovery: discovery,
+            launcher: BrowserLauncherFake()
+        )
+        let firstRequest = try RoutingRequest(
+            destination: IncomingURL("https://one.example"),
+            source: .system
+        )
+        let secondRequest = try RoutingRequest(
+            destination: IncomingURL("https://two.example"),
+            source: .system
+        )
+
+        coordinator.route(firstRequest)
+        await discovery.waitForFirstRequest()
+        coordinator.route(secondRequest)
+        coordinator.cancel()
+        await coordinator.waitForPendingOperations()
+
+        discovery.failFirstRequest()
+        await Task.yield()
+        await Task.yield()
+
+        #expect(
+            discovery.destinations == [
+                firstRequest.destination,
+                secondRequest.destination,
+            ]
+        )
+        #expect(coordinator.presentedStore?.destination == secondRequest.destination)
+        #expect(coordinator.lastError == nil)
+        #expect(coordinator.pendingRequestCount == 0)
     }
 
     @Test("cancels through the presentation callback")
@@ -183,14 +270,15 @@ struct BrowserPickerCoordinatorTests {
     }
 
     private func makeCoordinator(
-        discovery: BrowserDiscoveryFake,
+        discovery: any BrowserDiscovering,
         launcher: BrowserLauncherFake,
         panelBuilder: @escaping BrowserPickerCoordinator.PanelBuilder = { _, _, _ in nil }
     ) -> BrowserPickerCoordinator {
         BrowserPickerCoordinator(
             dependencies: AppDependencies(
                 browserDiscovery: discovery,
-                browserLauncher: launcher
+                browserLauncher: launcher,
+                preferencesStore: PreferencesStore()
             ),
             panelBuilder: panelBuilder
         )
@@ -212,6 +300,47 @@ struct BrowserPickerCoordinatorTests {
                 )
             )
         )
+    }
+}
+
+@MainActor
+private final class CancellationRacingDiscovery: BrowserDiscovering {
+    private let browsers: [BrowserApplication]
+    private var firstContinuation: CheckedContinuation<[BrowserApplication], Error>?
+
+    private(set) var destinations: [IncomingURL] = []
+
+    init(
+        browsers: [BrowserApplication]
+    ) {
+        self.browsers = browsers
+    }
+
+    func browsers(
+        for destination: IncomingURL
+    ) async throws -> [BrowserApplication] {
+        destinations.append(destination)
+
+        guard destinations.count == 1 else {
+            return browsers
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            firstContinuation = continuation
+        }
+    }
+
+    func waitForFirstRequest() async {
+        while firstContinuation == nil {
+            await Task.yield()
+        }
+    }
+
+    func failFirstRequest() {
+        firstContinuation?.resume(
+            throwing: BrowserPickerCoordinatorTests.TestError.expected
+        )
+        firstContinuation = nil
     }
 }
 
