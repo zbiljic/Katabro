@@ -15,6 +15,13 @@ let appSettings: Settings = .settings(
     ]
 )
 
+let cliSettings: Settings = .settings(
+    base: [
+        "PRODUCT_MODULE_NAME": "KatabroCLI",
+        "SWIFT_DEFAULT_ACTOR_ISOLATION": "MainActor",
+    ]
+)
+
 let project = Project(
     name: "Katabro",
     organizationName: "zbiljic",
@@ -39,6 +46,19 @@ let project = Project(
             sources: ["Packages/KatabroCore/Sources/**"]
         ),
         .target(
+            name: "KatabroCLI",
+            destinations: .macOS,
+            product: .commandLineTool,
+            productName: "katabro",
+            bundleId: "com.zbiljic.katabro-cli",
+            deploymentTargets: .macOS("14.0"),
+            sources: ["Sources/KatabroCLI/**"],
+            dependencies: [
+                .target(name: "KatabroCore"),
+            ],
+            settings: cliSettings
+        ),
+        .target(
             name: "Katabro",
             destinations: .macOS,
             product: .app,
@@ -47,9 +67,25 @@ let project = Project(
             infoPlist: .file(path: "Resources/Info.plist"),
             sources: ["Sources/KatabroApp/**"],
             resources: ["Resources/Assets.xcassets"],
+            copyFiles: [
+                .wrapper(
+                    name: "Embed command-line helper",
+                    subpath: "Contents/Helpers",
+                    files: [
+                        .buildProduct(
+                            name: "KatabroCLI",
+                            codeSignOnCopy: true
+                        ),
+                    ]
+                ),
+            ],
             entitlements: .file(path: "Resources/Katabro.entitlements"),
             dependencies: [
                 .target(name: "KatabroCore"),
+                .target(
+                    name: "KatabroCLI",
+                    status: .none
+                ),
             ],
             settings: appSettings
         ),

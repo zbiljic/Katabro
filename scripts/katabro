@@ -1,0 +1,20 @@
+#!/bin/sh
+
+set -eu
+
+script_directory=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+project_root=$(dirname "$script_directory")
+helper_path="$project_root/Derived/Build/Products/Debug/Katabro.app/Contents/Helpers/katabro"
+
+cd "$project_root"
+
+if ! test -x "$helper_path"; then
+    mise run app:build
+fi
+
+if ! test -x "$helper_path"; then
+    echo "Katabro helper not found at $helper_path" >&2
+    exit 1
+fi
+
+exec "$helper_path" "$@"
