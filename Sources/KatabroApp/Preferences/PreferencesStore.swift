@@ -16,6 +16,10 @@ final class PreferencesStore {
         preferences.browserOrder
     }
 
+    var hasCompletedOnboarding: Bool {
+        preferences.hasCompletedOnboarding
+    }
+
     init(
         initialPreferences: AppPreferences = AppPreferences(),
         save: @escaping (AppPreferences) -> Void = { _ in }
@@ -111,11 +115,9 @@ final class PreferencesStore {
             return trimmedIdentifier
         }
 
-        update(
-            AppPreferences(
-                browserOrder: normalizedOrder
-            )
-        )
+        var preferences = preferences
+        preferences.browserOrder = normalizedOrder
+        update(preferences)
     }
 
     func moveBrowser(
@@ -132,6 +134,12 @@ final class PreferencesStore {
 
     func resetBrowserOrder() {
         setBrowserOrder([])
+    }
+
+    func completeOnboarding() {
+        var preferences = preferences
+        preferences.hasCompletedOnboarding = true
+        update(preferences)
     }
 
     private func update(

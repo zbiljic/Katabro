@@ -106,6 +106,37 @@ struct PreferencesStoreTests {
         #expect(store.browserOrder.isEmpty)
     }
 
+    @Test("completing onboarding preserves browser order")
+    func completesOnboarding() {
+        let store = PreferencesStore(
+            initialPreferences: AppPreferences(
+                browserOrder: ["com.example.browser"]
+            )
+        )
+
+        store.completeOnboarding()
+
+        #expect(store.hasCompletedOnboarding)
+        #expect(store.browserOrder == ["com.example.browser"])
+    }
+
+    @Test("decodes preferences saved before onboarding was added")
+    func decodesLegacyPreferences() throws {
+        let data = Data(
+            """
+            {"browserOrder":["com.example.browser"]}
+            """.utf8
+        )
+
+        let preferences = try JSONDecoder().decode(
+            AppPreferences.self,
+            from: data
+        )
+
+        #expect(preferences.browserOrder == ["com.example.browser"])
+        #expect(!preferences.hasCompletedOnboarding)
+    }
+
     private func makeBrowser(
         identifier: String,
         name: String

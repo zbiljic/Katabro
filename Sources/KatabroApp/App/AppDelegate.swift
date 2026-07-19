@@ -2,8 +2,10 @@ import AppKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    let pickerCoordinator = BrowserPickerCoordinator(
-        dependencies: .live
+    let dependencies = AppDependencies.live
+
+    lazy var pickerCoordinator = BrowserPickerCoordinator(
+        dependencies: dependencies
     )
 
     func application(

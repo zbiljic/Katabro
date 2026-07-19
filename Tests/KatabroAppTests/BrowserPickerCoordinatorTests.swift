@@ -339,7 +339,20 @@ extension BrowserPickerCoordinatorTests {
             dependencies: AppDependencies(
                 browserDiscovery: discovery,
                 browserLauncher: launcher,
+                defaultBrowserClient: DefaultBrowserClient(
+                    appBundleIdentifier: "com.example.Katabro",
+                    currentHandler: { _ in
+                        "com.example.browser"
+                    },
+                    requestHandler: { _ in }
+                ),
                 errorPresenter: errorPresenter,
+                loginItemClient: LoginItemClient(
+                    statusProvider: {
+                        .disabled
+                    },
+                    updateHandler: { _ in }
+                ),
                 preferencesStore: PreferencesStore()
             ),
             panelBuilder: panelBuilder

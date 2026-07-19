@@ -11,14 +11,31 @@ struct KatabroApp: App {
             AppMetadata.displayName,
             systemImage: "arrow.triangle.branch"
         ) {
-            Text("Katabro is ready")
+            MenuBarView(
+                defaultBrowserClient: appDelegate.dependencies.defaultBrowserClient,
+                pickerCoordinator: appDelegate.pickerCoordinator,
+                preferencesStore: appDelegate.dependencies.preferencesStore
+            )
+        }
 
-            Divider()
+        Window(
+            "Welcome to Katabro",
+            id: "onboarding"
+        ) {
+            OnboardingView(
+                defaultBrowserClient: appDelegate.dependencies.defaultBrowserClient,
+                preferencesStore: appDelegate.dependencies.preferencesStore
+            )
+        }
+        .windowResizability(.contentSize)
 
-            Button("Quit Katabro") {
-                NSApplication.shared.terminate(nil)
-            }
-            .keyboardShortcut("q")
+        Settings {
+            SettingsView(
+                browserDiscovery: appDelegate.dependencies.browserDiscovery,
+                defaultBrowserClient: appDelegate.dependencies.defaultBrowserClient,
+                loginItemClient: appDelegate.dependencies.loginItemClient,
+                preferencesStore: appDelegate.dependencies.preferencesStore
+            )
         }
     }
 }
