@@ -3,17 +3,39 @@ import KatabroCore
 
 @MainActor
 final class BrowserPickerCoordinator: NSObject {
+    typealias PanelBuilder = @MainActor (
+        _ store: BrowserPickerStore,
+        _ onSelect: @escaping (BrowserApplication) -> Void,
+        _ onCancel: @escaping () -> Void
+    ) -> BrowserPickerPanel?
+
     private let dependencies: AppDependencies
+    private let panelBuilder: PanelBuilder
+    private var launchTask: Task<Void, Never>?
     private var panel: BrowserPickerPanel?
     private var request: RoutingRequest?
     private var routingTask: Task<Void, Never>?
 
     private(set) var lastError: String?
+    private(set) var presentedStore: BrowserPickerStore?
 
     init(
-        dependencies: AppDependencies
+        dependencies: AppDependencies,
+        panelBuilder: @escaping PanelBuilder = { store, onSelect, onCancel in
+            let view = BrowserPickerView(
+                store: store,
+                onSelect: onSelect,
+                onCancel: onCancel
+            )
+
+            return BrowserPickerPanel(
+                rootView: view,
+                browserCount: store.browsers.count
+            )
+        }
     ) {
         self.dependencies = dependencies
+        self.panelBuilder = panelBuilder
     }
 
     func handle(
@@ -90,6 +112,14 @@ final class BrowserPickerCoordinator: NSObject {
         dismiss()
     }
 
+    func waitForPendingOperations() async {
+        let pendingRoutingTask = routingTask
+        await pendingRoutingTask?.value
+
+        let pendingLaunchTask = launchTask
+        await pendingLaunchTask?.value
+    }
+
     private func present(
         request: RoutingRequest,
         browsers: [BrowserApplication]
@@ -98,19 +128,21 @@ final class BrowserPickerCoordinator: NSObject {
             destination: request.destination,
             browsers: browsers
         )
-        let view = BrowserPickerView(
-            store: store,
-            onSelect: { [weak self] browser in
+        presentedStore = store
+
+        let panel = panelBuilder(
+            store,
+            { [weak self] browser in
                 self?.select(browser)
             },
-            onCancel: { [weak self] in
+            { [weak self] in
                 self?.cancel()
             }
         )
-        let panel = BrowserPickerPanel(
-            rootView: view,
-            browserCount: browsers.count
-        )
+
+        guard let panel else {
+            return
+        }
 
         panel.delegate = self
         self.panel = panel
@@ -127,7 +159,7 @@ final class BrowserPickerCoordinator: NSObject {
 
         dismiss()
 
-        Task { [weak self] in
+        launchTask = Task { [weak self] in
             guard let self else {
                 return
             }
@@ -140,6 +172,8 @@ final class BrowserPickerCoordinator: NSObject {
             } catch {
                 lastError = String(describing: error)
             }
+
+            launchTask = nil
         }
     }
 
@@ -147,6 +181,7 @@ final class BrowserPickerCoordinator: NSObject {
         routingTask?.cancel()
         routingTask = nil
         request = nil
+        presentedStore = nil
 
         panel?.delegate = nil
         panel?.close()
@@ -173,6 +208,7 @@ extension BrowserPickerCoordinator: NSWindowDelegate {
         }
 
         request = nil
+        presentedStore = nil
         panel = nil
     }
 }

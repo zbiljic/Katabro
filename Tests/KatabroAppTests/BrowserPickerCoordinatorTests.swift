@@ -1,0 +1,278 @@
+import AppKit
+@testable import Katabro
+import KatabroCore
+import Testing
+
+@MainActor
+@Suite("Browser picker routing")
+struct BrowserPickerCoordinatorTests {
+    enum TestError: Error {
+        case expected
+    }
+
+    @Test("discovers browsers and launches the selected browser")
+    func launchesSelection() async throws {
+        let browser = makeBrowser()
+        let discovery = BrowserDiscoveryFake(
+            browsers: [browser]
+        )
+        let launcher = BrowserLauncherFake()
+        var selectionHandler: ((BrowserApplication) -> Void)?
+        let coordinator = makeCoordinator(
+            discovery: discovery,
+            launcher: launcher
+        ) { _, onSelect, _ in
+            selectionHandler = onSelect
+            return nil
+        }
+        let request = try RoutingRequest(
+            destination: IncomingURL("https://example.com/path"),
+            source: .system
+        )
+
+        coordinator.route(request)
+        await coordinator.waitForPendingOperations()
+
+        #expect(discovery.destinations == [request.destination])
+        #expect(coordinator.presentedStore?.browsers == [browser])
+
+        let selectBrowser = try #require(selectionHandler)
+        selectBrowser(browser)
+        await coordinator.waitForPendingOperations()
+
+        #expect(
+            launcher.openedRequests == [
+                BrowserLauncherFake.OpenedRequest(
+                    destination: request.destination,
+                    browser: browser
+                ),
+            ]
+        )
+        #expect(coordinator.presentedStore == nil)
+        #expect(coordinator.lastError == nil)
+    }
+
+    @Test("records discovery failures without presenting")
+    func handlesDiscoveryFailure() async throws {
+        let discovery = BrowserDiscoveryFake(
+            error: TestError.expected
+        )
+        let launcher = BrowserLauncherFake()
+        let coordinator = makeCoordinator(
+            discovery: discovery,
+            launcher: launcher
+        )
+        let request = try RoutingRequest(
+            destination: IncomingURL("https://example.com"),
+            source: .system
+        )
+
+        coordinator.route(request)
+        await coordinator.waitForPendingOperations()
+
+        #expect(coordinator.presentedStore == nil)
+        #expect(coordinator.lastError == "expected")
+        #expect(launcher.openedRequests.isEmpty)
+    }
+
+    @Test("presents an empty discovery result without inventing a selection")
+    func handlesEmptyDiscovery() async throws {
+        let coordinator = makeCoordinator(
+            discovery: BrowserDiscoveryFake(),
+            launcher: BrowserLauncherFake()
+        )
+
+        try coordinator.route(
+            RoutingRequest(
+                destination: IncomingURL("https://example.com"),
+                source: .system
+            )
+        )
+        await coordinator.waitForPendingOperations()
+
+        #expect(coordinator.presentedStore?.browsers.isEmpty == true)
+        #expect(coordinator.presentedStore?.selectedBrowser == nil)
+    }
+
+    @Test("records a browser launch failure after dismissing")
+    func handlesLaunchFailure() async throws {
+        let browser = makeBrowser()
+        let discovery = BrowserDiscoveryFake(
+            browsers: [browser]
+        )
+        let launcher = BrowserLauncherFake(
+            error: TestError.expected
+        )
+        var selectionHandler: ((BrowserApplication) -> Void)?
+        let coordinator = makeCoordinator(
+            discovery: discovery,
+            launcher: launcher
+        ) { _, onSelect, _ in
+            selectionHandler = onSelect
+            return nil
+        }
+
+        try coordinator.route(
+            RoutingRequest(
+                destination: IncomingURL("https://example.com"),
+                source: .system
+            )
+        )
+        await coordinator.waitForPendingOperations()
+
+        let selectBrowser = try #require(selectionHandler)
+        selectBrowser(browser)
+        await coordinator.waitForPendingOperations()
+
+        #expect(coordinator.presentedStore == nil)
+        #expect(coordinator.lastError == "expected")
+    }
+
+    @Test("ignores a second request while the picker is active")
+    func ignoresConcurrentRequest() async throws {
+        let discovery = BrowserDiscoveryFake(
+            browsers: [makeBrowser()]
+        )
+        let coordinator = makeCoordinator(
+            discovery: discovery,
+            launcher: BrowserLauncherFake()
+        )
+        let firstRequest = try RoutingRequest(
+            destination: IncomingURL("https://one.example"),
+            source: .system
+        )
+        let secondRequest = try RoutingRequest(
+            destination: IncomingURL("https://two.example"),
+            source: .system
+        )
+
+        coordinator.route(firstRequest)
+        await coordinator.waitForPendingOperations()
+        coordinator.route(secondRequest)
+        await coordinator.waitForPendingOperations()
+
+        #expect(discovery.destinations == [firstRequest.destination])
+        #expect(coordinator.presentedStore?.destination == firstRequest.destination)
+    }
+
+    @Test("cancels through the presentation callback")
+    func cancelsPresentation() async throws {
+        var cancellationHandler: (() -> Void)?
+        let coordinator = makeCoordinator(
+            discovery: BrowserDiscoveryFake(
+                browsers: [makeBrowser()]
+            ),
+            launcher: BrowserLauncherFake()
+        ) { _, _, onCancel in
+            cancellationHandler = onCancel
+            return nil
+        }
+
+        try coordinator.route(
+            RoutingRequest(
+                destination: IncomingURL("https://example.com"),
+                source: .system
+            )
+        )
+        await coordinator.waitForPendingOperations()
+
+        let cancel = try #require(cancellationHandler)
+        cancel()
+
+        #expect(coordinator.presentedStore == nil)
+    }
+
+    private func makeCoordinator(
+        discovery: BrowserDiscoveryFake,
+        launcher: BrowserLauncherFake,
+        panelBuilder: @escaping BrowserPickerCoordinator.PanelBuilder = { _, _, _ in nil }
+    ) -> BrowserPickerCoordinator {
+        BrowserPickerCoordinator(
+            dependencies: AppDependencies(
+                browserDiscovery: discovery,
+                browserLauncher: launcher
+            ),
+            panelBuilder: panelBuilder
+        )
+    }
+
+    private func makeBrowser() -> BrowserApplication {
+        BrowserApplication(
+            browser: Browser(
+                bundleIdentifier: "com.example.browser",
+                displayName: "Example Browser"
+            ),
+            applicationURL: URL(
+                fileURLWithPath: "/Applications/Example Browser.app"
+            ),
+            icon: NSImage(
+                size: NSSize(
+                    width: 32,
+                    height: 32
+                )
+            )
+        )
+    }
+}
+
+@MainActor
+private final class BrowserDiscoveryFake: BrowserDiscovering {
+    private let browsers: [BrowserApplication]
+    private let error: Error?
+
+    private(set) var destinations: [IncomingURL] = []
+
+    init(
+        browsers: [BrowserApplication] = [],
+        error: Error? = nil
+    ) {
+        self.browsers = browsers
+        self.error = error
+    }
+
+    func browsers(
+        for destination: IncomingURL
+    ) async throws -> [BrowserApplication] {
+        destinations.append(destination)
+
+        if let error {
+            throw error
+        }
+
+        return browsers
+    }
+}
+
+@MainActor
+private final class BrowserLauncherFake: BrowserLaunching {
+    struct OpenedRequest: Equatable {
+        let destination: IncomingURL
+        let browser: BrowserApplication
+    }
+
+    private let error: Error?
+
+    private(set) var openedRequests: [OpenedRequest] = []
+
+    init(
+        error: Error? = nil
+    ) {
+        self.error = error
+    }
+
+    func open(
+        _ destination: IncomingURL,
+        with browser: BrowserApplication
+    ) async throws {
+        openedRequests.append(
+            OpenedRequest(
+                destination: destination,
+                browser: browser
+            )
+        )
+
+        if let error {
+            throw error
+        }
+    }
+}
