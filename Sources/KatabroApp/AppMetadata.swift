@@ -1,4 +1,10 @@
+import Foundation
+import KatabroCore
+
 enum AppMetadata {
-    static let bundleIdentifier = "com.zbiljic.katabro"
+    static var bundleIdentifier: String {
+        Bundle.main.bundleIdentifier ?? KatabroCore.appBundleIdentifier
+    }
+
     static let displayName = "Katabro"
 }
