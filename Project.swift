@@ -1,0 +1,94 @@
+import ProjectDescription
+
+let sharedSettings: Settings = .settings(
+    base: [
+        "CLANG_ENABLE_MODULES": "YES",
+        "ENABLE_USER_SCRIPT_SANDBOXING": "YES",
+        "SWIFT_STRICT_CONCURRENCY": "complete",
+        "SWIFT_VERSION": "6.3",
+    ]
+)
+
+let appSettings: Settings = .settings(
+    base: [
+        "SWIFT_DEFAULT_ACTOR_ISOLATION": "MainActor",
+    ]
+)
+
+let project = Project(
+    name: "Katabro",
+    organizationName: "zbiljic",
+    options: .options(
+        automaticSchemesOptions: .disabled,
+        developmentRegion: "en",
+        textSettings: .textSettings(
+            usesTabs: false,
+            indentWidth: 4,
+            tabWidth: 4,
+            wrapsLines: true
+        )
+    ),
+    settings: sharedSettings,
+    targets: [
+        .target(
+            name: "KatabroCore",
+            destinations: .macOS,
+            product: .staticFramework,
+            bundleId: "com.zbiljic.katabrocore",
+            deploymentTargets: .macOS("14.0"),
+            sources: ["Packages/KatabroCore/Sources/**"]
+        ),
+        .target(
+            name: "Katabro",
+            destinations: .macOS,
+            product: .app,
+            bundleId: "com.zbiljic.katabro",
+            deploymentTargets: .macOS("14.0"),
+            infoPlist: .file(path: "Resources/Info.plist"),
+            sources: ["Sources/KatabroApp/**"],
+            resources: ["Resources/Assets.xcassets"],
+            entitlements: .file(path: "Resources/Katabro.entitlements"),
+            dependencies: [
+                .target(name: "KatabroCore"),
+            ],
+            settings: appSettings
+        ),
+        .target(
+            name: "KatabroTests",
+            destinations: .macOS,
+            product: .unitTests,
+            bundleId: "com.zbiljic.katabrotests",
+            deploymentTargets: .macOS("14.0"),
+            infoPlist: .default,
+            sources: ["Tests/KatabroAppTests/**"],
+            dependencies: [
+                .target(name: "Katabro"),
+            ],
+            settings: appSettings
+        ),
+    ],
+    schemes: [
+        .scheme(
+            name: "Katabro",
+            shared: true,
+            buildAction: .buildAction(
+                targets: ["Katabro"]
+            ),
+            testAction: .targets(
+                [
+                    .testableTarget(
+                        target: "KatabroTests",
+                        parallelization: .swiftTestingOnly
+                    ),
+                ],
+                options: .options(
+                    coverage: true,
+                    codeCoverageTargets: ["Katabro", "KatabroCore"]
+                )
+            ),
+            runAction: .runAction(
+                executable: "Katabro"
+            )
+        ),
+    ]
+)

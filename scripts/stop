@@ -1,0 +1,7 @@
+#!/bin/sh
+
+set -eu
+
+if ! pkill -x Katabro 2>/dev/null; then
+    echo "Katabro is not running"
+fi

@@ -69,6 +69,7 @@ opt_in_rules:
   - yoda_condition
 
 disabled_rules:
+  - trailing_comma
   - todo
 
 file_length:
