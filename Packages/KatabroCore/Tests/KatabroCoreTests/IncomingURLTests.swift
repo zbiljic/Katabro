@@ -80,4 +80,21 @@ struct IncomingURLTests {
         #expect(incomingURL.scheme == .http)
         #expect(incomingURL.url.absoluteString == "HTTP://Example.com/SomePath")
     }
+
+    @Test("rejects a relative URL that inherits an absolute base URL")
+    func rejectsURLRelativeToBase() throws {
+        let baseURL = try #require(URL(string: "https://example.com/root/"))
+        let relativeURL = try #require(
+            URL(
+                string: "child",
+                relativeTo: baseURL
+            )
+        )
+
+        #expect(relativeURL.scheme == "https")
+        #expect(relativeURL.host() == "example.com")
+        #expect(throws: IncomingURL.ValidationError.relative) {
+            try IncomingURL(relativeURL)
+        }
+    }
 }

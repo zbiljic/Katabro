@@ -32,6 +32,10 @@ public struct IncomingURL: Hashable, Sendable {
     }
 
     public init(_ url: URL) throws(ValidationError) {
+        guard url.baseURL == nil else {
+            throw .relative
+        }
+
         guard let rawScheme = url.scheme?.lowercased() else {
             throw .relative
         }
