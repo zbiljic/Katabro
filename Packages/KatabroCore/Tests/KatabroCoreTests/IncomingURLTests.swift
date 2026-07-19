@@ -1,0 +1,83 @@
+import Foundation
+@testable import KatabroCore
+import Testing
+
+@Suite("Incoming URL validation")
+struct IncomingURLTests {
+    struct AcceptedCase: Sendable {
+        let rawValue: String
+        let scheme: IncomingURL.Scheme
+        let host: String
+    }
+
+    struct RejectedCase: Sendable {
+        let rawValue: String
+        let error: IncomingURL.ValidationError
+    }
+
+    @Test(
+        "accepts absolute web URLs",
+        arguments: [
+            AcceptedCase(
+                rawValue: "http://example.com",
+                scheme: .http,
+                host: "example.com"
+            ),
+            AcceptedCase(
+                rawValue: "https://example.com/path?q=swift#results",
+                scheme: .https,
+                host: "example.com"
+            ),
+            AcceptedCase(
+                rawValue: "  HTTPS://LOCALHOST:8443/path  ",
+                scheme: .https,
+                host: "localhost"
+            ),
+        ]
+    )
+    func acceptsWebURL(testCase: AcceptedCase) throws {
+        let incomingURL = try IncomingURL(testCase.rawValue)
+
+        #expect(incomingURL.scheme == testCase.scheme)
+        #expect(incomingURL.url.host()?.lowercased() == testCase.host)
+    }
+
+    @Test(
+        "rejects invalid destinations with stable errors",
+        arguments: [
+            RejectedCase(
+                rawValue: "",
+                error: .empty
+            ),
+            RejectedCase(
+                rawValue: "docs/index.html",
+                error: .relative
+            ),
+            RejectedCase(
+                rawValue: "ftp://example.com/file",
+                error: .unsupportedScheme("ftp")
+            ),
+            RejectedCase(
+                rawValue: "https:///path",
+                error: .missingHost
+            ),
+            RejectedCase(
+                rawValue: "http://[invalid",
+                error: .malformed
+            ),
+        ]
+    )
+    func rejectsInvalidURL(testCase: RejectedCase) {
+        #expect(throws: testCase.error) {
+            try IncomingURL(testCase.rawValue)
+        }
+    }
+
+    @Test("normalizes schemes without rewriting the destination")
+    func normalizesScheme() throws {
+        let incomingURL = try IncomingURL("HTTP://Example.com/SomePath")
+
+        #expect(incomingURL.scheme == .http)
+        #expect(incomingURL.url.absoluteString == "HTTP://Example.com/SomePath")
+    }
+}
