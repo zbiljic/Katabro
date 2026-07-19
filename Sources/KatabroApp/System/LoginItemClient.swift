@@ -75,7 +75,24 @@ final class LoginItemClient {
     }
 
     func refresh() {
+        refresh(
+            clearsResolvedError: true
+        )
+    }
+
+    private func refresh(
+        clearsResolvedError: Bool
+    ) {
+        let previousStatus = status
         status = statusProvider()
+
+        let didResolveError = clearsResolvedError && (
+            status == .enabled || status != previousStatus
+        )
+
+        if didResolveError {
+            lastError = nil
+        }
     }
 
     func update(
@@ -89,6 +106,8 @@ final class LoginItemClient {
             lastError = error.localizedDescription
         }
 
-        refresh()
+        refresh(
+            clearsResolvedError: false
+        )
     }
 }

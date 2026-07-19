@@ -1,11 +1,9 @@
 import SwiftUI
 
 struct OnboardingView: View {
-    @Environment(\.dismiss)
-    private var dismiss
-
     let defaultBrowserClient: DefaultBrowserClient
     let preferencesStore: PreferencesStore
+    let onDone: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -70,7 +68,7 @@ struct OnboardingView: View {
 
                 Button("Done") {
                     preferencesStore.completeOnboarding()
-                    dismiss()
+                    onDone()
                 }
                 .keyboardShortcut(.defaultAction)
             }

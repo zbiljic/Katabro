@@ -2,10 +2,8 @@ import AppKit
 import SwiftUI
 
 struct MenuBarView: View {
-    @Environment(\.openWindow)
-    private var openWindow
-
     let defaultBrowserClient: DefaultBrowserClient
+    let onboardingCoordinator: OnboardingWindowCoordinator
     let pickerCoordinator: BrowserPickerCoordinator
     let preferencesStore: PreferencesStore
 
@@ -23,9 +21,7 @@ struct MenuBarView: View {
                 ? "Setup Guide…"
                 : "Finish Setup…"
         ) {
-            openWindow(
-                id: "onboarding"
-            )
+            onboardingCoordinator.present()
         }
 
         SettingsLink {

@@ -66,6 +66,32 @@ struct DefaultBrowserClientTests {
         #expect(client.status == .notCurrent)
         #expect(client.lastError == "expected")
     }
+
+    @Test("clears a request error after an external change succeeds")
+    func clearsResolvedError() async {
+        let state = DefaultBrowserState()
+        state.handlers["http"] = "com.example.other"
+        state.handlers["https"] = "com.example.other"
+        let client = DefaultBrowserClient(
+            appBundleIdentifier: "com.example.Katabro",
+            currentHandler: { scheme in
+                state.handlers[scheme]
+            },
+            requestHandler: { _ in
+                throw ClientTestError.expected
+            }
+        )
+
+        await client.requestDefaultBrowser()
+        #expect(client.lastError == "expected")
+
+        state.handlers["http"] = "com.example.Katabro"
+        state.handlers["https"] = "com.example.Katabro"
+        client.refresh()
+
+        #expect(client.status == .current)
+        #expect(client.lastError == nil)
+    }
 }
 
 @MainActor

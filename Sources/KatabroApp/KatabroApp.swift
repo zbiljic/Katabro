@@ -13,21 +13,11 @@ struct KatabroApp: App {
         ) {
             MenuBarView(
                 defaultBrowserClient: appDelegate.dependencies.defaultBrowserClient,
+                onboardingCoordinator: appDelegate.onboardingCoordinator,
                 pickerCoordinator: appDelegate.pickerCoordinator,
                 preferencesStore: appDelegate.dependencies.preferencesStore
             )
         }
-
-        Window(
-            "Welcome to Katabro",
-            id: "onboarding"
-        ) {
-            OnboardingView(
-                defaultBrowserClient: appDelegate.dependencies.defaultBrowserClient,
-                preferencesStore: appDelegate.dependencies.preferencesStore
-            )
-        }
-        .windowResizability(.contentSize)
 
         Settings {
             SettingsView(

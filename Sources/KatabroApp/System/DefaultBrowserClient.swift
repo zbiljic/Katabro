@@ -86,16 +86,33 @@ final class DefaultBrowserClient {
     }
 
     func refresh() {
+        refresh(
+            clearsResolvedError: true
+        )
+    }
+
+    private func refresh(
+        clearsResolvedError: Bool
+    ) {
+        let previousStatus = status
         let identifiers = ["http", "https"].compactMap(currentHandler)
 
         guard identifiers.count == 2 else {
             status = .unavailable
+            clearResolvedError(
+                previousStatus: previousStatus,
+                clearsResolvedError: clearsResolvedError
+            )
             return
         }
 
         status = identifiers.allSatisfy { identifier in
             identifier.caseInsensitiveCompare(appBundleIdentifier) == .orderedSame
         } ? .current : .notCurrent
+        clearResolvedError(
+            previousStatus: previousStatus,
+            clearsResolvedError: clearsResolvedError
+        )
     }
 
     func requestDefaultBrowser() async {
@@ -108,7 +125,9 @@ final class DefaultBrowserClient {
 
         defer {
             isRequesting = false
-            refresh()
+            refresh(
+                clearsResolvedError: false
+            )
         }
 
         do {
@@ -118,5 +137,19 @@ final class DefaultBrowserClient {
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    private func clearResolvedError(
+        previousStatus: Status,
+        clearsResolvedError: Bool
+    ) {
+        guard
+            clearsResolvedError,
+            status == .current || status != previousStatus
+        else {
+            return
+        }
+
+        lastError = nil
     }
 }

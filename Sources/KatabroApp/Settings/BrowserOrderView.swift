@@ -47,6 +47,9 @@ struct BrowserOrderView: View {
                             at: index
                         )
                     }
+                    .onMove(
+                        perform: moveBrowsers
+                    )
                 }
                 .frame(minHeight: 180)
             }
@@ -111,6 +114,23 @@ struct BrowserOrderView: View {
             .disabled(index == browsers.index(before: browsers.endIndex))
             .accessibilityLabel("Move \(browser.browser.displayName) down")
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment:
+                moveBrowser(
+                    at: index,
+                    by: 1
+                )
+            case .decrement:
+                moveBrowser(
+                    at: index,
+                    by: -1
+                )
+            @unknown default:
+                break
+            }
+        }
     }
 
     private func loadBrowsers() async {
@@ -148,6 +168,19 @@ struct BrowserOrderView: View {
         browsers.swapAt(
             index,
             destination
+        )
+        preferencesStore.setBrowserOrder(
+            browsers.map(\.browser.bundleIdentifier)
+        )
+    }
+
+    private func moveBrowsers(
+        from source: IndexSet,
+        to destination: Int
+    ) {
+        browsers.move(
+            fromOffsets: source,
+            toOffset: destination
         )
         preferencesStore.setBrowserOrder(
             browsers.map(\.browser.bundleIdentifier)

@@ -61,6 +61,35 @@ struct LoginItemClientTests {
         #expect(client.isEnabled)
         #expect(client.statusDescription.contains("System Settings"))
     }
+
+    @Test("clears a registration error after external approval")
+    func clearsResolvedError() {
+        let state = LoginItemState()
+        let client = LoginItemClient(
+            statusProvider: {
+                state.status
+            },
+            updateHandler: { _ in
+                throw LoginItemTestError.expected
+            }
+        )
+
+        client.update(
+            enabled: true
+        )
+        #expect(client.lastError == "expected")
+
+        state.status = .enabled
+        client.refresh()
+
+        #expect(client.status == .enabled)
+        #expect(client.lastError == nil)
+    }
+}
+
+@MainActor
+private final class LoginItemState {
+    var status = LoginItemClient.Status.disabled
 }
 
 private enum LoginItemTestError: LocalizedError {
