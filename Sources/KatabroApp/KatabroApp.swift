@@ -3,6 +3,9 @@ import SwiftUI
 
 @main
 struct KatabroApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self)
+    private var appDelegate
+
     var body: some Scene {
         MenuBarExtra(
             AppMetadata.displayName,
