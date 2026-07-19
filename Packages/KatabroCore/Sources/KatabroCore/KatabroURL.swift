@@ -90,3 +90,9 @@ extension KatabroURL.CodingError: CustomStringConvertible {
         }
     }
 }
+
+extension KatabroURL.CodingError: LocalizedError {
+    public var errorDescription: String? {
+        description
+    }
+}

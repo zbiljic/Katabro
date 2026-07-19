@@ -81,4 +81,14 @@ struct KatabroURLTests {
             try KatabroURL.decode(url)
         }
     }
+
+    @Test("provides a localized transport error message")
+    func providesLocalizedTransportErrorMessage() {
+        let error = KatabroURL.CodingError.missingDestination
+
+        #expect(
+            error.localizedDescription ==
+                "The Katabro URL is missing its destination."
+        )
+    }
 }

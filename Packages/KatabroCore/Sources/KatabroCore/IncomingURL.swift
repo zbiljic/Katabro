@@ -69,3 +69,9 @@ extension IncomingURL.ValidationError: CustomStringConvertible {
         }
     }
 }
+
+extension IncomingURL.ValidationError: LocalizedError {
+    public var errorDescription: String? {
+        description
+    }
+}

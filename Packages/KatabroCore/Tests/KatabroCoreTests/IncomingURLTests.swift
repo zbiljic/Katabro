@@ -97,4 +97,14 @@ struct IncomingURLTests {
             try IncomingURL(relativeURL)
         }
     }
+
+    @Test("provides a localized validation message")
+    func providesLocalizedValidationMessage() {
+        let error = IncomingURL.ValidationError.unsupportedScheme("ftp")
+
+        #expect(
+            error.localizedDescription ==
+                "The URL scheme 'ftp' is not supported."
+        )
+    }
 }
