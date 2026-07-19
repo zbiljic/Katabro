@@ -8,7 +8,14 @@ run = "swiftformat --lint ."
 
 [tasks."swift:lint"]
 description = "Lint Swift source code"
-run = "swiftlint lint --strict"
+run = '''
+if test -f Project.swift || test -f Tuist.swift || \
+    test -n "$(find Sources Tests Packages -type f -name '*.swift' -not -path '*/.build/*' -print -quit 2>/dev/null)"; then
+    swiftlint lint --strict
+else
+    swiftlint version >/dev/null
+fi
+'''
 
 [tasks."core:build"]
 description = "Build the portable KatabroCore package"
