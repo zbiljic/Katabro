@@ -4,6 +4,7 @@ import KatabroCore
 struct AppDependencies {
     let browserDiscovery: any BrowserDiscovering
     let browserLauncher: any BrowserLaunching
+    let errorPresenter: any RoutingErrorPresenting
     let preferencesStore: PreferencesStore
 
     static let live = Self(
@@ -13,6 +14,7 @@ struct AppDependencies {
             )
         ),
         browserLauncher: WorkspaceBrowserLauncher(),
+        errorPresenter: AlertRoutingErrorPresenter(),
         preferencesStore: .live()
     )
 }

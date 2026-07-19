@@ -1,6 +1,11 @@
 import SwiftUI
 
 struct BrowserPickerView: View {
+    @Environment(\.accessibilityReduceTransparency)
+    private var reduceTransparency
+
+    @Environment(\.colorSchemeContrast)
+    private var colorSchemeContrast
     @FocusState private var isFocused: Bool
 
     let store: BrowserPickerStore
@@ -37,13 +42,18 @@ struct BrowserPickerView: View {
         }
         .padding(12)
         .frame(width: 360)
-        .background(.regularMaterial)
+        .background {
+            if reduceTransparency {
+                Color(nsColor: .windowBackgroundColor)
+            } else {
+                Rectangle()
+                    .fill(.regularMaterial)
+            }
+        }
         .clipShape(.rect(cornerRadius: 14))
         .focusable()
         .focused($isFocused)
-        .onAppear {
-            isFocused = true
-        }
+        .defaultFocus($isFocused, true)
         .onKeyPress(.upArrow) {
             store.moveSelection(by: -1)
             return .handled
@@ -113,7 +123,9 @@ struct BrowserPickerView: View {
             .contentShape(.rect)
             .background(
                 store.selectedIndex == index
-                    ? Color.accentColor.opacity(0.18)
+                    ? Color.accentColor.opacity(
+                        colorSchemeContrast == .increased ? 0.42 : 0.18
+                    )
                     : Color.clear,
                 in: .rect(cornerRadius: 8)
             )
@@ -121,6 +133,9 @@ struct BrowserPickerView: View {
         .buttonStyle(.plain)
         .accessibilityLabel("Open in \(browser.browser.displayName)")
         .accessibilityHint("Opens the requested URL in this browser")
+        .accessibilityAddTraits(
+            store.selectedIndex == index ? .isSelected : []
+        )
         .onHover { isHovering in
             if isHovering {
                 store.select(index: index)

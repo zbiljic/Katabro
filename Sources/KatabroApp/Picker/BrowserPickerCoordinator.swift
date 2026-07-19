@@ -7,12 +7,12 @@ final class BrowserPickerCoordinator: NSObject {
         _ store: BrowserPickerStore,
         _ onSelect: @escaping (BrowserApplication) -> Void,
         _ onCancel: @escaping () -> Void
-    ) -> BrowserPickerPanel?
+    ) -> any BrowserPickerPresenting
 
     private let dependencies: AppDependencies
     private let panelBuilder: PanelBuilder
     private var launchTask: Task<Void, Never>?
-    private var panel: BrowserPickerPanel?
+    private var panel: (any BrowserPickerPresenting)?
     private var request: RoutingRequest?
     private var requestQueue = RoutingRequestQueue()
     private var routingTask: Task<Void, Never>?
@@ -69,7 +69,7 @@ final class BrowserPickerCoordinator: NSObject {
 
             route(request)
         } catch {
-            lastError = String(describing: error)
+            record(error)
         }
     }
 
@@ -128,11 +128,14 @@ final class BrowserPickerCoordinator: NSObject {
                 )
                 routingTask = nil
             } catch {
-                guard self.request?.id == request.id else {
+                guard
+                    !Task.isCancelled,
+                    self.request?.id == request.id
+                else {
                     return
                 }
 
-                lastError = String(describing: error)
+                record(error)
                 routingTask = nil
                 finishCurrentRequest(
                     id: request.id
@@ -161,10 +164,6 @@ final class BrowserPickerCoordinator: NSObject {
             }
         )
 
-        guard let panel else {
-            return
-        }
-
         panel.delegate = self
         self.panel = panel
         panel.presentNearPointer()
@@ -173,6 +172,10 @@ final class BrowserPickerCoordinator: NSObject {
     private func select(
         _ browser: BrowserApplication
     ) {
+        guard launchTask == nil else {
+            return
+        }
+
         guard let request else {
             finishCurrentRequest()
             return
@@ -191,7 +194,7 @@ final class BrowserPickerCoordinator: NSObject {
                     with: browser
                 )
             } catch {
-                lastError = String(describing: error)
+                record(error)
             }
 
             launchTask = nil
@@ -231,6 +234,13 @@ final class BrowserPickerCoordinator: NSObject {
         panel?.delegate = nil
         panel?.close()
         panel = nil
+    }
+
+    private func record(
+        _ error: any Error
+    ) {
+        lastError = String(describing: error)
+        dependencies.errorPresenter.present(error)
     }
 }
 

@@ -23,7 +23,7 @@ struct BrowserPickerCoordinatorTests {
             launcher: launcher
         ) { _, onSelect, _ in
             selectionHandler = onSelect
-            return nil
+            return BrowserPickerPresentationFake()
         }
         let request = try RoutingRequest(
             destination: IncomingURL("https://example.com/path"),
@@ -58,9 +58,11 @@ struct BrowserPickerCoordinatorTests {
             error: TestError.expected
         )
         let launcher = BrowserLauncherFake()
+        let errorPresenter = RoutingErrorPresenterFake()
         let coordinator = makeCoordinator(
             discovery: discovery,
-            launcher: launcher
+            launcher: launcher,
+            errorPresenter: errorPresenter
         )
         let request = try RoutingRequest(
             destination: IncomingURL("https://example.com"),
@@ -72,6 +74,7 @@ struct BrowserPickerCoordinatorTests {
 
         #expect(coordinator.presentedStore == nil)
         #expect(coordinator.lastError == "expected")
+        #expect(errorPresenter.presentedErrors == ["expected"])
         #expect(launcher.openedRequests.isEmpty)
     }
 
@@ -103,13 +106,15 @@ struct BrowserPickerCoordinatorTests {
         let launcher = BrowserLauncherFake(
             error: TestError.expected
         )
+        let errorPresenter = RoutingErrorPresenterFake()
         var selectionHandler: ((BrowserApplication) -> Void)?
         let coordinator = makeCoordinator(
             discovery: discovery,
-            launcher: launcher
+            launcher: launcher,
+            errorPresenter: errorPresenter
         ) { _, onSelect, _ in
             selectionHandler = onSelect
-            return nil
+            return BrowserPickerPresentationFake()
         }
 
         try coordinator.route(
@@ -126,6 +131,43 @@ struct BrowserPickerCoordinatorTests {
 
         #expect(coordinator.presentedStore == nil)
         #expect(coordinator.lastError == "expected")
+        #expect(errorPresenter.presentedErrors == ["expected"])
+    }
+}
+
+extension BrowserPickerCoordinatorTests {
+    @Test("serializes repeated selection callbacks")
+    func serializesSelection() async throws {
+        let browser = makeBrowser()
+        let launcher = SuspendedBrowserLauncher()
+        var selectionHandler: ((BrowserApplication) -> Void)?
+        let coordinator = makeCoordinator(
+            discovery: BrowserDiscoveryFake(
+                browsers: [browser]
+            ),
+            launcher: launcher
+        ) { _, onSelect, _ in
+            selectionHandler = onSelect
+            return BrowserPickerPresentationFake()
+        }
+
+        try coordinator.route(
+            RoutingRequest(
+                destination: IncomingURL("https://example.com"),
+                source: .system
+            )
+        )
+        await coordinator.waitForPendingOperations()
+
+        let selectBrowser = try #require(selectionHandler)
+        selectBrowser(browser)
+        selectBrowser(browser)
+        await launcher.waitForRequest()
+
+        #expect(launcher.requestCount == 1)
+
+        launcher.succeed()
+        await coordinator.waitForPendingOperations()
     }
 
     @Test("queues a second request while the picker is active")
@@ -252,7 +294,7 @@ struct BrowserPickerCoordinatorTests {
             launcher: BrowserLauncherFake()
         ) { _, _, onCancel in
             cancellationHandler = onCancel
-            return nil
+            return BrowserPickerPresentationFake()
         }
 
         try coordinator.route(
@@ -269,15 +311,35 @@ struct BrowserPickerCoordinatorTests {
         #expect(coordinator.presentedStore == nil)
     }
 
+    @Test("reports invalid incoming URLs to the user")
+    func reportsInvalidURL() throws {
+        let errorPresenter = RoutingErrorPresenterFake()
+        let coordinator = makeCoordinator(
+            discovery: BrowserDiscoveryFake(),
+            launcher: BrowserLauncherFake(),
+            errorPresenter: errorPresenter
+        )
+        let invalidURL = try #require(URL(string: "file:///tmp/example"))
+
+        coordinator.handle(invalidURL)
+
+        #expect(errorPresenter.presentedErrors.count == 1)
+        #expect(coordinator.lastError != nil)
+    }
+
     private func makeCoordinator(
         discovery: any BrowserDiscovering,
-        launcher: BrowserLauncherFake,
-        panelBuilder: @escaping BrowserPickerCoordinator.PanelBuilder = { _, _, _ in nil }
+        launcher: any BrowserLaunching,
+        errorPresenter: RoutingErrorPresenterFake = RoutingErrorPresenterFake(),
+        panelBuilder: @escaping BrowserPickerCoordinator.PanelBuilder = { _, _, _ in
+            BrowserPickerPresentationFake()
+        }
     ) -> BrowserPickerCoordinator {
         BrowserPickerCoordinator(
             dependencies: AppDependencies(
                 browserDiscovery: discovery,
                 browserLauncher: launcher,
+                errorPresenter: errorPresenter,
                 preferencesStore: PreferencesStore()
             ),
             panelBuilder: panelBuilder
@@ -300,108 +362,5 @@ struct BrowserPickerCoordinatorTests {
                 )
             )
         )
-    }
-}
-
-@MainActor
-private final class CancellationRacingDiscovery: BrowserDiscovering {
-    private let browsers: [BrowserApplication]
-    private var firstContinuation: CheckedContinuation<[BrowserApplication], Error>?
-
-    private(set) var destinations: [IncomingURL] = []
-
-    init(
-        browsers: [BrowserApplication]
-    ) {
-        self.browsers = browsers
-    }
-
-    func browsers(
-        for destination: IncomingURL
-    ) async throws -> [BrowserApplication] {
-        destinations.append(destination)
-
-        guard destinations.count == 1 else {
-            return browsers
-        }
-
-        return try await withCheckedThrowingContinuation { continuation in
-            firstContinuation = continuation
-        }
-    }
-
-    func waitForFirstRequest() async {
-        while firstContinuation == nil {
-            await Task.yield()
-        }
-    }
-
-    func failFirstRequest() {
-        firstContinuation?.resume(
-            throwing: BrowserPickerCoordinatorTests.TestError.expected
-        )
-        firstContinuation = nil
-    }
-}
-
-@MainActor
-private final class BrowserDiscoveryFake: BrowserDiscovering {
-    private let browsers: [BrowserApplication]
-    private let error: Error?
-
-    private(set) var destinations: [IncomingURL] = []
-
-    init(
-        browsers: [BrowserApplication] = [],
-        error: Error? = nil
-    ) {
-        self.browsers = browsers
-        self.error = error
-    }
-
-    func browsers(
-        for destination: IncomingURL
-    ) async throws -> [BrowserApplication] {
-        destinations.append(destination)
-
-        if let error {
-            throw error
-        }
-
-        return browsers
-    }
-}
-
-@MainActor
-private final class BrowserLauncherFake: BrowserLaunching {
-    struct OpenedRequest: Equatable {
-        let destination: IncomingURL
-        let browser: BrowserApplication
-    }
-
-    private let error: Error?
-
-    private(set) var openedRequests: [OpenedRequest] = []
-
-    init(
-        error: Error? = nil
-    ) {
-        self.error = error
-    }
-
-    func open(
-        _ destination: IncomingURL,
-        with browser: BrowserApplication
-    ) async throws {
-        openedRequests.append(
-            OpenedRequest(
-                destination: destination,
-                browser: browser
-            )
-        )
-
-        if let error {
-            throw error
-        }
     }
 }
