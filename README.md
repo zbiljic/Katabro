@@ -90,6 +90,36 @@ mise run clean          # remove generated projects and build outputs
 Tuist is the source of truth for the Xcode project. Do not commit generated
 `.xcodeproj` or `.xcworkspace` files.
 
+## Review the interface
+
+Debug builds can open deterministic review windows without reading or changing
+the real default-browser, login-item, or Launch Services state:
+
+```sh
+scripts/run settings normal
+scripts/run settings service-errors
+scripts/run settings many-browsers light
+scripts/run onboarding normal
+scripts/run picker normal dark
+scripts/run menu normal
+```
+
+Available fixture states are `normal`, `loading`, `no-browsers`,
+`browser-discovery-error`, `service-errors`, and `many-browsers`. The optional
+appearance is `system`, `light`, or `dark`. Normal `scripts/run` behavior remains
+menu-bar only.
+
+The `KatabroUITests` target exercises these surfaces and keeps screenshots as
+test-result attachments:
+
+```sh
+tuist xcodebuild test \
+  -scheme Katabro \
+  -configuration Debug \
+  -derivedDataPath Derived \
+  -only-testing:KatabroUITests
+```
+
 ## Project documentation
 
 - [Architecture](docs/ARCHITECTURE.md)
