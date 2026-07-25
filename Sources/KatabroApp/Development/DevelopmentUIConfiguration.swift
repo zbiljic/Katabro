@@ -405,7 +405,7 @@
                 backing: .buffered,
                 defer: false
             )
-            window.contentViewController = NSHostingController(
+            let hostingController = NSHostingController(
                 rootView: DevelopmentUIReviewView(
                     configuration: configuration,
                     dependencies: dependencies,
@@ -413,6 +413,8 @@
                     pickerCoordinator: pickerCoordinator
                 )
             )
+            hostingController.sizingOptions = []
+            window.contentViewController = hostingController
             window.setContentSize(
                 contentSize
             )

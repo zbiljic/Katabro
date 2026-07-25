@@ -152,6 +152,34 @@ final class KatabroUITests: XCTestCase {
     }
 
     @MainActor
+    func testOnboardingServiceErrorsReviewSurface() {
+        let application = launch(
+            surface: "onboarding",
+            state: "service-errors"
+        )
+        defer {
+            application.terminate()
+        }
+
+        for identifier in [
+            "onboarding.default-browser.status",
+            "onboarding.default-browser.action",
+            "onboarding.default-browser.error",
+            "onboarding.done",
+        ] {
+            assertExists(
+                application.descendants(
+                    matching: .any
+                )[identifier]
+            )
+        }
+        attachScreenshot(
+            named: "Onboarding-service-errors",
+            from: application
+        )
+    }
+
+    @MainActor
     private func launch(
         surface: String,
         state: String,
