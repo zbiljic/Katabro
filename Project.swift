@@ -102,6 +102,18 @@ let project = Project(
             ],
             settings: appSettings
         ),
+        .target(
+            name: "KatabroUITests",
+            destinations: .macOS,
+            product: .uiTests,
+            bundleId: "com.zbiljic.katabrouitests",
+            deploymentTargets: .macOS("14.0"),
+            infoPlist: .default,
+            sources: ["Tests/KatabroUITests/**"],
+            dependencies: [
+                .target(name: "Katabro"),
+            ]
+        ),
     ],
     schemes: [
         .scheme(
@@ -115,6 +127,9 @@ let project = Project(
                     .testableTarget(
                         target: "KatabroTests",
                         parallelization: .swiftTestingOnly
+                    ),
+                    .testableTarget(
+                        target: "KatabroUITests"
                     ),
                 ],
                 options: .options(
