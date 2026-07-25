@@ -4,6 +4,19 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let dependencies: AppDependencies
 
+    #if DEBUG
+        let developmentUIConfiguration: DevelopmentUIConfiguration?
+
+        private lazy var developmentUIWindowCoordinator = developmentUIConfiguration.map {
+            DevelopmentUIWindowCoordinator(
+                configuration: $0,
+                dependencies: dependencies,
+                onboardingCoordinator: onboardingCoordinator,
+                pickerCoordinator: pickerCoordinator
+            )
+        }
+    #endif
+
     lazy var pickerCoordinator = BrowserPickerCoordinator(
         dependencies: dependencies
     )
@@ -14,21 +27,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
 
     override convenience init() {
-        self.init(
-            dependencies: .live
-        )
+        #if DEBUG
+            let configuration = DevelopmentUIConfiguration.current()
+            self.init(
+                dependencies: configuration.map {
+                    DevelopmentUIFixtures.dependencies(
+                        for: $0.state
+                    )
+                } ?? .live,
+                developmentUIConfiguration: configuration
+            )
+        #else
+            self.init(
+                dependencies: .live
+            )
+        #endif
     }
 
     init(
         dependencies: AppDependencies
     ) {
         self.dependencies = dependencies
+        #if DEBUG
+            developmentUIConfiguration = nil
+        #endif
         super.init()
     }
+
+    #if DEBUG
+        init(
+            dependencies: AppDependencies,
+            developmentUIConfiguration: DevelopmentUIConfiguration?
+        ) {
+            self.dependencies = dependencies
+            self.developmentUIConfiguration = developmentUIConfiguration
+            super.init()
+        }
+    #endif
 
     func applicationDidFinishLaunching(
         _: Notification
     ) {
+        #if DEBUG
+            if let developmentUIWindowCoordinator {
+                developmentUIWindowCoordinator.present()
+                return
+            }
+        #endif
         onboardingCoordinator.presentIfNeeded()
     }
 

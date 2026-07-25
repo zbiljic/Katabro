@@ -1,6 +1,19 @@
 import Observation
 import ServiceManagement
 
+#if DEBUG
+    @MainActor
+    private final class DevelopmentLoginItemState {
+        var status: LoginItemClient.Status
+
+        init(
+            status: LoginItemClient.Status
+        ) {
+            self.status = status
+        }
+    }
+#endif
+
 @MainActor
 @Observable
 final class LoginItemClient {
@@ -73,6 +86,33 @@ final class LoginItemClient {
             }
         )
     }
+
+    #if DEBUG
+        static func development(
+            status: Status,
+            lastError: String? = nil
+        ) -> LoginItemClient {
+            let state = DevelopmentLoginItemState(
+                status: status
+            )
+            let client = Self(
+                statusProvider: {
+                    state.status
+                },
+                updateHandler: { enabled in
+                    if let lastError {
+                        throw DevelopmentUIError(
+                            message: lastError
+                        )
+                    }
+
+                    state.status = enabled ? .enabled : .disabled
+                }
+            )
+            client.lastError = lastError
+            return client
+        }
+    #endif
 
     func refresh() {
         refresh(

@@ -1,6 +1,19 @@
 import AppKit
 import Observation
 
+#if DEBUG
+    @MainActor
+    private final class DevelopmentDefaultBrowserState {
+        var status: DefaultBrowserClient.Status
+
+        init(
+            status: DefaultBrowserClient.Status
+        ) {
+            self.status = status
+        }
+    }
+#endif
+
 @MainActor
 @Observable
 final class DefaultBrowserClient {
@@ -84,6 +97,41 @@ final class DefaultBrowserClient {
             }
         )
     }
+
+    #if DEBUG
+        static func development(
+            status: Status,
+            lastError: String? = nil
+        ) -> DefaultBrowserClient {
+            let state = DevelopmentDefaultBrowserState(
+                status: status
+            )
+            let client = Self(
+                appBundleIdentifier: AppMetadata.bundleIdentifier,
+                currentHandler: { _ in
+                    switch state.status {
+                    case .current:
+                        AppMetadata.bundleIdentifier
+                    case .notCurrent:
+                        "com.apple.Safari"
+                    case .unavailable:
+                        nil
+                    }
+                },
+                requestHandler: { _ in
+                    if let lastError {
+                        throw DevelopmentUIError(
+                            message: lastError
+                        )
+                    }
+
+                    state.status = .current
+                }
+            )
+            client.lastError = lastError
+            return client
+        }
+    #endif
 
     func refresh() {
         refresh(

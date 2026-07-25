@@ -5,6 +5,26 @@ set -eu
 script_directory=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 project_root=$(dirname "$script_directory")
 app_path="$project_root/Derived/Build/Products/Debug/Katabro.app"
+surface=${1:-}
+
+if test "$surface" = "--help" || test "$surface" = "-h"; then
+    cat <<'EOF'
+Usage:
+  scripts/run
+  scripts/run <surface> [state] [appearance]
+
+UI review surfaces:
+  settings | onboarding | picker | menu
+
+Fixture states:
+  normal | loading | no-browsers | browser-discovery-error
+  service-errors | many-browsers
+
+Appearances:
+  system | light | dark
+EOF
+    exit 0
+fi
 
 cd "$project_root"
 mise run app:build
@@ -15,4 +35,44 @@ if ! test -d "$app_path"; then
 fi
 
 pkill -x Katabro 2>/dev/null || true
-open "$app_path"
+
+if test -z "$surface"; then
+    open "$app_path"
+    exit 0
+fi
+
+case "$surface" in
+    settings | onboarding | picker | menu)
+        ;;
+    *)
+        echo "Unknown UI review surface: $surface" >&2
+        exit 2
+        ;;
+esac
+
+state=${2:-normal}
+
+case "$state" in
+    normal | loading | no-browsers | browser-discovery-error | service-errors | many-browsers)
+        ;;
+    *)
+        echo "Unknown UI fixture state: $state" >&2
+        exit 2
+        ;;
+esac
+
+appearance=${3:-system}
+
+case "$appearance" in
+    system | light | dark)
+        ;;
+    *)
+        echo "Unknown UI appearance: $appearance" >&2
+        exit 2
+        ;;
+esac
+
+open -n "$app_path" --args \
+    --ui-review "$surface" \
+    --ui-state "$state" \
+    --ui-appearance "$appearance"
