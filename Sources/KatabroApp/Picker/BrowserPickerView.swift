@@ -23,6 +23,9 @@ struct BrowserPickerView: View {
                     description: Text("Install or enable a browser that can open this URL.")
                 )
                 .frame(maxWidth: .infinity, minHeight: 120)
+                .accessibilityIdentifier(
+                    AccessibilityIdentifier.pickerEmptyState
+                )
             } else {
                 ScrollView {
                     VStack(spacing: 4) {
@@ -85,6 +88,9 @@ struct BrowserPickerView: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .accessibilityLabel("Destination \(store.destination.url.absoluteString)")
+                .accessibilityIdentifier(
+                    AccessibilityIdentifier.pickerDestination
+                )
         }
         .padding(.horizontal, 6)
         .padding(.top, 2)
@@ -135,6 +141,11 @@ struct BrowserPickerView: View {
         .accessibilityHint("Opens the requested URL in this browser")
         .accessibilityAddTraits(
             store.selectedIndex == index ? .isSelected : []
+        )
+        .accessibilityIdentifier(
+            AccessibilityIdentifier.pickerBrowser(
+                bundleIdentifier: browser.browser.bundleIdentifier
+            )
         )
         .onHover { isHovering in
             if isHovering {

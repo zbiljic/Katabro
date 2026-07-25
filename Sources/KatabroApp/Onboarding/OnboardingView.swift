@@ -48,6 +48,9 @@ struct OnboardingView: View {
                 Label(lastError, systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(.red)
                     .textSelection(.enabled)
+                    .accessibilityIdentifier(
+                        AccessibilityIdentifier.onboardingDefaultBrowserError
+                    )
             }
 
             HStack {
@@ -58,6 +61,9 @@ struct OnboardingView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(defaultBrowserClient.isRequesting)
+                .accessibilityIdentifier(
+                    AccessibilityIdentifier.onboardingDefaultBrowserAction
+                )
 
                 if defaultBrowserClient.isRequesting {
                     ProgressView()
@@ -71,6 +77,9 @@ struct OnboardingView: View {
                     onDone()
                 }
                 .keyboardShortcut(.defaultAction)
+                .accessibilityIdentifier(
+                    AccessibilityIdentifier.onboardingDone
+                )
             }
         }
         .padding(24)
@@ -92,6 +101,9 @@ struct OnboardingView: View {
         )
         .accessibilityLabel(
             "Default browser status: \(defaultBrowserClient.statusDescription)"
+        )
+        .accessibilityIdentifier(
+            AccessibilityIdentifier.onboardingDefaultBrowserStatus
         )
     }
 

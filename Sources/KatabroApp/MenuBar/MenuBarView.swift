@@ -15,6 +15,9 @@ struct MenuBarView: View {
 
             pickerCoordinator.handle(url)
         }
+        .accessibilityIdentifier(
+            AccessibilityIdentifier.menuOpenTestPicker
+        )
 
         Button(
             preferencesStore.hasCompletedOnboarding
@@ -23,11 +26,17 @@ struct MenuBarView: View {
         ) {
             onboardingCoordinator.present()
         }
+        .accessibilityIdentifier(
+            AccessibilityIdentifier.menuSetupGuide
+        )
 
         SettingsLink {
             Text("Settings…")
         }
         .keyboardShortcut(",", modifiers: .command)
+        .accessibilityIdentifier(
+            AccessibilityIdentifier.menuSettings
+        )
 
         Divider()
 
@@ -40,6 +49,9 @@ struct MenuBarView: View {
         .foregroundStyle(
             defaultBrowserClient.status == .current ? .green : .secondary
         )
+        .accessibilityIdentifier(
+            AccessibilityIdentifier.menuDefaultBrowserStatus
+        )
 
         Divider()
 
@@ -47,5 +59,8 @@ struct MenuBarView: View {
             NSApplication.shared.terminate(nil)
         }
         .keyboardShortcut("q", modifiers: .command)
+        .accessibilityIdentifier(
+            AccessibilityIdentifier.menuQuit
+        )
     }
 }

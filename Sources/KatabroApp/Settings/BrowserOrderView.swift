@@ -52,6 +52,9 @@ struct BrowserOrderView: View {
                     )
                 }
                 .frame(minHeight: 180)
+                .accessibilityIdentifier(
+                    AccessibilityIdentifier.settingsBrowserList
+                )
             }
 
             HStack {
@@ -60,12 +63,18 @@ struct BrowserOrderView: View {
                         await loadBrowsers()
                     }
                 }
+                .accessibilityIdentifier(
+                    AccessibilityIdentifier.settingsBrowserRefresh
+                )
 
                 Button("Reset Order") {
                     preferencesStore.resetBrowserOrder()
                     browsers = defaultBrowsers
                 }
                 .disabled(browsers.isEmpty)
+                .accessibilityIdentifier(
+                    AccessibilityIdentifier.settingsBrowserReset
+                )
 
                 Spacer()
             }
@@ -90,29 +99,19 @@ struct BrowserOrderView: View {
 
             Spacer()
 
-            Button {
-                moveBrowser(
-                    at: index,
-                    by: -1
-                )
-            } label: {
-                Image(systemName: "chevron.up")
-            }
-            .buttonStyle(.borderless)
-            .disabled(index == browsers.startIndex)
-            .accessibilityLabel("Move \(browser.browser.displayName) up")
+            moveButton(
+                browser: browser,
+                at: index,
+                offset: -1,
+                directionDescription: "up"
+            )
 
-            Button {
-                moveBrowser(
-                    at: index,
-                    by: 1
-                )
-            } label: {
-                Image(systemName: "chevron.down")
-            }
-            .buttonStyle(.borderless)
-            .disabled(index == browsers.index(before: browsers.endIndex))
-            .accessibilityLabel("Move \(browser.browser.displayName) down")
+            moveButton(
+                browser: browser,
+                at: index,
+                offset: 1,
+                directionDescription: "down"
+            )
         }
         .accessibilityElement(children: .contain)
         .accessibilityAdjustableAction { direction in
@@ -131,6 +130,49 @@ struct BrowserOrderView: View {
                 break
             }
         }
+        .accessibilityIdentifier(
+            AccessibilityIdentifier.browserOrderRow(
+                bundleIdentifier: browser.browser.bundleIdentifier
+            )
+        )
+    }
+
+    private func moveButton(
+        browser: BrowserApplication,
+        at index: Int,
+        offset: Int,
+        directionDescription: String
+    ) -> some View {
+        let isMovingUp = offset < 0
+
+        return Button {
+            moveBrowser(
+                at: index,
+                by: offset
+            )
+        } label: {
+            Image(
+                systemName: isMovingUp ? "chevron.up" : "chevron.down"
+            )
+        }
+        .buttonStyle(.borderless)
+        .disabled(
+            isMovingUp
+                ? index == browsers.startIndex
+                : index == browsers.index(before: browsers.endIndex)
+        )
+        .accessibilityLabel(
+            "Move \(browser.browser.displayName) \(directionDescription)"
+        )
+        .accessibilityIdentifier(
+            isMovingUp
+                ? AccessibilityIdentifier.browserOrderMoveUp(
+                    bundleIdentifier: browser.browser.bundleIdentifier
+                )
+                : AccessibilityIdentifier.browserOrderMoveDown(
+                    bundleIdentifier: browser.browser.bundleIdentifier
+                )
+        )
     }
 
     private func loadBrowsers() async {

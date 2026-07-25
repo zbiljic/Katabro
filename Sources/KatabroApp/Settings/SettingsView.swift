@@ -12,6 +12,9 @@ struct SettingsView: View {
                 LabeledContent("Status") {
                     Text(defaultBrowserClient.statusDescription)
                         .foregroundStyle(.secondary)
+                        .accessibilityIdentifier(
+                            AccessibilityIdentifier.settingsDefaultBrowserStatus
+                        )
                 }
 
                 Button("Use Katabro as Default Browser…") {
@@ -20,11 +23,17 @@ struct SettingsView: View {
                     }
                 }
                 .disabled(defaultBrowserClient.isRequesting)
+                .accessibilityIdentifier(
+                    AccessibilityIdentifier.settingsDefaultBrowserAction
+                )
 
                 if let lastError = defaultBrowserClient.lastError {
                     Label(lastError, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.red)
                         .textSelection(.enabled)
+                        .accessibilityIdentifier(
+                            AccessibilityIdentifier.settingsDefaultBrowserError
+                        )
                 }
             }
 
@@ -42,15 +51,24 @@ struct SettingsView: View {
                         }
                     )
                 )
+                .accessibilityIdentifier(
+                    AccessibilityIdentifier.settingsLoginItemToggle
+                )
 
                 Text(loginItemClient.statusDescription)
                     .font(.callout)
                     .foregroundStyle(.secondary)
+                    .accessibilityIdentifier(
+                        AccessibilityIdentifier.settingsLoginItemStatus
+                    )
 
                 if let lastError = loginItemClient.lastError {
                     Label(lastError, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.red)
                         .textSelection(.enabled)
+                        .accessibilityIdentifier(
+                            AccessibilityIdentifier.settingsLoginItemError
+                        )
                 }
             }
 
@@ -62,6 +80,9 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .accessibilityIdentifier(
+            AccessibilityIdentifier.settingsForm
+        )
         .frame(
             minWidth: 560,
             minHeight: 560
