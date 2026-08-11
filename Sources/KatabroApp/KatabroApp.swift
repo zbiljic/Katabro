@@ -7,16 +7,17 @@ struct KatabroApp: App {
     private var appDelegate
 
     var body: some Scene {
-        MenuBarExtra(
-            AppMetadata.displayName,
-            systemImage: "arrow.triangle.branch"
-        ) {
+        MenuBarExtra {
             MenuBarView(
                 defaultBrowserClient: appDelegate.dependencies.defaultBrowserClient,
                 onboardingCoordinator: appDelegate.onboardingCoordinator,
                 pickerCoordinator: appDelegate.pickerCoordinator,
                 preferencesStore: appDelegate.dependencies.preferencesStore
             )
+        } label: {
+            Image("MenuBarIcon")
+                .renderingMode(.template)
+                .accessibilityLabel(AppMetadata.displayName)
         }
 
         Settings {
