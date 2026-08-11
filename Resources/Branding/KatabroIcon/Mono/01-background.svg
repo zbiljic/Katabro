@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1024"
+     height="1024"
+     viewBox="0 0 1024 1024">
+  <defs>
+    <filter id="tileShadow" x="0" y="0" width="1024" height="1024" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="20" stdDeviation="24" flood-color="#000000" flood-opacity="0.48"/>
+    </filter>
+  </defs>
+
+  <rect x="58" y="58" width="908" height="908" rx="210"
+        fill="#18181B" filter="url(#tileShadow)"/>
+  <rect x="60" y="60" width="904" height="904" rx="208"
+        fill="none" stroke="#F4F4F5" stroke-opacity="0.13" stroke-width="4"/>
+</svg>

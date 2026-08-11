@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1024"
+     height="1024"
+     viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="background" x1="180" y1="112" x2="850" y2="930" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#1E1B4B"/>
+    </linearGradient>
+    <radialGradient id="highlight" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse"
+                    gradientTransform="translate(332 210) rotate(51) scale(680 720)">
+      <stop offset="0" stop-color="#7DD3FC" stop-opacity="0.19"/>
+      <stop offset="0.62" stop-color="#7DD3FC" stop-opacity="0.025"/>
+      <stop offset="1" stop-color="#020617" stop-opacity="0.24"/>
+    </radialGradient>
+    <filter id="tileShadow" x="0" y="0" width="1024" height="1024" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="20" stdDeviation="24" flood-color="#020617" flood-opacity="0.50"/>
+    </filter>
+    <clipPath id="tileClip">
+      <rect x="58" y="58" width="908" height="908" rx="210"/>
+    </clipPath>
+  </defs>
+
+  <rect x="58" y="58" width="908" height="908" rx="210"
+        fill="url(#background)" filter="url(#tileShadow)"/>
+  <g clip-path="url(#tileClip)">
+    <rect x="58" y="58" width="908" height="908" fill="url(#highlight)"/>
+  </g>
+  <rect x="60" y="60" width="904" height="904" rx="208"
+        fill="none" stroke="#7DD3FC" stroke-opacity="0.20" stroke-width="4"/>
+</svg>

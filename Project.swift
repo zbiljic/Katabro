@@ -11,6 +11,7 @@ let sharedSettings: Settings = .settings(
 
 let appSettings: Settings = .settings(
     base: [
+        "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
         "SWIFT_DEFAULT_ACTOR_ISOLATION": "MainActor",
     ]
 )
