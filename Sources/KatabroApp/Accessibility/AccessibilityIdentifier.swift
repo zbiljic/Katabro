@@ -5,7 +5,10 @@ enum AccessibilityIdentifier {
     static let menuDefaultBrowserStatus = "menu.default-browser-status"
     static let menuQuit = "menu.quit"
 
-    static let settingsForm = "settings.form"
+    static let settingsGeneralPane = "settings.pane.general"
+    static let settingsBrowsersPane = "settings.pane.browsers"
+    static let settingsGeneralForm = "settings.general.form"
+    static let settingsBrowsersForm = "settings.browsers.form"
     static let settingsDefaultBrowserStatus = "settings.default-browser.status"
     static let settingsDefaultBrowserAction = "settings.default-browser.action"
     static let settingsDefaultBrowserError = "settings.default-browser.error"

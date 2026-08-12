@@ -25,6 +25,15 @@
         case browserDiscoveryError = "browser-discovery-error"
         case serviceErrors = "service-errors"
         case manyBrowsers = "many-browsers"
+
+        var settingsInitialPane: SettingsPane {
+            switch self {
+            case .normal, .serviceErrors:
+                .general
+            case .loading, .noBrowsers, .browserDiscoveryError, .manyBrowsers:
+                .browsers
+            }
+        }
     }
 
     enum DevelopmentUIAppearance: String, CaseIterable {
@@ -329,7 +338,8 @@
                         browserDiscovery: dependencies.browserDiscovery,
                         defaultBrowserClient: dependencies.defaultBrowserClient,
                         loginItemClient: dependencies.loginItemClient,
-                        preferencesStore: dependencies.preferencesStore
+                        preferencesStore: dependencies.preferencesStore,
+                        initialPane: configuration.state.settingsInitialPane
                     )
                 case .onboarding:
                     OnboardingView(

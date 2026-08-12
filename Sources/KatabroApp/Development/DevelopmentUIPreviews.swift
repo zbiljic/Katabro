@@ -1,42 +1,45 @@
 #if DEBUG
     import SwiftUI
 
-    #Preview("Settings — Normal") {
-        let dependencies = DevelopmentUIFixtures.dependencies(
-            for: .normal
-        )
-
-        SettingsView(
-            browserDiscovery: dependencies.browserDiscovery,
-            defaultBrowserClient: dependencies.defaultBrowserClient,
-            loginItemClient: dependencies.loginItemClient,
-            preferencesStore: dependencies.preferencesStore
+    #Preview("Settings — General Normal") {
+        settingsPreview(
+            state: .normal,
+            pane: .general
         )
     }
 
-    #Preview("Settings — No Browsers") {
-        let dependencies = DevelopmentUIFixtures.dependencies(
-            for: .noBrowsers
-        )
-
-        SettingsView(
-            browserDiscovery: dependencies.browserDiscovery,
-            defaultBrowserClient: dependencies.defaultBrowserClient,
-            loginItemClient: dependencies.loginItemClient,
-            preferencesStore: dependencies.preferencesStore
+    #Preview("Settings — General Service Errors") {
+        settingsPreview(
+            state: .serviceErrors,
+            pane: .general
         )
     }
 
-    #Preview("Settings — Service Errors") {
-        let dependencies = DevelopmentUIFixtures.dependencies(
-            for: .serviceErrors
+    #Preview("Settings — Browsers Normal") {
+        settingsPreview(
+            state: .normal,
+            pane: .browsers
         )
+    }
 
-        SettingsView(
-            browserDiscovery: dependencies.browserDiscovery,
-            defaultBrowserClient: dependencies.defaultBrowserClient,
-            loginItemClient: dependencies.loginItemClient,
-            preferencesStore: dependencies.preferencesStore
+    #Preview("Settings — Browsers No Browsers") {
+        settingsPreview(
+            state: .noBrowsers,
+            pane: .browsers
+        )
+    }
+
+    #Preview("Settings — Browsers Discovery Error") {
+        settingsPreview(
+            state: .browserDiscoveryError,
+            pane: .browsers
+        )
+    }
+
+    #Preview("Settings — Browsers Many Browsers") {
+        settingsPreview(
+            state: .manyBrowsers,
+            pane: .browsers
         )
     }
 
@@ -58,6 +61,24 @@
             ),
             onSelect: { _ in },
             onCancel: {}
+        )
+    }
+
+    @MainActor
+    private func settingsPreview(
+        state: DevelopmentUIState,
+        pane: SettingsPane
+    ) -> some View {
+        let dependencies = DevelopmentUIFixtures.dependencies(
+            for: state
+        )
+
+        return SettingsView(
+            browserDiscovery: dependencies.browserDiscovery,
+            defaultBrowserClient: dependencies.defaultBrowserClient,
+            loginItemClient: dependencies.loginItemClient,
+            preferencesStore: dependencies.preferencesStore,
+            initialPane: pane
         )
     }
 #endif

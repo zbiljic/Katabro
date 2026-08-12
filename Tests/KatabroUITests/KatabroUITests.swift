@@ -11,9 +11,14 @@ final class KatabroUITests: XCTestCase {
             application.terminate()
         }
 
-        assertExists(
-            application.scrollViews["settings.form"]
-        )
+        let generalTab = application.radioButtons["settings.pane.general"]
+        let browsersTab = application.radioButtons["settings.pane.browsers"]
+
+        assertExists(application.scrollViews["settings.general.form"])
+        assertExists(generalTab)
+        assertExists(browsersTab)
+        XCTAssertTrue(isControlOn(generalTab))
+        XCTAssertFalse(isControlOn(browsersTab))
         assertExists(
             application.staticTexts["settings.default-browser.status"]
         )
@@ -23,6 +28,9 @@ final class KatabroUITests: XCTestCase {
         assertExists(
             application.staticTexts["settings.icloud.status"]
         )
+        browsersTab.click()
+
+        assertExists(application.scrollViews["settings.browsers.form"])
         let browserListExists =
             application.outlines["settings.browser-list"].exists ||
             application.tables["settings.browser-list"].exists ||
@@ -31,23 +39,23 @@ final class KatabroUITests: XCTestCase {
             browserListExists
         )
         attachScreenshot(
-            named: "Settings-normal",
+            named: "Settings-normal-browsers-system",
             from: application
         )
     }
 
     @MainActor
     func testSettingsFixtureStates() {
-        let states = [
+        let browserStates = [
+            "loading",
             "no-browsers",
             "browser-discovery-error",
-            "service-errors",
             "many-browsers",
         ]
 
         var previousApplication: XCUIApplication?
 
-        for state in states {
+        for state in browserStates {
             previousApplication?.terminate()
             let application = launch(
                 surface: "settings",
@@ -56,26 +64,78 @@ final class KatabroUITests: XCTestCase {
             previousApplication = application
 
             assertExists(
-                application.scrollViews["settings.form"],
-                message: "Settings did not appear for fixture state \(state)"
+                application.scrollViews["settings.browsers.form"],
+                message: "Browsers did not appear for fixture state \(state)"
             )
-            if state == "service-errors" {
-                let status = application.staticTexts["settings.icloud.status"]
-                assertExists(status)
-                let expectedStatus =
-                    "Browser order stays on this Mac because iCloud sync is unavailable for this build."
-                XCTAssertTrue(
-                    status.label == expectedStatus
-                        || status.value as? String == expectedStatus
+            XCTAssertTrue(
+                isControlOn(
+                    application.radioButtons["settings.pane.browsers"]
                 )
-            }
+            )
             attachScreenshot(
-                named: "Settings-\(state)",
+                named: "Settings-browsers-\(state)-system",
                 from: application
             )
         }
 
         previousApplication?.terminate()
+    }
+
+    @MainActor
+    func testSettingsServiceErrorsOpenGeneral() {
+        let application = launch(
+            surface: "settings",
+            state: "service-errors"
+        )
+        defer {
+            application.terminate()
+        }
+
+        assertExists(application.scrollViews["settings.general.form"])
+        XCTAssertTrue(
+            isControlOn(
+                application.radioButtons["settings.pane.general"]
+            )
+        )
+        assertExists(
+            application.staticTexts["settings.default-browser.error"]
+        )
+        let status = application.staticTexts["settings.icloud.status"]
+        assertExists(status)
+        let expectedStatus =
+            "Browser order stays on this Mac because iCloud sync is unavailable for this build."
+        XCTAssertTrue(
+            status.label == expectedStatus
+                || status.value as? String == expectedStatus
+        )
+    }
+
+    @MainActor
+    func testSettingsPaneSwitching() {
+        let application = launch(
+            surface: "settings",
+            state: "normal"
+        )
+        defer {
+            application.terminate()
+        }
+
+        let generalTab = application.radioButtons["settings.pane.general"]
+        let browsersTab = application.radioButtons["settings.pane.browsers"]
+
+        assertExists(application.scrollViews["settings.general.form"])
+        browsersTab.click()
+        assertExists(application.scrollViews["settings.browsers.form"])
+        assertExists(
+            application.descendants(matching: .any)[
+                "settings.browser-row.com.apple.Safari.visibility"
+            ]
+        )
+        generalTab.click()
+        assertExists(application.scrollViews["settings.general.form"])
+        assertExists(
+            application.switches["settings.login-item.toggle"]
+        )
     }
 
     @MainActor
@@ -91,11 +151,15 @@ final class KatabroUITests: XCTestCase {
             )
             previousApplication = application
 
-            assertExists(
-                application.scrollViews["settings.form"]
-            )
+            assertExists(application.scrollViews["settings.general.form"])
             attachScreenshot(
-                named: "Settings-\(appearance)",
+                named: "Settings-general-normal-\(appearance)",
+                from: application
+            )
+            application.radioButtons["settings.pane.browsers"].click()
+            assertExists(application.scrollViews["settings.browsers.form"])
+            attachScreenshot(
+                named: "Settings-browsers-normal-\(appearance)",
                 from: application
             )
         }
@@ -148,6 +212,8 @@ final class KatabroUITests: XCTestCase {
             matching: .any
         )["settings.browser-row.com.google.Chrome.visibility"]
         let showAll = application.buttons["settings.browser-show-all"]
+
+        application.radioButtons["settings.pane.browsers"].click()
 
         assertExists(safari)
         assertExists(chrome)
@@ -256,9 +322,11 @@ final class KatabroUITests: XCTestCase {
             from: application
         )
     }
+}
 
+private extension KatabroUITests {
     @MainActor
-    private func launch(
+    func launch(
         surface: String,
         state: String,
         appearance: String = "system"
@@ -277,7 +345,7 @@ final class KatabroUITests: XCTestCase {
     }
 
     @MainActor
-    private func attachScreenshot(
+    func attachScreenshot(
         named name: String,
         from application: XCUIApplication
     ) {
@@ -290,7 +358,7 @@ final class KatabroUITests: XCTestCase {
     }
 
     @MainActor
-    private func isControlOn(
+    func isControlOn(
         _ element: XCUIElement
     ) -> Bool {
         if let number = element.value as? NSNumber {
@@ -304,7 +372,7 @@ final class KatabroUITests: XCTestCase {
     }
 
     @MainActor
-    private func assertExists(
+    func assertExists(
         _ element: XCUIElement,
         message: String = "Expected UI element did not appear"
     ) {
