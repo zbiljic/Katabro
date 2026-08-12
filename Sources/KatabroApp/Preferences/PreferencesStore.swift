@@ -1,6 +1,8 @@
 import Foundation
 import Observation
 
+// Visibility and iCloud reconciliation intentionally share the aggregate preference owner.
+// swiftlint:disable type_body_length
 @MainActor
 @Observable
 final class PreferencesStore {
@@ -30,6 +32,10 @@ final class PreferencesStore {
         preferences.browserOrder
     }
 
+    var hiddenBrowserIdentifiers: [String] {
+        preferences.hiddenBrowserIdentifiers
+    }
+
     var hasCompletedOnboarding: Bool {
         preferences.hasCompletedOnboarding
     }
@@ -40,7 +46,11 @@ final class PreferencesStore {
         iCloudClient: ICloudPreferencesClient? = nil,
         save: @escaping (AppPreferences) -> Void = { _ in }
     ) {
-        preferences = initialPreferences
+        var normalizedPreferences = initialPreferences
+        normalizedPreferences.hiddenBrowserIdentifiers = Self.normalizedIdentifiers(
+            initialPreferences.hiddenBrowserIdentifiers
+        )
+        preferences = normalizedPreferences
         iCloudSyncStatus = initialSyncStatus
         self.iCloudClient = iCloudClient
         self.save = save
@@ -131,6 +141,131 @@ final class PreferencesStore {
         }
 
         return orderedBrowsers
+    }
+
+    func effectiveVisibleBrowsers(
+        _ browsers: [BrowserApplication]
+    ) -> [BrowserApplication] {
+        let hiddenIdentifiers = Set(
+            hiddenBrowserIdentifiers.map { $0.lowercased() }
+        )
+        let visibleBrowsers = browsers.filter { browser in
+            !hiddenIdentifiers.contains(
+                browser.browser.bundleIdentifier.lowercased()
+            )
+        }
+
+        if visibleBrowsers.isEmpty, let firstBrowser = browsers.first {
+            return [firstBrowser]
+        }
+
+        return visibleBrowsers
+    }
+
+    func isBrowserShown(
+        _ bundleIdentifier: String,
+        among discoveredBrowserIdentifiers: [String]
+    ) -> Bool {
+        let identifier = bundleIdentifier
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+
+        return effectiveVisibleIdentifiers(
+            discoveredBrowserIdentifiers
+        ).contains { $0.lowercased() == identifier }
+    }
+
+    func canHideBrowser(
+        _ bundleIdentifier: String,
+        among discoveredBrowserIdentifiers: [String]
+    ) -> Bool {
+        let effectiveIdentifiers = effectiveVisibleIdentifiers(
+            discoveredBrowserIdentifiers
+        )
+        let identifier = bundleIdentifier
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+
+        return effectiveIdentifiers.count > 1
+            && effectiveIdentifiers.contains {
+                $0.lowercased() == identifier
+            }
+    }
+
+    @discardableResult
+    func setBrowserShown(
+        _ bundleIdentifier: String,
+        shown: Bool,
+        among discoveredBrowserIdentifiers: [String]
+    ) -> Bool {
+        let discoveredIdentifiers = Self.normalizedIdentifiers(
+            discoveredBrowserIdentifiers
+        )
+        let requestedIdentifier = bundleIdentifier
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+
+        guard
+            let canonicalIdentifier = discoveredIdentifiers.first(where: {
+                $0.lowercased() == requestedIdentifier
+            })
+        else {
+            return false
+        }
+
+        let isHidden = hiddenBrowserIdentifiers.contains {
+            $0.lowercased() == requestedIdentifier
+        }
+
+        if shown {
+            guard isHidden else {
+                return false
+            }
+
+            var preferences = preferences
+            preferences.hiddenBrowserIdentifiers.removeAll {
+                $0.lowercased() == requestedIdentifier
+            }
+            update(
+                preferences,
+                origin: .local
+            )
+            return true
+        }
+
+        guard
+            !isHidden, canHideBrowser(
+                canonicalIdentifier,
+                among: discoveredIdentifiers
+            )
+        else {
+            return false
+        }
+
+        var preferences = preferences
+        preferences.hiddenBrowserIdentifiers = Self.normalizedIdentifiers(
+            preferences.hiddenBrowserIdentifiers + [canonicalIdentifier]
+        )
+        update(
+            preferences,
+            origin: .local
+        )
+        return true
+    }
+
+    @discardableResult
+    func showAllBrowsers() -> Bool {
+        guard !hiddenBrowserIdentifiers.isEmpty else {
+            return false
+        }
+
+        var preferences = preferences
+        preferences.hiddenBrowserIdentifiers = []
+        update(
+            preferences,
+            origin: .local
+        )
+        return true
     }
 
     func setVisibleBrowserOrder(
@@ -299,6 +434,32 @@ final class PreferencesStore {
     private static func normalizedOrder(
         _ bundleIdentifiers: [String]
     ) -> [String] {
+        normalizedIdentifiers(bundleIdentifiers)
+    }
+
+    private func effectiveVisibleIdentifiers(
+        _ discoveredBrowserIdentifiers: [String]
+    ) -> [String] {
+        let discoveredIdentifiers = Self.normalizedIdentifiers(
+            discoveredBrowserIdentifiers
+        )
+        let hiddenIdentifiers = Set(
+            hiddenBrowserIdentifiers.map { $0.lowercased() }
+        )
+        let visibleIdentifiers = discoveredIdentifiers.filter {
+            !hiddenIdentifiers.contains($0.lowercased())
+        }
+
+        if visibleIdentifiers.isEmpty, let firstIdentifier = discoveredIdentifiers.first {
+            return [firstIdentifier]
+        }
+
+        return visibleIdentifiers
+    }
+
+    private static func normalizedIdentifiers(
+        _ bundleIdentifiers: [String]
+    ) -> [String] {
         var seenIdentifiers = Set<String>()
 
         return bundleIdentifiers.compactMap { identifier in
@@ -318,3 +479,5 @@ final class PreferencesStore {
         }
     }
 }
+
+// swiftlint:enable type_body_length

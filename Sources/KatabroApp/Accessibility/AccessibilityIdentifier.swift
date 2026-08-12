@@ -16,6 +16,7 @@ enum AccessibilityIdentifier {
     static let settingsBrowserList = "settings.browser-list"
     static let settingsBrowserRefresh = "settings.browser-refresh"
     static let settingsBrowserReset = "settings.browser-reset"
+    static let settingsBrowserShowAll = "settings.browser-show-all"
 
     static let onboardingDefaultBrowserStatus = "onboarding.default-browser.status"
     static let onboardingDefaultBrowserAction = "onboarding.default-browser.action"
@@ -41,6 +42,12 @@ enum AccessibilityIdentifier {
         bundleIdentifier: String
     ) -> String {
         "settings.browser-row.\(bundleIdentifier).move-down"
+    }
+
+    static func browserVisibility(
+        bundleIdentifier: String
+    ) -> String {
+        "settings.browser-row.\(bundleIdentifier).visibility"
     }
 
     static func pickerBrowser(

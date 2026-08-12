@@ -111,8 +111,11 @@ final class BrowserPickerCoordinator: NSObject {
                 let discoveredBrowsers = try await dependencies.browserDiscovery.browsers(
                     for: request.destination
                 )
-                let browsers = dependencies.preferencesStore.orderedBrowsers(
+                let orderedBrowsers = dependencies.preferencesStore.orderedBrowsers(
                     discoveredBrowsers
+                )
+                let browsers = dependencies.preferencesStore.effectiveVisibleBrowsers(
+                    orderedBrowsers
                 )
 
                 guard

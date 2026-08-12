@@ -133,6 +133,71 @@ final class KatabroUITests: XCTestCase {
     }
 
     @MainActor
+    func testBrowserVisibilityControls() {
+        let application = launch(
+            surface: "settings",
+            state: "normal"
+        )
+        defer {
+            application.terminate()
+        }
+        let safari = application.descendants(
+            matching: .any
+        )["settings.browser-row.com.apple.Safari.visibility"]
+        let chrome = application.descendants(
+            matching: .any
+        )["settings.browser-row.com.google.Chrome.visibility"]
+        let showAll = application.buttons["settings.browser-show-all"]
+
+        assertExists(safari)
+        assertExists(chrome)
+        assertExists(showAll)
+        XCTAssertTrue(isControlOn(safari))
+        XCTAssertTrue(isControlOn(chrome))
+        XCTAssertFalse(showAll.isEnabled)
+
+        chrome.click()
+
+        XCTAssertFalse(isControlOn(chrome))
+        XCTAssertTrue(showAll.isEnabled)
+
+        showAll.click()
+
+        XCTAssertTrue(isControlOn(chrome))
+        XCTAssertFalse(showAll.isEnabled)
+    }
+
+    @MainActor
+    func testManyBrowserVisibilityControlsScrollToLateRows() {
+        let application = launch(
+            surface: "settings",
+            state: "many-browsers"
+        )
+        defer {
+            application.terminate()
+        }
+        let lateBrowser = application.descendants(
+            matching: .any
+        )["settings.browser-row.com.apple.SafariTechnologyPreview.visibility"]
+        let browserList = application.descendants(
+            matching: .any
+        )["settings.browser-list"]
+
+        assertExists(browserList)
+
+        for _ in 0 ..< 8 where !lateBrowser.isHittable {
+            browserList.swipeUp()
+        }
+
+        assertExists(
+            lateBrowser,
+            message: "The final browser visibility control was not reachable by scrolling"
+        )
+        XCTAssertTrue(lateBrowser.isHittable)
+        XCTAssertTrue(isControlOn(lateBrowser))
+    }
+
+    @MainActor
     func testOnboardingAndPickerReviewSurfaces() {
         let surfaces = [
             ("onboarding", "onboarding.done"),
@@ -222,6 +287,20 @@ final class KatabroUITests: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    @MainActor
+    private func isControlOn(
+        _ element: XCUIElement
+    ) -> Bool {
+        if let number = element.value as? NSNumber {
+            return number.boolValue
+        }
+
+        let value = String(
+            describing: element.value
+        ).lowercased()
+        return ["1", "true", "on", "checked"].contains(value)
     }
 
     @MainActor

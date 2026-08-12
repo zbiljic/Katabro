@@ -15,9 +15,13 @@ struct BrowserOrderView: View {
             Text("Browser Order")
                 .font(.headline)
 
-            Text("Katabro shows browsers in this order. Newly installed browsers are added at the end.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            Text(
+                "Checked browsers appear in the picker. "
+                    + "Their list order controls the picker order, "
+                    + "and newly installed browsers are shown by default."
+            )
+            .font(.callout)
+            .foregroundStyle(.secondary)
 
             if isLoading {
                 ProgressView("Finding browsers…")
@@ -76,6 +80,14 @@ struct BrowserOrderView: View {
                     AccessibilityIdentifier.settingsBrowserReset
                 )
 
+                Button("Show All") {
+                    preferencesStore.showAllBrowsers()
+                }
+                .disabled(preferencesStore.hiddenBrowserIdentifiers.isEmpty)
+                .accessibilityIdentifier(
+                    AccessibilityIdentifier.settingsBrowserShowAll
+                )
+
                 Spacer()
             }
         }
@@ -84,18 +96,40 @@ struct BrowserOrderView: View {
         }
     }
 
+    // The row keeps visibility and both existing move affordances in one AX element.
+    // swiftlint:disable:next function_body_length
     private func browserRow(
         _ browser: BrowserApplication,
         at index: Int
     ) -> some View {
         HStack(spacing: 10) {
-            Image(nsImage: browser.icon)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 28, height: 28)
-                .accessibilityHidden(true)
+            Toggle(
+                isOn: visibilityBinding(for: browser)
+            ) {
+                HStack(spacing: 10) {
+                    Image(nsImage: browser.icon)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 28, height: 28)
+                        .accessibilityHidden(true)
 
-            Text(browser.browser.displayName)
+                    Text(browser.browser.displayName)
+                }
+            }
+            .toggleStyle(.checkbox)
+            .disabled(
+                isLastShownBrowser(browser)
+            )
+            .help(
+                isLastShownBrowser(browser)
+                    ? "At least one browser must remain shown."
+                    : "Show \(browser.browser.displayName) in the picker."
+            )
+            .accessibilityIdentifier(
+                AccessibilityIdentifier.browserVisibility(
+                    bundleIdentifier: browser.browser.bundleIdentifier
+                )
+            )
 
             Spacer()
 
@@ -135,6 +169,42 @@ struct BrowserOrderView: View {
                 bundleIdentifier: browser.browser.bundleIdentifier
             )
         )
+    }
+
+    private func visibilityBinding(
+        for browser: BrowserApplication
+    ) -> Binding<Bool> {
+        Binding(
+            get: {
+                preferencesStore.isBrowserShown(
+                    browser.browser.bundleIdentifier,
+                    among: discoveredBrowserIdentifiers
+                )
+            },
+            set: { shown in
+                preferencesStore.setBrowserShown(
+                    browser.browser.bundleIdentifier,
+                    shown: shown,
+                    among: discoveredBrowserIdentifiers
+                )
+            }
+        )
+    }
+
+    private func isLastShownBrowser(
+        _ browser: BrowserApplication
+    ) -> Bool {
+        preferencesStore.isBrowserShown(
+            browser.browser.bundleIdentifier,
+            among: discoveredBrowserIdentifiers
+        ) && !preferencesStore.canHideBrowser(
+            browser.browser.bundleIdentifier,
+            among: discoveredBrowserIdentifiers
+        )
+    }
+
+    private var discoveredBrowserIdentifiers: [String] {
+        browsers.map(\.browser.bundleIdentifier)
     }
 
     private func moveButton(

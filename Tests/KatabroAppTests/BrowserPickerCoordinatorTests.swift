@@ -97,6 +97,91 @@ struct BrowserPickerCoordinatorTests {
         #expect(coordinator.presentedStore?.selectedBrowser == nil)
     }
 
+    @Test("excludes hidden browsers while preserving visible order")
+    func filtersHiddenBrowsers() async throws {
+        let first = makeBrowser(
+            identifier: "com.example.first",
+            name: "First"
+        )
+        let second = makeBrowser(
+            identifier: "com.example.second",
+            name: "Second"
+        )
+        let third = makeBrowser(
+            identifier: "com.example.third",
+            name: "Third"
+        )
+        let preferencesStore = PreferencesStore(
+            initialPreferences: AppPreferences(
+                browserOrder: [
+                    "com.example.third",
+                    "com.example.second",
+                    "com.example.first",
+                ],
+                hiddenBrowserIdentifiers: ["com.example.second"]
+            )
+        )
+        let coordinator = makeCoordinator(
+            discovery: BrowserDiscoveryFake(
+                browsers: [first, second, third]
+            ),
+            launcher: BrowserLauncherFake(),
+            preferencesStore: preferencesStore
+        )
+
+        try coordinator.route(
+            RoutingRequest(
+                destination: IncomingURL("https://example.com"),
+                source: .system
+            )
+        )
+        await coordinator.waitForPendingOperations()
+
+        #expect(
+            coordinator.presentedStore?.browsers == [third, first]
+        )
+    }
+
+    @Test("falls back to the first ordered browser when all are hidden")
+    func fallsBackWhenAllBrowsersAreHidden() async throws {
+        let first = makeBrowser(
+            identifier: "com.example.first",
+            name: "First"
+        )
+        let second = makeBrowser(
+            identifier: "com.example.second",
+            name: "Second"
+        )
+        let coordinator = makeCoordinator(
+            discovery: BrowserDiscoveryFake(
+                browsers: [first, second]
+            ),
+            launcher: BrowserLauncherFake(),
+            preferencesStore: PreferencesStore(
+                initialPreferences: AppPreferences(
+                    browserOrder: [
+                        "com.example.second",
+                        "com.example.first",
+                    ],
+                    hiddenBrowserIdentifiers: [
+                        "com.example.first",
+                        "com.example.second",
+                    ]
+                )
+            )
+        )
+
+        try coordinator.route(
+            RoutingRequest(
+                destination: IncomingURL("https://example.com"),
+                source: .system
+            )
+        )
+        await coordinator.waitForPendingOperations()
+
+        #expect(coordinator.presentedStore?.browsers == [second])
+    }
+
     @Test("records a browser launch failure after dismissing")
     func handlesLaunchFailure() async throws {
         let browser = makeBrowser()
@@ -331,6 +416,7 @@ extension BrowserPickerCoordinatorTests {
         discovery: any BrowserDiscovering,
         launcher: any BrowserLaunching,
         errorPresenter: RoutingErrorPresenterFake = RoutingErrorPresenterFake(),
+        preferencesStore: PreferencesStore = PreferencesStore(),
         panelBuilder: @escaping BrowserPickerCoordinator.PanelBuilder = { _, _, _ in
             BrowserPickerPresentationFake()
         }
@@ -353,20 +439,23 @@ extension BrowserPickerCoordinatorTests {
                     },
                     updateHandler: { _ in }
                 ),
-                preferencesStore: PreferencesStore()
+                preferencesStore: preferencesStore
             ),
             panelBuilder: panelBuilder
         )
     }
 
-    private func makeBrowser() -> BrowserApplication {
+    private func makeBrowser(
+        identifier: String = "com.example.browser",
+        name: String = "Example Browser"
+    ) -> BrowserApplication {
         BrowserApplication(
             browser: Browser(
-                bundleIdentifier: "com.example.browser",
-                displayName: "Example Browser"
+                bundleIdentifier: identifier,
+                displayName: name
             ),
             applicationURL: URL(
-                fileURLWithPath: "/Applications/Example Browser.app"
+                fileURLWithPath: "/Applications/\(name).app"
             ),
             icon: NSImage(
                 size: NSSize(

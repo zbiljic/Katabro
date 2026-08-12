@@ -3,6 +3,8 @@ import AppKit
 import KatabroCore
 import Testing
 
+// The suite covers the complete aggregate preference contract in one fixture namespace.
+// swiftlint:disable type_body_length
 @MainActor
 @Suite("App preferences")
 struct PreferencesStoreTests {
@@ -145,7 +147,8 @@ struct PreferencesStoreTests {
                     "one",
                     "two",
                     "three",
-                ]
+                ],
+                hiddenBrowserIdentifiers: ["two"]
             )
         ) { preferences in
             savedPreferences.append(preferences)
@@ -165,6 +168,7 @@ struct PreferencesStoreTests {
 
         store.resetBrowserOrder()
         #expect(store.browserOrder.isEmpty)
+        #expect(store.hiddenBrowserIdentifiers == ["two"])
         #expect(savedPreferences.last?.browserOrder.isEmpty == true)
     }
 
@@ -196,7 +200,243 @@ struct PreferencesStoreTests {
         )
 
         #expect(preferences.browserOrder == ["com.example.browser"])
+        #expect(preferences.hiddenBrowserIdentifiers.isEmpty)
         #expect(!preferences.hasCompletedOnboarding)
+    }
+
+    @Test("normalizes hidden identifiers case-insensitively")
+    func normalizesHiddenIdentifiers() {
+        let store = PreferencesStore(
+            initialPreferences: AppPreferences(
+                hiddenBrowserIdentifiers: [
+                    " com.example.Browser ",
+                    "COM.EXAMPLE.BROWSER",
+                    "",
+                    "\n",
+                    "com.example.other",
+                ]
+            )
+        )
+
+        #expect(
+            store.hiddenBrowserIdentifiers == [
+                "com.example.Browser",
+                "com.example.other",
+            ]
+        )
+    }
+
+    @Test("hides one browser while retaining Settings order")
+    func hidesBrowserWithoutFilteringSettingsOrder() {
+        var savedPreferences: [AppPreferences] = []
+        let store = PreferencesStore(
+            initialPreferences: AppPreferences(
+                browserOrder: [
+                    "com.example.second",
+                    "com.example.first",
+                ]
+            )
+        ) { savedPreferences.append($0) }
+        let first = makeBrowser(
+            identifier: "com.example.first",
+            name: "First"
+        )
+        let second = makeBrowser(
+            identifier: "com.example.second",
+            name: "Second"
+        )
+
+        let changed = store.setBrowserShown(
+            " COM.EXAMPLE.SECOND ",
+            shown: false,
+            among: [
+                "com.example.first",
+                "com.example.second",
+            ]
+        )
+
+        #expect(changed)
+        #expect(store.hiddenBrowserIdentifiers == ["com.example.second"])
+        #expect(
+            store.orderedBrowsers([first, second]).map(\.browser.bundleIdentifier) == [
+                "com.example.second",
+                "com.example.first",
+            ]
+        )
+        #expect(
+            store.effectiveVisibleBrowsers([first, second]) == [first]
+        )
+        #expect(savedPreferences == [store.preferences])
+    }
+
+    @Test("newly discovered browser is shown by default")
+    func showsNewBrowserByDefault() {
+        let hidden = makeBrowser(
+            identifier: "com.example.hidden",
+            name: "Hidden"
+        )
+        let newlyInstalled = makeBrowser(
+            identifier: "com.example.new",
+            name: "New"
+        )
+        let store = PreferencesStore(
+            initialPreferences: AppPreferences(
+                hiddenBrowserIdentifiers: ["COM.EXAMPLE.HIDDEN"]
+            )
+        )
+
+        #expect(
+            store.effectiveVisibleBrowsers([hidden, newlyInstalled]) == [newlyInstalled]
+        )
+        #expect(
+            store.isBrowserShown(
+                "com.example.new",
+                among: [
+                    "com.example.hidden",
+                    "com.example.new",
+                ]
+            )
+        )
+    }
+
+    @Test("effective visibility preserves the supplied browser order")
+    func preservesSuppliedVisibilityOrder() {
+        let first = makeBrowser(
+            identifier: "com.example.first",
+            name: "First"
+        )
+        let second = makeBrowser(
+            identifier: "com.example.second",
+            name: "Second"
+        )
+        let third = makeBrowser(
+            identifier: "com.example.third",
+            name: "Third"
+        )
+        let store = PreferencesStore(
+            initialPreferences: AppPreferences(
+                browserOrder: [
+                    "com.example.first",
+                    "com.example.second",
+                    "com.example.third",
+                ],
+                hiddenBrowserIdentifiers: ["com.example.second"]
+            )
+        )
+
+        #expect(
+            store.effectiveVisibleBrowsers([third, second, first]) == [third, first]
+        )
+    }
+
+    @Test("refuses to hide the last effective browser without saving")
+    func refusesLastEffectiveHide() {
+        var savedPreferences: [AppPreferences] = []
+        let store = PreferencesStore { savedPreferences.append($0) }
+
+        let changed = store.setBrowserShown(
+            "com.example.only",
+            shown: false,
+            among: ["com.example.only"]
+        )
+
+        #expect(!changed)
+        #expect(store.hiddenBrowserIdentifiers.isEmpty)
+        #expect(savedPreferences.isEmpty)
+    }
+
+    @Test("all-hidden external state falls back without writing")
+    func fallsBackWhenAllDiscoveredBrowsersAreHidden() {
+        var savedPreferences: [AppPreferences] = []
+        let first = makeBrowser(
+            identifier: "com.example.first",
+            name: "First"
+        )
+        let second = makeBrowser(
+            identifier: "com.example.second",
+            name: "Second"
+        )
+        let store = PreferencesStore(
+            initialPreferences: AppPreferences(
+                browserOrder: [
+                    "com.example.second",
+                    "com.example.first",
+                ],
+                hiddenBrowserIdentifiers: [
+                    "com.example.first",
+                    "com.example.second",
+                ]
+            )
+        ) { savedPreferences.append($0) }
+
+        let alreadyOrderedBrowsers = [second, first]
+        let visibleBrowsers = store.effectiveVisibleBrowsers(alreadyOrderedBrowsers)
+
+        #expect(visibleBrowsers == [second])
+        #expect(
+            store.isBrowserShown(
+                "com.example.second",
+                among: [
+                    "com.example.second",
+                    "com.example.first",
+                ]
+            )
+        )
+        #expect(savedPreferences.isEmpty)
+    }
+
+    @Test("Show All changes only local visibility preferences")
+    func showsAllWithoutChangingOtherPreferencesOrCloud() {
+        var savedPreferences: [AppPreferences] = []
+        let cloudStore = PreferencesCloudStoreSpy()
+        let cloudClient = ICloudPreferencesClient(
+            store: cloudStore,
+            notificationCenter: NotificationCenter()
+        )
+        let store = PreferencesStore(
+            initialPreferences: AppPreferences(
+                browserOrder: ["two", "one"],
+                hiddenBrowserIdentifiers: ["one"],
+                hasCompletedOnboarding: true
+            ),
+            initialSyncStatus: .available,
+            iCloudClient: cloudClient
+        ) { savedPreferences.append($0) }
+
+        let changed = store.showAllBrowsers()
+
+        #expect(changed)
+        #expect(store.hiddenBrowserIdentifiers.isEmpty)
+        #expect(store.browserOrder == ["two", "one"])
+        #expect(store.hasCompletedOnboarding)
+        #expect(savedPreferences == [store.preferences])
+        #expect(cloudStore.writes.isEmpty)
+    }
+
+    @Test("visibility changes save locally and never write to cloud")
+    func keepsVisibilityLocal() {
+        var savedPreferences: [AppPreferences] = []
+        let cloudStore = PreferencesCloudStoreSpy()
+        let store = PreferencesStore(
+            initialSyncStatus: .available,
+            iCloudClient: ICloudPreferencesClient(
+                store: cloudStore,
+                notificationCenter: NotificationCenter()
+            )
+        ) { savedPreferences.append($0) }
+
+        let changed = store.setBrowserShown(
+            "com.example.second",
+            shown: false,
+            among: [
+                "com.example.first",
+                "com.example.second",
+            ]
+        )
+
+        #expect(changed)
+        #expect(savedPreferences.map(\.hiddenBrowserIdentifiers) == [["com.example.second"]])
+        #expect(cloudStore.writes.isEmpty)
     }
 
     private func makeBrowser(
@@ -218,5 +458,34 @@ struct PreferencesStoreTests {
                 )
             )
         )
+    }
+}
+
+// swiftlint:enable type_body_length
+
+@MainActor
+private final class PreferencesCloudStoreSpy: ICloudKeyValueStoring {
+    struct Write {
+        let key: String
+        let value: Any?
+    }
+
+    var writes: [Write] = []
+
+    func object(forKey _: String) -> Any? {
+        nil
+    }
+
+    func set(_ anObject: Any?, forKey aKey: String) {
+        writes.append(
+            Write(
+                key: aKey,
+                value: anObject
+            )
+        )
+    }
+
+    func synchronize() -> Bool {
+        true
     }
 }
