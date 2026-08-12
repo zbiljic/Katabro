@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct OnboardingView: View {
@@ -8,9 +9,10 @@ struct OnboardingView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack(spacing: 14) {
-                Image(systemName: "arrow.triangle.branch")
-                    .font(.system(size: 38))
-                    .foregroundStyle(.tint)
+                Image(nsImage: NSApplication.shared.applicationIconImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 56, height: 56)
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 3) {
