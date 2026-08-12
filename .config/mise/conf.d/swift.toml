@@ -38,6 +38,11 @@ description = "Build the Katabro application"
 depends = ["app:generate"]
 run = "tuist xcodebuild build -scheme Katabro -configuration Debug -derivedDataPath Derived"
 
+[tasks."app:build:icloud"]
+description = "Build the provisioned Katabro iCloud application"
+depends = ["app:generate"]
+run = "tuist xcodebuild build -scheme 'Katabro iCloud' -configuration Debug -derivedDataPath Derived -allowProvisioningUpdates"
+
 [tasks."app:test"]
 description = "Test the Katabro application"
 depends = ["app:generate"]
