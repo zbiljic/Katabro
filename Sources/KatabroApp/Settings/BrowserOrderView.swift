@@ -211,7 +211,7 @@ struct BrowserOrderView: View {
             index,
             destination
         )
-        preferencesStore.setBrowserOrder(
+        preferencesStore.setVisibleBrowserOrder(
             browsers.map(\.browser.bundleIdentifier)
         )
     }
@@ -224,7 +224,7 @@ struct BrowserOrderView: View {
             fromOffsets: source,
             toOffset: destination
         )
-        preferencesStore.setBrowserOrder(
+        preferencesStore.setVisibleBrowserOrder(
             browsers.map(\.browser.bundleIdentifier)
         )
     }

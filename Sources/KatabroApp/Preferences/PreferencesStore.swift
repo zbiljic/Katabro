@@ -4,13 +4,27 @@ import Observation
 @MainActor
 @Observable
 final class PreferencesStore {
+    enum ICloudSyncStatus: Equatable, Sendable {
+        case available
+        case localOnly
+        case invalidCloudValue
+    }
+
     private enum Key {
         static let preferences = "app.preferences"
     }
 
+    private enum UpdateOrigin: Equatable {
+        case user
+        case remote
+        case local
+    }
+
     @ObservationIgnored private let save: (AppPreferences) -> Void
+    @ObservationIgnored private let iCloudClient: ICloudPreferencesClient?
 
     private(set) var preferences: AppPreferences
+    private(set) var iCloudSyncStatus: ICloudSyncStatus
 
     var browserOrder: [String] {
         preferences.browserOrder
@@ -22,14 +36,35 @@ final class PreferencesStore {
 
     init(
         initialPreferences: AppPreferences = AppPreferences(),
+        initialSyncStatus: ICloudSyncStatus = .localOnly,
+        iCloudClient: ICloudPreferencesClient? = nil,
         save: @escaping (AppPreferences) -> Void = { _ in }
     ) {
         preferences = initialPreferences
+        iCloudSyncStatus = initialSyncStatus
+        self.iCloudClient = iCloudClient
         self.save = save
     }
 
     static func live(
         userDefaults: UserDefaults = .standard
+    ) -> PreferencesStore {
+        #if KATABRO_ICLOUD
+            live(
+                userDefaults: userDefaults,
+                iCloudClient: .live()
+            )
+        #else
+            live(
+                userDefaults: userDefaults,
+                iCloudClient: nil
+            )
+        #endif
+    }
+
+    static func live(
+        userDefaults: UserDefaults,
+        iCloudClient: ICloudPreferencesClient?
     ) -> PreferencesStore {
         let data = userDefaults.data(
             forKey: Key.preferences
@@ -41,7 +76,10 @@ final class PreferencesStore {
             )
         } ?? AppPreferences()
 
-        return Self(initialPreferences: preferences) { preferences in
+        let store = Self(
+            initialPreferences: preferences,
+            iCloudClient: iCloudClient
+        ) { preferences in
             guard let data = try? JSONEncoder().encode(preferences) else {
                 return
             }
@@ -51,6 +89,10 @@ final class PreferencesStore {
                 forKey: Key.preferences
             )
         }
+        if iCloudClient != nil {
+            store.startICloudSync()
+        }
+        return store
     }
 
     func orderedBrowsers(
@@ -88,36 +130,56 @@ final class PreferencesStore {
             }
         }
 
-        setBrowserOrder(
-            orderedBrowsers.map(\.browser.bundleIdentifier)
-        )
-
         return orderedBrowsers
+    }
+
+    func setVisibleBrowserOrder(
+        _ bundleIdentifiers: [String]
+    ) {
+        let normalizedVisibleOrder = Self.normalizedOrder(
+            bundleIdentifiers
+        )
+        let normalizedStoredOrder = Self.normalizedOrder(
+            browserOrder
+        )
+        let storedIdentifiers = Set(
+            normalizedStoredOrder.map { $0.lowercased() }
+        )
+        let visibleIdentifiers = Set(
+            normalizedVisibleOrder.map { $0.lowercased() }
+        )
+        var reorderedStoredIdentifiers = normalizedVisibleOrder
+            .filter {
+                storedIdentifiers.contains($0.lowercased())
+            }
+            .makeIterator()
+        var mergedOrder = normalizedStoredOrder.map { identifier in
+            guard visibleIdentifiers.contains(identifier.lowercased()) else {
+                return identifier
+            }
+
+            return reorderedStoredIdentifiers.next() ?? identifier
+        }
+
+        mergedOrder.append(
+            contentsOf: normalizedVisibleOrder.filter {
+                !storedIdentifiers.contains($0.lowercased())
+            }
+        )
+        setBrowserOrder(mergedOrder)
     }
 
     func setBrowserOrder(
         _ bundleIdentifiers: [String]
     ) {
-        var seenIdentifiers = Set<String>()
-        let normalizedOrder: [String] = bundleIdentifiers.compactMap { identifier in
-            let trimmedIdentifier = identifier.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-            let normalizedIdentifier = trimmedIdentifier.lowercased()
-
-            guard
-                !trimmedIdentifier.isEmpty,
-                seenIdentifiers.insert(normalizedIdentifier).inserted
-            else {
-                return nil
-            }
-
-            return trimmedIdentifier
-        }
-
         var preferences = preferences
-        preferences.browserOrder = normalizedOrder
-        update(preferences)
+        preferences.browserOrder = Self.normalizedOrder(
+            bundleIdentifiers
+        )
+        update(
+            preferences,
+            origin: .user
+        )
     }
 
     func moveBrowser(
@@ -139,11 +201,15 @@ final class PreferencesStore {
     func completeOnboarding() {
         var preferences = preferences
         preferences.hasCompletedOnboarding = true
-        update(preferences)
+        update(
+            preferences,
+            origin: .local
+        )
     }
 
     private func update(
-        _ preferences: AppPreferences
+        _ preferences: AppPreferences,
+        origin: UpdateOrigin
     ) {
         guard self.preferences != preferences else {
             return
@@ -151,5 +217,104 @@ final class PreferencesStore {
 
         self.preferences = preferences
         save(preferences)
+
+        if origin == .user, iCloudSyncStatus == .available {
+            iCloudClient?.writeBrowserOrder(preferences.browserOrder)
+        }
+    }
+
+    func startICloudSync() {
+        guard let iCloudClient else {
+            return
+        }
+
+        let didStart = iCloudClient.start { [weak self] event in
+            self?.handleICloudEvent(event)
+        }
+
+        guard didStart else {
+            iCloudSyncStatus = .localOnly
+            return
+        }
+
+        applyCloudBrowserOrder(
+            seedWhenMissing: true
+        )
+    }
+
+    private func handleICloudEvent(
+        _ event: ICloudPreferencesClient.Event
+    ) {
+        switch event {
+        case let .changed(reason, keys):
+            let ignoresBrowserOrder = reason == .serverChange
+                && keys?.contains(ICloudPreferencesClient.browserOrderKey) == false
+
+            if ignoresBrowserOrder {
+                return
+            }
+
+            applyCloudBrowserOrder(
+                seedWhenMissing: false
+            )
+        case .quotaViolation:
+            iCloudSyncStatus = .localOnly
+        }
+    }
+
+    private func applyCloudBrowserOrder(
+        seedWhenMissing: Bool
+    ) {
+        guard let iCloudClient else {
+            return
+        }
+
+        switch iCloudClient.readBrowserOrder() {
+        case let .value(browserOrder):
+            var preferences = preferences
+            preferences.browserOrder = Self.normalizedOrder(browserOrder)
+            update(
+                preferences,
+                origin: .remote
+            )
+            iCloudSyncStatus = .available
+        case .missing:
+            let normalizedOrder = Self.normalizedOrder(browserOrder)
+            var preferences = preferences
+            preferences.browserOrder = normalizedOrder
+            update(
+                preferences,
+                origin: .remote
+            )
+            iCloudSyncStatus = .available
+
+            if seedWhenMissing {
+                iCloudClient.writeBrowserOrder(normalizedOrder)
+            }
+        case .invalid:
+            iCloudSyncStatus = .invalidCloudValue
+        }
+    }
+
+    private static func normalizedOrder(
+        _ bundleIdentifiers: [String]
+    ) -> [String] {
+        var seenIdentifiers = Set<String>()
+
+        return bundleIdentifiers.compactMap { identifier in
+            let trimmedIdentifier = identifier.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            let normalizedIdentifier = trimmedIdentifier.lowercased()
+
+            guard
+                !trimmedIdentifier.isEmpty,
+                seenIdentifiers.insert(normalizedIdentifier).inserted
+            else {
+                return nil
+            }
+
+            return trimmedIdentifier
+        }
     }
 }

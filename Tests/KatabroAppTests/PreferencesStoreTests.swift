@@ -50,18 +50,76 @@ struct PreferencesStoreTests {
         #expect(
             store.browserOrder == [
                 "com.example.second",
-                "com.example.first",
-                "com.example.third",
+                "com.example.missing",
             ]
         )
-        #expect(savedPreferences.last == store.preferences)
+        #expect(savedPreferences.isEmpty)
+    }
+
+    @Test("visible reorder preserves browsers unavailable on this Mac")
+    func preservesUnavailableBrowserOrder() {
+        var savedPreferences: [AppPreferences] = []
+        let store = PreferencesStore(
+            initialPreferences: AppPreferences(
+                browserOrder: [
+                    "com.google.Chrome",
+                    "org.mozilla.firefox",
+                    "com.apple.Safari",
+                ]
+            )
+        ) { preferences in
+            savedPreferences.append(preferences)
+        }
+
+        store.setVisibleBrowserOrder(
+            [
+                "com.apple.Safari",
+                "com.google.Chrome",
+            ]
+        )
+
+        #expect(
+            store.browserOrder == [
+                "com.apple.Safari",
+                "org.mozilla.firefox",
+                "com.google.Chrome",
+            ]
+        )
+        #expect(savedPreferences == [store.preferences])
+    }
+
+    @Test("new visible browsers append after preserved stored slots")
+    func appendsNewVisibleBrowser() {
+        let store = PreferencesStore(
+            initialPreferences: AppPreferences(
+                browserOrder: [
+                    "com.google.Chrome",
+                    "org.mozilla.firefox",
+                ]
+            )
+        )
+
+        store.setVisibleBrowserOrder(
+            [
+                "com.google.Chrome",
+                "com.apple.Safari",
+            ]
+        )
+
+        #expect(
+            store.browserOrder == [
+                "com.google.Chrome",
+                "org.mozilla.firefox",
+                "com.apple.Safari",
+            ]
+        )
     }
 
     @Test("normalizes duplicate and empty identifiers")
     func normalizesIdentifiers() {
         let store = PreferencesStore()
 
-        store.setBrowserOrder(
+        store.setVisibleBrowserOrder(
             [
                 " com.example.Browser ",
                 "COM.EXAMPLE.BROWSER",
@@ -80,6 +138,7 @@ struct PreferencesStoreTests {
 
     @Test("moves and resets browser order")
     func movesAndResetsOrder() {
+        var savedPreferences: [AppPreferences] = []
         let store = PreferencesStore(
             initialPreferences: AppPreferences(
                 browserOrder: [
@@ -88,7 +147,9 @@ struct PreferencesStoreTests {
                     "three",
                 ]
             )
-        )
+        ) { preferences in
+            savedPreferences.append(preferences)
+        }
 
         store.moveBrowser(
             from: IndexSet(integer: 0),
@@ -104,6 +165,7 @@ struct PreferencesStoreTests {
 
         store.resetBrowserOrder()
         #expect(store.browserOrder.isEmpty)
+        #expect(savedPreferences.last?.browserOrder.isEmpty == true)
     }
 
     @Test("completing onboarding preserves browser order")
