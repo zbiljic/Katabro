@@ -16,6 +16,7 @@ release artifacts, notarization, and an installer are not available yet.
 - Supports arrow keys, Return, Escape, and numeric picker shortcuts.
 - Queues simultaneous link requests instead of dropping them.
 - Provides onboarding, Settings, open-at-login control, and browser ordering.
+- Syncs browser order through iCloud across Macs using the same Apple Account.
 - Bundles a `katabro` command-line helper inside the application.
 - Keeps URL validation and routing policy in a portable Swift package.
 
@@ -89,6 +90,24 @@ mise run clean          # remove generated projects and build outputs
 
 Tuist is the source of truth for the Xcode project. Do not commit generated
 `.xcodeproj` or `.xcworkspace` files.
+
+Browser-order sync requires a correctly entitled build signed for an App ID
+with iCloud key-value storage enabled, such as a provisioned development or App
+Store build. Source builds without that capability keep browser preferences
+locally and continue to work without iCloud.
+
+The default `Katabro` scheme deliberately has no iCloud entitlement and is the
+scheme used by `mise run check` and `scripts/run`. Apple Developer Program team
+members can build the separate provisioned scheme after selecting a development
+team for `com.zbiljic.katabro`:
+
+```sh
+mise run app:build:icloud
+```
+
+The `Katabro iCloud` scheme is the only scheme that instantiates the live iCloud
+key-value store. Both schemes compile the same synchronization implementation,
+and the default scheme exercises it through deterministic in-memory tests.
 
 ## Review the interface
 
