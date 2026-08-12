@@ -16,6 +16,17 @@ let appSettings: Settings = .settings(
     ]
 )
 
+let iCloudAppSettings: Settings = .settings(
+    base: [
+        "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
+        "CODE_SIGN_IDENTITY": "Apple Development",
+        "CODE_SIGN_STYLE": "Automatic",
+        "PRODUCT_MODULE_NAME": "KatabroICloud",
+        "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "$(inherited) KATABRO_ICLOUD",
+        "SWIFT_DEFAULT_ACTOR_ISOLATION": "MainActor",
+    ]
+)
+
 let cliSettings: Settings = .settings(
     base: [
         "PRODUCT_MODULE_NAME": "KatabroCLI",
@@ -91,6 +102,38 @@ let project = Project(
             settings: appSettings
         ),
         .target(
+            name: "Katabro iCloud",
+            destinations: .macOS,
+            product: .app,
+            productName: "Katabro",
+            bundleId: "com.zbiljic.katabro",
+            deploymentTargets: .macOS("14.0"),
+            infoPlist: .file(path: "Resources/Info.plist"),
+            sources: ["Sources/KatabroApp/**"],
+            resources: ["Resources/Assets.xcassets"],
+            copyFiles: [
+                .wrapper(
+                    name: "Embed command-line helper",
+                    subpath: "Contents/Helpers",
+                    files: [
+                        .buildProduct(
+                            name: "KatabroCLI",
+                            codeSignOnCopy: true
+                        ),
+                    ]
+                ),
+            ],
+            entitlements: .file(path: "Resources/Katabro.iCloud.entitlements"),
+            dependencies: [
+                .target(name: "KatabroCore"),
+                .target(
+                    name: "KatabroCLI",
+                    status: .none
+                ),
+            ],
+            settings: iCloudAppSettings
+        ),
+        .target(
             name: "KatabroTests",
             destinations: .macOS,
             product: .unitTests,
@@ -140,6 +183,16 @@ let project = Project(
             ),
             runAction: .runAction(
                 executable: "Katabro"
+            )
+        ),
+        .scheme(
+            name: "Katabro iCloud",
+            shared: true,
+            buildAction: .buildAction(
+                targets: ["Katabro iCloud"]
+            ),
+            runAction: .runAction(
+                executable: "Katabro iCloud"
             )
         ),
     ]
