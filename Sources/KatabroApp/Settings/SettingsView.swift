@@ -72,6 +72,19 @@ struct SettingsView: View {
                 }
             }
 
+            Section("iCloud") {
+                LabeledContent("Browser Order") {
+                    Text(iCloudStatusDescription)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.trailing)
+                        .accessibilityLabel(iCloudStatusDescription)
+                        .accessibilityIdentifier(
+                            AccessibilityIdentifier.settingsICloudStatus
+                        )
+                }
+            }
+
             Section {
                 BrowserOrderView(
                     browserDiscovery: browserDiscovery,
@@ -90,6 +103,17 @@ struct SettingsView: View {
         .task {
             defaultBrowserClient.refresh()
             loginItemClient.refresh()
+        }
+    }
+
+    private var iCloudStatusDescription: String {
+        switch preferencesStore.iCloudSyncStatus {
+        case .available:
+            "Browser order syncs through iCloud across Macs using the same Apple Account."
+        case .localOnly:
+            "Browser order stays on this Mac because iCloud sync is unavailable for this build."
+        case .invalidCloudValue:
+            "Browser order stays on this Mac because the saved iCloud setting could not be read."
         }
     }
 }

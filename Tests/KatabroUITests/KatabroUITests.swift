@@ -20,6 +20,9 @@ final class KatabroUITests: XCTestCase {
         assertExists(
             application.switches["settings.login-item.toggle"]
         )
+        assertExists(
+            application.staticTexts["settings.icloud.status"]
+        )
         let browserListExists =
             application.outlines["settings.browser-list"].exists ||
             application.tables["settings.browser-list"].exists ||
@@ -56,6 +59,16 @@ final class KatabroUITests: XCTestCase {
                 application.scrollViews["settings.form"],
                 message: "Settings did not appear for fixture state \(state)"
             )
+            if state == "service-errors" {
+                let status = application.staticTexts["settings.icloud.status"]
+                assertExists(status)
+                let expectedStatus =
+                    "Browser order stays on this Mac because iCloud sync is unavailable for this build."
+                XCTAssertTrue(
+                    status.label == expectedStatus
+                        || status.value as? String == expectedStatus
+                )
+            }
             attachScreenshot(
                 named: "Settings-\(state)",
                 from: application

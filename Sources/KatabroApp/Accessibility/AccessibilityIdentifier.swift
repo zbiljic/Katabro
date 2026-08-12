@@ -12,6 +12,7 @@ enum AccessibilityIdentifier {
     static let settingsLoginItemToggle = "settings.login-item.toggle"
     static let settingsLoginItemStatus = "settings.login-item.status"
     static let settingsLoginItemError = "settings.login-item.error"
+    static let settingsICloudStatus = "settings.icloud.status"
     static let settingsBrowserList = "settings.browser-list"
     static let settingsBrowserRefresh = "settings.browser-refresh"
     static let settingsBrowserReset = "settings.browser-reset"

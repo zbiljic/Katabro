@@ -164,7 +164,10 @@
                             \.browser.bundleIdentifier
                         ),
                         hasCompletedOnboarding: true
-                    )
+                    ),
+                    initialSyncStatus: state == .serviceErrors
+                        ? .localOnly
+                        : .available
                 )
             )
         }
