@@ -43,6 +43,13 @@
         )
     }
 
+    #Preview("Settings — About") {
+        settingsPreview(
+            state: .normal,
+            pane: .about
+        )
+    }
+
     #Preview("Onboarding") {
         let dependencies = DevelopmentUIFixtures.dependencies(
             for: .normal

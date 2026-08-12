@@ -13,12 +13,15 @@ final class KatabroUITests: XCTestCase {
 
         let generalTab = application.radioButtons["settings.pane.general"]
         let browsersTab = application.radioButtons["settings.pane.browsers"]
+        let aboutTab = application.radioButtons["settings.pane.about"]
 
         assertExists(application.scrollViews["settings.general.form"])
         assertExists(generalTab)
         assertExists(browsersTab)
+        assertExists(aboutTab)
         XCTAssertTrue(isControlOn(generalTab))
         XCTAssertFalse(isControlOn(browsersTab))
+        XCTAssertFalse(isControlOn(aboutTab))
         assertExists(
             application.staticTexts["settings.default-browser.status"]
         )
@@ -122,6 +125,7 @@ final class KatabroUITests: XCTestCase {
 
         let generalTab = application.radioButtons["settings.pane.general"]
         let browsersTab = application.radioButtons["settings.pane.browsers"]
+        let aboutTab = application.radioButtons["settings.pane.about"]
 
         assertExists(application.scrollViews["settings.general.form"])
         browsersTab.click()
@@ -131,6 +135,9 @@ final class KatabroUITests: XCTestCase {
                 "settings.browser-row.com.apple.Safari.visibility"
             ]
         )
+        aboutTab.click()
+        assertExists(application.scrollViews["settings.about.content"])
+        assertExists(application.links["settings.about.link.repository"])
         generalTab.click()
         assertExists(application.scrollViews["settings.general.form"])
         assertExists(
@@ -160,6 +167,12 @@ final class KatabroUITests: XCTestCase {
             assertExists(application.scrollViews["settings.browsers.form"])
             attachScreenshot(
                 named: "Settings-browsers-normal-\(appearance)",
+                from: application
+            )
+            application.radioButtons["settings.pane.about"].click()
+            assertExists(application.scrollViews["settings.about.content"])
+            attachScreenshot(
+                named: "Settings-about-normal-\(appearance)",
                 from: application
             )
         }
@@ -321,6 +334,29 @@ final class KatabroUITests: XCTestCase {
             named: "Onboarding-service-errors",
             from: application
         )
+    }
+}
+
+extension KatabroUITests {
+    @MainActor
+    func testSettingsAboutPane() {
+        let application = launch(
+            surface: "settings",
+            state: "normal"
+        )
+        defer {
+            application.terminate()
+        }
+
+        let aboutTab = application.radioButtons["settings.pane.about"]
+        aboutTab.click()
+
+        assertExists(application.scrollViews["settings.about.content"])
+        assertExists(application.staticTexts["settings.about.version"])
+        assertExists(application.links["settings.about.link.repository"])
+        assertExists(application.links["settings.about.link.issues"])
+        assertExists(application.links["settings.about.link.license"])
+        XCTAssertTrue(isControlOn(aboutTab))
     }
 }
 

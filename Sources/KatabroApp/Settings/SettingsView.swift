@@ -54,6 +54,18 @@ struct SettingsView: View {
                 )
             }
             .tag(SettingsPane.browsers)
+
+            AboutSettingsView()
+                .tabItem {
+                    Label(
+                        SettingsPane.about.displayName,
+                        systemImage: SettingsPane.about.systemImage
+                    )
+                    .accessibilityIdentifier(
+                        AccessibilityIdentifier.settingsAboutPane
+                    )
+                }
+                .tag(SettingsPane.about)
         }
         .frame(
             minWidth: 560,

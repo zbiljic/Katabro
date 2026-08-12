@@ -3,6 +3,7 @@ import SwiftUI
 enum SettingsPane: String, CaseIterable, Hashable {
     case general
     case browsers
+    case about
 
     var displayName: LocalizedStringResource {
         switch self {
@@ -10,6 +11,8 @@ enum SettingsPane: String, CaseIterable, Hashable {
             "General"
         case .browsers:
             "Browsers"
+        case .about:
+            "About"
         }
     }
 
@@ -19,6 +22,8 @@ enum SettingsPane: String, CaseIterable, Hashable {
             "gear"
         case .browsers:
             "globe"
+        case .about:
+            "info.circle"
         }
     }
 }
