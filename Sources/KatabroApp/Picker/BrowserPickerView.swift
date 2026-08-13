@@ -75,6 +75,22 @@ struct BrowserPickerView: View {
             onCancel()
             return .handled
         }
+        .onKeyPress(
+            characters: .letters,
+            phases: .down
+        ) { keyPress in
+            guard
+                let browser = store.browser(
+                    forPickerShortcutInput: keyPress.characters,
+                    modifiers: keyPress.modifiers
+                )
+            else {
+                return .ignored
+            }
+
+            onSelect(browser)
+            return .handled
+        }
     }
 
     private func activateSelection() -> KeyPress.Result {
@@ -103,6 +119,8 @@ struct BrowserPickerView: View {
         .padding(.top, 2)
     }
 
+    // The row keeps its styling, accessibility, hover, and numeric shortcut as one unit.
+    // swiftlint:disable function_body_length
     @ViewBuilder
     private func browserRow(
         _ browser: BrowserApplication,
@@ -124,11 +142,26 @@ struct BrowserPickerView: View {
 
                 Spacer(minLength: 8)
 
-                if index < 9 {
-                    Text("\(index + 1)")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.tertiary)
-                        .accessibilityHidden(true)
+                HStack(spacing: 5) {
+                    if let shortcut = store.pickerShortcut(for: browser) {
+                        Text(shortcut.displayValue)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(
+                                .quaternary,
+                                in: .rect(cornerRadius: 4)
+                            )
+                            .accessibilityHidden(true)
+                    }
+
+                    if index < 9 {
+                        Text("\(index + 1)")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
+                    }
                 }
             }
             .padding(.horizontal, 8)
@@ -145,7 +178,12 @@ struct BrowserPickerView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Open in \(browser.browser.displayName)")
-        .accessibilityHint("Opens the requested URL in this browser")
+        .accessibilityHint(
+            shortcutAccessibilityHint(
+                for: browser,
+                at: index
+            )
+        )
         .accessibilityAddTraits(
             store.selectedIndex == index ? .isSelected : []
         )
@@ -170,5 +208,24 @@ struct BrowserPickerView: View {
         } else {
             button
         }
+    }
+
+    // swiftlint:enable function_body_length
+
+    private func shortcutAccessibilityHint(
+        for browser: BrowserApplication,
+        at index: Int
+    ) -> String {
+        let letter = store.pickerShortcut(
+            for: browser
+        )?.displayValue
+        let number = index < 9 ? String(index + 1) : nil
+        let shortcuts = [letter, number].compactMap(\.self)
+
+        guard !shortcuts.isEmpty else {
+            return "Opens the requested URL in this browser."
+        }
+
+        return "Shortcuts \(shortcuts.joined(separator: " or "))."
     }
 }

@@ -1,11 +1,13 @@
 import KatabroCore
 import Observation
+import SwiftUI
 
 @MainActor
 @Observable
 final class BrowserPickerStore {
     let destination: IncomingURL
     let browsers: [BrowserApplication]
+    let pickerShortcuts: [String: PickerShortcut]
     private(set) var selectedIndex: Int?
 
     var selectedBrowser: BrowserApplication? {
@@ -18,11 +20,39 @@ final class BrowserPickerStore {
 
     init(
         destination: IncomingURL,
-        browsers: [BrowserApplication]
+        browsers: [BrowserApplication],
+        pickerShortcuts: [String: PickerShortcut] = [:]
     ) {
         self.destination = destination
         self.browsers = browsers
+        self.pickerShortcuts = pickerShortcuts
         selectedIndex = browsers.isEmpty ? nil : 0
+    }
+
+    func pickerShortcut(
+        for browser: BrowserApplication
+    ) -> PickerShortcut? {
+        pickerShortcuts[
+            browser.browser.bundleIdentifier
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+        ]
+    }
+
+    func browser(
+        forPickerShortcutInput input: String,
+        modifiers: EventModifiers
+    ) -> BrowserApplication? {
+        guard
+            modifiers.isDisjoint(with: [.command, .option, .control]),
+            let shortcut = PickerShortcut(input)
+        else {
+            return nil
+        }
+
+        return browsers.first {
+            pickerShortcut(for: $0) == shortcut
+        }
     }
 
     func select(

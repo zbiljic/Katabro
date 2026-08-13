@@ -1,11 +1,88 @@
 import AppKit
 @testable import Katabro
 import KatabroCore
+import SwiftUI
 import Testing
 
 @MainActor
 @Suite("Browser picker state")
 struct BrowserPickerStoreTests {
+    @Test("looks up custom picker shortcuts case-insensitively")
+    func looksUpPickerShortcuts() throws {
+        let first = makeBrowser(
+            identifier: "com.example.first",
+            name: "First"
+        )
+        let second = makeBrowser(
+            identifier: "com.example.second",
+            name: "Second"
+        )
+        let store = try BrowserPickerStore(
+            destination: IncomingURL("https://example.com"),
+            browsers: [first, second],
+            pickerShortcuts: [
+                "com.example.second": #require(PickerShortcut("s")),
+            ]
+        )
+
+        #expect(
+            store.browser(
+                forPickerShortcutInput: "s",
+                modifiers: []
+            ) == second
+        )
+        #expect(
+            store.browser(
+                forPickerShortcutInput: "S",
+                modifiers: [.shift]
+            ) == second
+        )
+        #expect(
+            store.browser(
+                forPickerShortcutInput: "s",
+                modifiers: [.capsLock]
+            ) == second
+        )
+        #expect(
+            store.browser(
+                forPickerShortcutInput: "f",
+                modifiers: []
+            ) == nil
+        )
+    }
+
+    @Test(
+        "ignores command-producing picker shortcut modifiers",
+        arguments: [
+            EventModifiers.command,
+            EventModifiers.option,
+            EventModifiers.control,
+            [EventModifiers.command, .shift],
+        ]
+    )
+    func ignoresCommandModifiers(
+        modifiers: EventModifiers
+    ) throws {
+        let browser = makeBrowser(
+            identifier: "com.example.browser",
+            name: "Browser"
+        )
+        let store = try BrowserPickerStore(
+            destination: IncomingURL("https://example.com"),
+            browsers: [browser],
+            pickerShortcuts: [
+                "com.example.browser": #require(PickerShortcut("b")),
+            ]
+        )
+
+        #expect(
+            store.browser(
+                forPickerShortcutInput: "b",
+                modifiers: modifiers
+            ) == nil
+        )
+    }
+
     @Test("selects the first browser initially")
     func selectsFirstBrowser() throws {
         let browsers = [

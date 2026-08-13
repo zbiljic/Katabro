@@ -153,7 +153,8 @@ final class BrowserPickerCoordinator: NSObject {
     ) {
         let store = BrowserPickerStore(
             destination: request.destination,
-            browsers: browsers
+            browsers: browsers,
+            pickerShortcuts: dependencies.preferencesStore.pickerShortcuts
         )
         presentedStore = store
 
