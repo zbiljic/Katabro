@@ -13,10 +13,13 @@ release artifacts, notarization, and an installer are not available yet.
 - Handles HTTP and HTTPS links after macOS confirms Katabro as the default
   browser.
 - Discovers compatible browsers without a hard-coded browser list.
-- Supports arrow keys, Return or Space, Escape, and numeric picker shortcuts.
+- Supports arrow keys, Return or Space, Escape, numeric picker shortcuts, and
+  optional per-browser letter shortcuts.
 - Queues simultaneous link requests instead of dropping them.
-- Provides onboarding, Settings, open-at-login control, and browser ordering.
-- Syncs browser order through iCloud across Macs using the same Apple Account.
+- Provides onboarding, Settings, open-at-login control, browser ordering, and
+  shortcut assignment under **Shown Browsers**.
+- Syncs browser order and picker shortcuts through iCloud across Macs using the
+  same Apple Account.
 - Bundles a `katabro` command-line helper inside the application.
 - Keeps URL validation and routing policy in a portable Swift package.
 
@@ -95,6 +98,11 @@ Browser-order sync requires a correctly entitled build signed for an App ID
 with iCloud key-value storage enabled, such as a provisioned development or App
 Store build. Source builds without that capability keep browser preferences
 locally and continue to work without iCloud.
+
+Custom picker letters sync through iCloud in entitled builds. Assign one letter
+from A through Z to a browser in Settings > Browsers. Assigning a letter already
+in use moves it to the new browser. Numeric shortcuts 1 through 9 remain active
+at the same time and always follow the visible picker order.
 
 The default `Katabro` scheme deliberately has no iCloud entitlement and is the
 scheme used by `mise run check` and `scripts/run`. Apple Developer Program team
