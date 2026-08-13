@@ -35,6 +35,49 @@ struct ICloudPreferencesClientTests {
         #expect(store.synchronizeCallCount == 0)
     }
 
+    @Test("reads valid, empty, missing, and invalid picker shortcuts")
+    func readsPickerShortcuts() throws {
+        let store = InMemoryKeyValueStore()
+        let client = makeClient(store: store)
+
+        #expect(client.readPickerShortcuts() == .missing)
+
+        store.values[ICloudPreferencesClient.pickerShortcutsKey] = [
+            "browser.one": "a",
+            "browser.two": "Z",
+        ]
+        #expect(
+            try client.readPickerShortcuts() == .value([
+                "browser.one": #require(PickerShortcut("A")),
+                "browser.two": #require(PickerShortcut("Z")),
+            ])
+        )
+
+        store.values[ICloudPreferencesClient.pickerShortcutsKey] = [String: String]()
+        #expect(client.readPickerShortcuts() == .value([:]))
+
+        store.values[ICloudPreferencesClient.pickerShortcutsKey] = ["browser": "1"]
+        #expect(client.readPickerShortcuts() == .invalid)
+
+        store.values[ICloudPreferencesClient.pickerShortcutsKey] = ["not", "a", "dictionary"]
+        #expect(client.readPickerShortcuts() == .invalid)
+    }
+
+    @Test("writes picker shortcuts under their versioned key")
+    func writesPickerShortcuts() throws {
+        let store = InMemoryKeyValueStore()
+        let client = makeClient(store: store)
+
+        try client.writePickerShortcuts([
+            "browser.one": #require(PickerShortcut("a")),
+        ])
+
+        #expect(store.writes.count == 1)
+        #expect(store.writes.first?.key == "settings.pickerShortcuts.v1")
+        #expect(store.writes.first?.value as? [String: String] == ["browser.one": "A"])
+        #expect(store.synchronizeCallCount == 0)
+    }
+
     @Test("registers before synchronizing and starts only once")
     func startsIdempotently() async {
         let notificationCenter = NotificationCenter()
@@ -95,7 +138,11 @@ struct ICloudPreferencesClientTests {
 
         post(
             reason: NSUbiquitousKeyValueStoreServerChange,
-            keys: [ICloudPreferencesClient.browserOrderKey, "unrelated"],
+            keys: [
+                ICloudPreferencesClient.browserOrderKey,
+                ICloudPreferencesClient.pickerShortcutsKey,
+                "unrelated",
+            ],
             store: store,
             notificationCenter: notificationCenter
         )
@@ -121,7 +168,11 @@ struct ICloudPreferencesClientTests {
             events == [
                 .changed(
                     reason: .serverChange,
-                    keys: [ICloudPreferencesClient.browserOrderKey, "unrelated"]
+                    keys: [
+                        ICloudPreferencesClient.browserOrderKey,
+                        ICloudPreferencesClient.pickerShortcutsKey,
+                        "unrelated",
+                    ]
                 ),
                 .changed(
                     reason: .initialSync,

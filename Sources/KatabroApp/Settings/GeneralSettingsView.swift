@@ -72,7 +72,7 @@ struct GeneralSettingsView: View {
             }
 
             Section("iCloud") {
-                LabeledContent("Browser Order") {
+                LabeledContent("Browser Settings") {
                     Text(iCloudStatusDescription)
                         .font(.callout)
                         .foregroundStyle(.secondary)
@@ -97,11 +97,11 @@ struct GeneralSettingsView: View {
     private var iCloudStatusDescription: String {
         switch preferencesStore.iCloudSyncStatus {
         case .available:
-            "Browser order syncs through iCloud across Macs using the same Apple Account."
+            "Browser order and picker shortcuts sync through iCloud across Macs using the same Apple Account."
         case .localOnly:
-            "Browser order stays on this Mac because iCloud sync is unavailable for this build."
+            "Browser order and picker shortcuts stay on this Mac because iCloud sync is unavailable for this build."
         case .invalidCloudValue:
-            "Browser order stays on this Mac because the saved iCloud setting could not be read."
+            "Some browser settings stay on this Mac because the saved iCloud settings could not be read."
         }
     }
 }

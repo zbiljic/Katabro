@@ -17,7 +17,8 @@ final class PreferencesStore {
     }
 
     private enum UpdateOrigin: Equatable {
-        case user
+        case browserOrder
+        case pickerShortcuts
         case remote
         case local
     }
@@ -311,7 +312,7 @@ final class PreferencesStore {
         let changed = self.preferences != preferences
         update(
             preferences,
-            origin: .local
+            origin: .pickerShortcuts
         )
         return changed
     }
@@ -361,7 +362,7 @@ final class PreferencesStore {
         )
         update(
             preferences,
-            origin: .user
+            origin: .browserOrder
         )
     }
 
@@ -401,8 +402,17 @@ final class PreferencesStore {
         self.preferences = preferences
         save(preferences)
 
-        if origin == .user, iCloudSyncStatus == .available {
+        guard iCloudSyncStatus == .available else {
+            return
+        }
+
+        switch origin {
+        case .browserOrder:
             iCloudClient?.writeBrowserOrder(preferences.browserOrder)
+        case .pickerShortcuts:
+            iCloudClient?.writePickerShortcuts(preferences.pickerShortcuts)
+        case .remote, .local:
+            break
         }
     }
 
@@ -420,7 +430,7 @@ final class PreferencesStore {
             return
         }
 
-        applyCloudBrowserOrder(
+        applyCloudPreferences(
             seedWhenMissing: true
         )
     }
@@ -430,14 +440,18 @@ final class PreferencesStore {
     ) {
         switch event {
         case let .changed(reason, keys):
-            let ignoresBrowserOrder = reason == .serverChange
-                && keys?.contains(ICloudPreferencesClient.browserOrderKey) == false
+            let synchronizedKeys: Set<String> = [
+                ICloudPreferencesClient.browserOrderKey,
+                ICloudPreferencesClient.pickerShortcutsKey,
+            ]
+            let ignoresPreferences = reason == .serverChange
+                && keys?.isDisjoint(with: synchronizedKeys) == true
 
-            if ignoresBrowserOrder {
+            if ignoresPreferences {
                 return
             }
 
-            applyCloudBrowserOrder(
+            applyCloudPreferences(
                 seedWhenMissing: false
             )
         case .quotaViolation:
@@ -445,11 +459,26 @@ final class PreferencesStore {
         }
     }
 
-    private func applyCloudBrowserOrder(
+    private func applyCloudPreferences(
         seedWhenMissing: Bool
     ) {
+        let browserOrderIsValid = applyCloudBrowserOrder(
+            seedWhenMissing: seedWhenMissing
+        )
+        let pickerShortcutsAreValid = applyCloudPickerShortcuts(
+            seedWhenMissing: seedWhenMissing
+        )
+
+        iCloudSyncStatus = browserOrderIsValid && pickerShortcutsAreValid
+            ? .available
+            : .invalidCloudValue
+    }
+
+    private func applyCloudBrowserOrder(
+        seedWhenMissing: Bool
+    ) -> Bool {
         guard let iCloudClient else {
-            return
+            return true
         }
 
         switch iCloudClient.readBrowserOrder() {
@@ -460,7 +489,7 @@ final class PreferencesStore {
                 preferences,
                 origin: .remote
             )
-            iCloudSyncStatus = .available
+            return true
         case .missing:
             let normalizedOrder = Self.normalizedOrder(browserOrder)
             var preferences = preferences
@@ -469,13 +498,50 @@ final class PreferencesStore {
                 preferences,
                 origin: .remote
             )
-            iCloudSyncStatus = .available
-
             if seedWhenMissing {
                 iCloudClient.writeBrowserOrder(normalizedOrder)
             }
+            return true
         case .invalid:
-            iCloudSyncStatus = .invalidCloudValue
+            return false
+        }
+    }
+
+    private func applyCloudPickerShortcuts(
+        seedWhenMissing: Bool
+    ) -> Bool {
+        guard let iCloudClient else {
+            return true
+        }
+
+        switch iCloudClient.readPickerShortcuts() {
+        case let .value(pickerShortcuts):
+            var preferences = preferences
+            preferences.pickerShortcuts = Self.normalizedPickerShortcuts(
+                pickerShortcuts
+            )
+            update(
+                preferences,
+                origin: .remote
+            )
+            return true
+        case .missing:
+            let normalizedShortcuts = Self.normalizedPickerShortcuts(
+                pickerShortcuts
+            )
+            var preferences = preferences
+            preferences.pickerShortcuts = normalizedShortcuts
+            update(
+                preferences,
+                origin: .remote
+            )
+
+            if seedWhenMissing {
+                iCloudClient.writePickerShortcuts(normalizedShortcuts)
+            }
+            return true
+        case .invalid:
+            return false
         }
     }
 

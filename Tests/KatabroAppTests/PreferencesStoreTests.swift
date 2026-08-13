@@ -163,8 +163,8 @@ struct PreferencesStoreTests {
         #expect(saves.count == 2)
     }
 
-    @Test("picker shortcut changes stay local when iCloud is available")
-    func keepsPickerShortcutsLocal() throws {
+    @Test("picker shortcut changes write their iCloud key when available")
+    func syncsPickerShortcuts() throws {
         let input = "O"
         let shortcut = try #require(PickerShortcut(input))
         let cloudStore = PreferencesCloudStoreSpy()
@@ -189,7 +189,9 @@ struct PreferencesStoreTests {
 
         #expect(saves.count == 1)
         #expect(saves[0].browserOrder == ["one"])
-        #expect(cloudStore.writes.isEmpty)
+        #expect(cloudStore.writes.count == 1)
+        #expect(cloudStore.writes.first?.key == ICloudPreferencesClient.pickerShortcutsKey)
+        #expect(cloudStore.writes.first?.value as? [String: String] == ["one": "O"])
     }
 
     @Test("restores known browser order and appends new browsers")

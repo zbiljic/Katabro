@@ -108,7 +108,7 @@ final class KatabroUITests: XCTestCase {
         let status = application.staticTexts["settings.icloud.status"]
         assertExists(status)
         let expectedStatus =
-            "Browser order stays on this Mac because iCloud sync is unavailable for this build."
+            "Browser order and picker shortcuts stay on this Mac because iCloud sync is unavailable for this build."
         XCTAssertTrue(
             status.label == expectedStatus
                 || status.value as? String == expectedStatus

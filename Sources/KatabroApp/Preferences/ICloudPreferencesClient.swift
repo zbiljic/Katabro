@@ -17,6 +17,12 @@ final class ICloudPreferencesClient: NSObject {
         case invalid
     }
 
+    enum PickerShortcutsReadResult: Equatable, Sendable {
+        case missing
+        case value([String: PickerShortcut])
+        case invalid
+    }
+
     enum ChangeReason: Equatable, Sendable {
         case serverChange
         case initialSync
@@ -32,6 +38,7 @@ final class ICloudPreferencesClient: NSObject {
     }
 
     static let browserOrderKey = "settings.browserOrder.v1"
+    static let pickerShortcutsKey = "settings.pickerShortcuts.v1"
 
     private let store: any ICloudKeyValueStoring
     private let notificationCenter: NotificationCenter
@@ -83,6 +90,41 @@ final class ICloudPreferencesClient: NSObject {
         store.set(
             browserOrder,
             forKey: Self.browserOrderKey
+        )
+    }
+
+    func readPickerShortcuts() -> PickerShortcutsReadResult {
+        guard
+            let value = store.object(
+                forKey: Self.pickerShortcutsKey
+            )
+        else {
+            return .missing
+        }
+
+        guard let encodedShortcuts = value as? [String: String] else {
+            return .invalid
+        }
+
+        var shortcuts: [String: PickerShortcut] = [:]
+
+        for (identifier, value) in encodedShortcuts {
+            guard let shortcut = PickerShortcut(value) else {
+                return .invalid
+            }
+
+            shortcuts[identifier] = shortcut
+        }
+
+        return .value(shortcuts)
+    }
+
+    func writePickerShortcuts(
+        _ pickerShortcuts: [String: PickerShortcut]
+    ) {
+        store.set(
+            pickerShortcuts.mapValues(\.rawValue),
+            forKey: Self.pickerShortcutsKey
         )
     }
 

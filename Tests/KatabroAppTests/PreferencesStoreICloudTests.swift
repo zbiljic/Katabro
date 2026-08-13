@@ -2,6 +2,8 @@ import Foundation
 @testable import Katabro
 import Testing
 
+// The suite keeps the complete multi-key synchronization contract in one harness.
+// swiftlint:disable file_length type_body_length
 @MainActor
 @Suite("iCloud preference sync")
 struct PreferencesStoreICloudTests {
@@ -22,6 +24,36 @@ struct PreferencesStoreICloudTests {
 
         #expect(store.browserOrder == ["cloud.second", "cloud.first"])
         #expect(store.hasCompletedOnboarding)
+        #expect(store.iCloudSyncStatus == .available)
+        #expect(saves == [store.preferences])
+        #expect(harness.keyValueStore.writes.isEmpty)
+    }
+
+    @Test("cloud shortcuts win and normalize at startup")
+    func appliesCloudShortcutsAtStartup() throws {
+        let harness = PreferencesCloudHarness(
+            cloudValue: ["browser.one", "browser.two"],
+            cloudShortcuts: [
+                " BROWSER.TWO ": "a",
+                "browser.one": "S",
+            ]
+        )
+        var saves: [AppPreferences] = []
+        let store = try harness.makeStore(
+            preferences: AppPreferences(
+                browserOrder: ["browser.one", "browser.two"],
+                pickerShortcuts: [
+                    "local.browser": #require(PickerShortcut("L")),
+                ]
+            )
+        ) { saves.append($0) }
+
+        store.startICloudSync()
+
+        #expect(try store.pickerShortcuts == [
+            "browser.one": #require(PickerShortcut("S")),
+            "browser.two": #require(PickerShortcut("A")),
+        ])
         #expect(store.iCloudSyncStatus == .available)
         #expect(saves == [store.preferences])
         #expect(harness.keyValueStore.writes.isEmpty)
@@ -67,6 +99,29 @@ struct PreferencesStoreICloudTests {
         #expect(harness.keyValueStore.synchronizeCallCount == 1)
     }
 
+    @Test("missing cloud shortcuts seed normalized local assignments once")
+    func seedsMissingCloudShortcuts() throws {
+        let harness = PreferencesCloudHarness(
+            cloudValue: ["browser.one"],
+            cloudShortcuts: nil
+        )
+        let store = try harness.makeStore(
+            preferences: AppPreferences(
+                pickerShortcuts: [
+                    " BROWSER.ONE ": #require(PickerShortcut("s")),
+                ]
+            )
+        ) { _ in }
+
+        store.startICloudSync()
+
+        #expect(try store.pickerShortcuts == [
+            "browser.one": #require(PickerShortcut("S")),
+        ])
+        #expect(harness.writtenShortcuts == [["browser.one": "S"]])
+        #expect(store.iCloudSyncStatus == .available)
+    }
+
     @Test("invalid cloud data remains untouched while local updates work")
     func retainsInvalidCloudData() {
         let harness = PreferencesCloudHarness(
@@ -108,6 +163,31 @@ struct PreferencesStoreICloudTests {
         #expect(harness.keyValueStore.synchronizeCallCount == 1)
     }
 
+    @Test("local shortcut changes write local and cloud once")
+    func uploadsLocalShortcutChange() throws {
+        let harness = PreferencesCloudHarness(
+            cloudValue: ["browser.one"]
+        )
+        var saves: [AppPreferences] = []
+        let store = harness.makeStore(
+            preferences: AppPreferences(
+                browserOrder: ["browser.one"]
+            )
+        ) { saves.append($0) }
+        store.startICloudSync()
+        let shortcut = try #require(PickerShortcut("S"))
+
+        store.setPickerShortcut(
+            shortcut,
+            for: "browser.one"
+        )
+
+        #expect(try saves.map(\.pickerShortcuts) == [[
+            "browser.one": #require(PickerShortcut("S")),
+        ]])
+        #expect(harness.writtenShortcuts == [["browser.one": "S"]])
+    }
+
     @Test("remote changes update locally without echoing")
     func appliesRemoteChangesWithoutEcho() async {
         let harness = PreferencesCloudHarness(
@@ -130,6 +210,60 @@ struct PreferencesStoreICloudTests {
         #expect(saves.map(\.browserOrder) == [["two", "one"]])
         #expect(harness.keyValueStore.writes.isEmpty)
         #expect(store.iCloudSyncStatus == .available)
+    }
+
+    @Test("remote shortcut changes update locally without echoing")
+    func appliesRemoteShortcutChangesWithoutEcho() async throws {
+        let harness = PreferencesCloudHarness(
+            cloudValue: ["browser.one"],
+            cloudShortcuts: ["browser.one": "S"]
+        )
+        var saves: [AppPreferences] = []
+        let store = try harness.makeStore(
+            preferences: AppPreferences(
+                browserOrder: ["browser.one"],
+                pickerShortcuts: [
+                    "browser.one": #require(PickerShortcut("S")),
+                ]
+            )
+        ) { saves.append($0) }
+        store.startICloudSync()
+
+        harness.setCloudShortcuts(["browser.two": "c"])
+        harness.post(
+            reason: NSUbiquitousKeyValueStoreServerChange,
+            keys: [ICloudPreferencesClient.pickerShortcutsKey]
+        )
+        await Task.yield()
+
+        #expect(try store.pickerShortcuts == [
+            "browser.two": #require(PickerShortcut("C")),
+        ])
+        #expect(try saves.map(\.pickerShortcuts) == [[
+            "browser.two": #require(PickerShortcut("C")),
+        ]])
+        #expect(harness.keyValueStore.writes.isEmpty)
+        #expect(store.iCloudSyncStatus == .available)
+    }
+
+    @Test("invalid cloud shortcuts retain local assignments")
+    func retainsInvalidCloudShortcuts() throws {
+        let harness = PreferencesCloudHarness(
+            cloudValue: ["browser.one"],
+            cloudShortcuts: ["browser.one": "1"]
+        )
+        let localShortcut = try #require(PickerShortcut("S"))
+        let store = harness.makeStore(
+            preferences: AppPreferences(
+                pickerShortcuts: ["browser.one": localShortcut]
+            )
+        ) { _ in }
+
+        store.startICloudSync()
+
+        #expect(store.pickerShortcuts == ["browser.one": localShortcut])
+        #expect(store.iCloudSyncStatus == .invalidCloudValue)
+        #expect(harness.keyValueStore.writes.isEmpty)
     }
 
     @Test("irrelevant server changes are ignored")
@@ -253,6 +387,8 @@ struct PreferencesStoreICloudTests {
     }
 }
 
+// swiftlint:enable type_body_length
+
 @MainActor
 private final class PreferencesCloudHarness {
     let keyValueStore = PreferencesKeyValueStore()
@@ -269,12 +405,26 @@ private final class PreferencesCloudHarness {
         }
     }
 
+    var writtenShortcuts: [[String: String]] {
+        keyValueStore.writes.compactMap { write in
+            guard write.key == ICloudPreferencesClient.pickerShortcutsKey else {
+                return nil
+            }
+
+            return write.value as? [String: String]
+        }
+    }
+
     init(
         cloudValue: Any? = nil,
+        cloudShortcuts: Any? = [String: String](),
         synchronizeResult: Bool = true
     ) {
         if let cloudValue {
             keyValueStore.values[ICloudPreferencesClient.browserOrderKey] = cloudValue
+        }
+        if let cloudShortcuts {
+            keyValueStore.values[ICloudPreferencesClient.pickerShortcutsKey] = cloudShortcuts
         }
         keyValueStore.synchronizeResult = synchronizeResult
         client = ICloudPreferencesClient(
@@ -296,6 +446,10 @@ private final class PreferencesCloudHarness {
 
     func setCloudValue(_ value: Any) {
         keyValueStore.values[ICloudPreferencesClient.browserOrderKey] = value
+    }
+
+    func setCloudShortcuts(_ value: Any) {
+        keyValueStore.values[ICloudPreferencesClient.pickerShortcutsKey] = value
     }
 
     func removeCloudValue() {
@@ -360,3 +514,5 @@ private final class PreferencesKeyValueStore: ICloudKeyValueStoring {
         return synchronizeResult
     }
 }
+
+// swiftlint:enable file_length
