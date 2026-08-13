@@ -35,6 +35,7 @@ enum AccessibilityIdentifier {
     static let pickerDestination = "picker.destination"
     static let pickerEmptyState = "picker.empty-state"
     static let pickerSelectionReceipt = "picker.selection-receipt"
+    static let pickerCancellationReceipt = "picker.cancellation-receipt"
 
     static func browserOrderRow(
         bundleIdentifier: String
@@ -58,6 +59,18 @@ enum AccessibilityIdentifier {
         bundleIdentifier: String
     ) -> String {
         "settings.browser-row.\(bundleIdentifier).visibility"
+    }
+
+    static func browserPickerShortcut(
+        bundleIdentifier: String
+    ) -> String {
+        "settings.browser-row.\(bundleIdentifier).shortcut"
+    }
+
+    static func browserPickerShortcutClear(
+        bundleIdentifier: String
+    ) -> String {
+        "settings.browser-row.\(bundleIdentifier).shortcut-clear"
     }
 
     static func pickerBrowser(

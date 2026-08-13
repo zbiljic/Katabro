@@ -1,6 +1,8 @@
 import KatabroCore
 import SwiftUI
 
+// Browser rows keep visibility, shortcut, and reorder interactions together.
+// swiftlint:disable type_body_length
 struct BrowserOrderView: View {
     let browserDiscovery: any BrowserDiscovering
     let preferencesStore: PreferencesStore
@@ -12,13 +14,15 @@ struct BrowserOrderView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Browser Order")
+            Text("Shown Browsers")
                 .font(.headline)
 
             Text(
                 "Checked browsers appear in the picker. "
                     + "Their list order controls the picker order, "
-                    + "and newly installed browsers are shown by default."
+                    + "and newly installed browsers are shown by default. "
+                    + "Press a letter in a shortcut field to open that browser directly from the picker. "
+                    + "Assigning a used letter moves it."
             )
             .font(.callout)
             .foregroundStyle(.secondary)
@@ -102,7 +106,11 @@ struct BrowserOrderView: View {
         _ browser: BrowserApplication,
         at index: Int
     ) -> some View {
-        HStack(spacing: 10) {
+        let pickerShortcut = preferencesStore.pickerShortcut(
+            for: browser.browser.bundleIdentifier
+        )
+
+        return HStack(spacing: 10) {
             Toggle(
                 isOn: visibilityBinding(for: browser)
             ) {
@@ -114,6 +122,8 @@ struct BrowserOrderView: View {
                         .accessibilityHidden(true)
 
                     Text(browser.browser.displayName)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 }
             }
             .toggleStyle(.checkbox)
@@ -131,7 +141,46 @@ struct BrowserOrderView: View {
                 )
             )
 
-            Spacer()
+            Spacer(minLength: 4)
+
+            HStack(spacing: 3) {
+                PickerShortcutField(
+                    shortcut: pickerShortcut,
+                    accessibilityLabel: "Shortcut for \(browser.browser.displayName)",
+                    accessibilityIdentifier: AccessibilityIdentifier.browserPickerShortcut(
+                        bundleIdentifier: browser.browser.bundleIdentifier
+                    )
+                ) { shortcut in
+                    preferencesStore.setPickerShortcut(
+                        shortcut,
+                        for: browser.browser.bundleIdentifier
+                    )
+                }
+                .frame(width: 38)
+                .help("Press a letter to assign it.")
+
+                if pickerShortcut != nil {
+                    Button {
+                        preferencesStore.setPickerShortcut(
+                            nil,
+                            for: browser.browser.bundleIdentifier
+                        )
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(
+                        "Clear shortcut for \(browser.browser.displayName)"
+                    )
+                    .accessibilityIdentifier(
+                        AccessibilityIdentifier.browserPickerShortcutClear(
+                            bundleIdentifier: browser.browser.bundleIdentifier
+                        )
+                    )
+                }
+            }
+            .frame(width: 58, alignment: .leading)
 
             moveButton(
                 browser: browser,
@@ -299,3 +348,5 @@ struct BrowserOrderView: View {
         )
     }
 }
+
+// swiftlint:enable type_body_length
