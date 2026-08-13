@@ -34,6 +34,7 @@ enum AccessibilityIdentifier {
 
     static let pickerDestination = "picker.destination"
     static let pickerEmptyState = "picker.empty-state"
+    static let pickerSelectionReceipt = "picker.selection-receipt"
 
     static func browserOrderRow(
         bundleIdentifier: String

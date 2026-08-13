@@ -57,7 +57,6 @@
         static let surfaceArgument = "--ui-review"
         static let stateArgument = "--ui-state"
         static let appearanceArgument = "--ui-appearance"
-
         let surface: DevelopmentUISurface
         let state: DevelopmentUIState
         var appearance = DevelopmentUIAppearance.system
@@ -347,18 +346,8 @@
                         preferencesStore: dependencies.preferencesStore
                     ) {}
                 case .picker:
-                    BrowserPickerView(
-                        store: DevelopmentUIFixtures.pickerStore(
-                            for: configuration.state
-                        ),
-                        onSelect: { _ in },
-                        onCancel: {}
-                    )
-                    .frame(
-                        minHeight: DevelopmentUIFixtures.pickerHeight(
-                            for: configuration.state
-                        ),
-                        alignment: .top
+                    DevelopmentPickerReviewView(
+                        state: configuration.state
                     )
                 case .menu:
                     MenuBarView(
@@ -374,6 +363,39 @@
             .preferredColorScheme(
                 configuration.appearance.colorScheme
             )
+        }
+    }
+
+    private struct DevelopmentPickerReviewView: View {
+        @State private var selectedBrowserName: String?
+        @State private var selectionCount = 0
+        let state: DevelopmentUIState
+        var body: some View {
+            VStack(spacing: 4) {
+                BrowserPickerView(
+                    store: DevelopmentUIFixtures.pickerStore(for: state),
+                    onSelect: recordSelection
+                ) {}
+
+                Text(selectionReceipt)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Picker selection receipt")
+                    .accessibilityValue(selectionReceipt)
+                    .accessibilityIdentifier(AccessibilityIdentifier.pickerSelectionReceipt)
+            }
+            .frame(minHeight: DevelopmentUIFixtures.pickerHeight(for: state), alignment: .top)
+        }
+
+        private var selectionReceipt: String {
+            selectedBrowserName.map {
+                "\($0) selected \(selectionCount) time\(selectionCount == 1 ? "" : "s")"
+            } ?? "No browser selected"
+        }
+
+        private func recordSelection(_ browser: BrowserApplication) {
+            selectedBrowserName = browser.browser.displayName
+            selectionCount += 1
         }
     }
 

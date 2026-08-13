@@ -339,6 +339,43 @@ final class KatabroUITests: XCTestCase {
 
 extension KatabroUITests {
     @MainActor
+    func testPickerKeyboardSelection() {
+        let application = launch(
+            surface: "picker",
+            state: "normal"
+        )
+        defer {
+            application.terminate()
+        }
+        let receipt = application.descendants(
+            matching: .any
+        )["picker.selection-receipt"]
+
+        assertExists(receipt)
+        XCTAssertEqual(
+            receipt.value as? String,
+            "No browser selected"
+        )
+
+        application.typeKey(" ", modifierFlags: [])
+
+        let selectionRecorded = NSPredicate(
+            format: "value ENDSWITH %@",
+            " selected 1 time"
+        )
+        expectation(
+            for: selectionRecorded,
+            evaluatedWith: receipt
+        )
+        waitForExpectations(timeout: 5)
+        XCTAssertTrue(
+            (receipt.value as? String)?.hasSuffix(
+                " selected 1 time"
+            ) == true
+        )
+    }
+
+    @MainActor
     func testSettingsAboutPane() {
         let application = launch(
             surface: "settings",

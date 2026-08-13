@@ -66,15 +66,22 @@ struct BrowserPickerView: View {
             return .handled
         }
         .onKeyPress(.return) {
-            if let browser = store.selectedBrowser {
-                onSelect(browser)
-            }
-            return .handled
+            activateSelection()
+        }
+        .onKeyPress(.space) {
+            activateSelection()
         }
         .onKeyPress(.escape) {
             onCancel()
             return .handled
         }
+    }
+
+    private func activateSelection() -> KeyPress.Result {
+        if let browser = store.selectedBrowser {
+            onSelect(browser)
+        }
+        return .handled
     }
 
     private var header: some View {

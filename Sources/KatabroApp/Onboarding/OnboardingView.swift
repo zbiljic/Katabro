@@ -40,7 +40,7 @@ struct OnboardingView: View {
                 setupStep(
                     number: 3,
                     title: "Choose with the mouse or keyboard",
-                    detail: "Use the arrow keys and Return, or press a displayed number."
+                    detail: "Use the arrow keys and Return or Space, or press a displayed number."
                 )
             }
 

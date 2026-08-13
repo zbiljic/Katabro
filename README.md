@@ -13,7 +13,7 @@ release artifacts, notarization, and an installer are not available yet.
 - Handles HTTP and HTTPS links after macOS confirms Katabro as the default
   browser.
 - Discovers compatible browsers without a hard-coded browser list.
-- Supports arrow keys, Return, Escape, and numeric picker shortcuts.
+- Supports arrow keys, Return or Space, Escape, and numeric picker shortcuts.
 - Queues simultaneous link requests instead of dropping them.
 - Provides onboarding, Settings, open-at-login control, and browser ordering.
 - Syncs browser order through iCloud across Macs using the same Apple Account.
