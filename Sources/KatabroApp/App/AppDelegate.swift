@@ -32,7 +32,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.init(
                 dependencies: configuration.map {
                     DevelopmentUIFixtures.dependencies(
-                        for: $0.state
+                        for: $0.state,
+                        preferencesSuite: $0.preferencesSuite,
+                        resetsPreferences: $0.resetsPreferences
                     )
                 } ?? .live,
                 developmentUIConfiguration: configuration

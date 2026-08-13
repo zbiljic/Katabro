@@ -1,5 +1,7 @@
 import XCTest
 
+// UI fixture coverage intentionally shares launch and assertion helpers.
+// swiftlint:disable file_length
 final class KatabroUITests: XCTestCase {
     @MainActor
     func testSettingsNormalState() {
@@ -338,6 +340,133 @@ final class KatabroUITests: XCTestCase {
 }
 
 extension KatabroUITests {
+    // swiftlint:disable function_body_length
+    @MainActor
+    func testPickerLetterShortcuts() {
+        let preferencesSuite = "picker-shortcuts-\(UUID().uuidString)"
+        var application = launch(
+            surface: "settings",
+            state: "normal",
+            preferencesSuite: preferencesSuite,
+            resetsPreferences: true
+        )
+        application.radioButtons["settings.pane.browsers"].click()
+
+        let safariShortcut = application.descendants(matching: .any)[
+            "settings.browser-row.com.apple.Safari.shortcut"
+        ]
+        let chromeShortcut = application.descendants(matching: .any)[
+            "settings.browser-row.com.google.Chrome.shortcut"
+        ]
+        let chromeVisibility = application.descendants(matching: .any)[
+            "settings.browser-row.com.google.Chrome.visibility"
+        ]
+        assertExists(safariShortcut)
+        assertExists(chromeShortcut)
+        XCTAssertEqual(shortcutValue(safariShortcut), "S")
+        XCTAssertEqual(shortcutValue(chromeShortcut), "C")
+
+        enterShortcut("s", in: chromeShortcut)
+        XCTAssertEqual(shortcutValue(chromeShortcut), "S")
+        XCTAssertEqual(shortcutValue(safariShortcut), "—")
+
+        chromeVisibility.click()
+        XCTAssertFalse(isControlOn(chromeVisibility))
+        application.terminate()
+
+        application = launch(
+            surface: "settings",
+            state: "normal",
+            preferencesSuite: preferencesSuite
+        )
+        application.radioButtons["settings.pane.browsers"].click()
+        let persistedChromeShortcut = application.descendants(matching: .any)[
+            "settings.browser-row.com.google.Chrome.shortcut"
+        ]
+        let persistedChromeVisibility = application.descendants(matching: .any)[
+            "settings.browser-row.com.google.Chrome.visibility"
+        ]
+        let persistedChromeShortcutClear = application.descendants(matching: .any)[
+            "settings.browser-row.com.google.Chrome.shortcut-clear"
+        ]
+        assertExists(persistedChromeShortcut)
+        assertExists(persistedChromeShortcutClear)
+        XCTAssertEqual(shortcutValue(persistedChromeShortcut), "S")
+        XCTAssertFalse(isControlOn(persistedChromeVisibility))
+
+        persistedChromeShortcutClear.click()
+        XCTAssertEqual(shortcutValue(persistedChromeShortcut), "—")
+        persistedChromeShortcut.typeKey("1", modifierFlags: [])
+        XCTAssertEqual(shortcutValue(persistedChromeShortcut), "—")
+        enterShortcut("s", in: persistedChromeShortcut)
+        persistedChromeVisibility.click()
+        XCTAssertTrue(isControlOn(persistedChromeVisibility))
+        application.terminate()
+
+        application = launch(
+            surface: "picker",
+            state: "normal",
+            preferencesSuite: preferencesSuite
+        )
+        var receipt = application.descendants(matching: .any)["picker.selection-receipt"]
+        assertExists(receipt)
+        application.typeKey("s", modifierFlags: [])
+        assertReceipt(receipt, equals: "Google Chrome selected 1 time")
+        application.terminate()
+
+        application = launch(
+            surface: "picker",
+            state: "normal",
+            preferencesSuite: preferencesSuite
+        )
+        receipt = application.descendants(matching: .any)["picker.selection-receipt"]
+        assertExists(receipt)
+        application.typeKey("2", modifierFlags: [])
+        assertReceipt(receipt, equals: "Google Chrome selected 1 time")
+        application.typeKey("1", modifierFlags: [])
+        assertReceipt(receipt, equals: "Safari selected 2 times")
+        application.terminate()
+
+        for modifiers in [
+            XCUIElement.KeyModifierFlags.shift,
+            XCUIElement.KeyModifierFlags.capsLock,
+        ] {
+            application = launch(
+                surface: "picker",
+                state: "normal",
+                preferencesSuite: preferencesSuite
+            )
+            receipt = application.descendants(matching: .any)["picker.selection-receipt"]
+            assertExists(receipt)
+            application.typeKey("s", modifierFlags: modifiers)
+            assertReceipt(receipt, equals: "Google Chrome selected 1 time")
+            application.terminate()
+        }
+
+        application = launch(
+            surface: "picker",
+            state: "normal",
+            preferencesSuite: preferencesSuite
+        )
+        receipt = application.descendants(matching: .any)["picker.selection-receipt"]
+        assertExists(receipt)
+        for modifiers in [
+            XCUIElement.KeyModifierFlags.command,
+            XCUIElement.KeyModifierFlags.option,
+            XCUIElement.KeyModifierFlags.control,
+        ] {
+            application.typeKey("s", modifierFlags: modifiers)
+            XCTAssertEqual(receipt.value as? String, "No browser selected")
+        }
+        attachScreenshot(
+            named: "Picker-letter-shortcuts",
+            from: application
+        )
+        application.terminate()
+    }
+
+    // swiftlint:enable function_body_length
+
     @MainActor
     func testPickerKeyboardSelection() {
         let application = launch(
@@ -350,8 +479,12 @@ extension KatabroUITests {
         let receipt = application.descendants(
             matching: .any
         )["picker.selection-receipt"]
+        let cancellationReceipt = application.descendants(
+            matching: .any
+        )["picker.cancellation-receipt"]
 
         assertExists(receipt)
+        assertExists(cancellationReceipt)
         XCTAssertEqual(
             receipt.value as? String,
             "No browser selected"
@@ -372,6 +505,19 @@ extension KatabroUITests {
             (receipt.value as? String)?.hasSuffix(
                 " selected 1 time"
             ) == true
+        )
+
+        application.typeKey(.downArrow, modifierFlags: [])
+        application.typeKey(.return, modifierFlags: [])
+        assertReceipt(
+            receipt,
+            equals: "Google Chrome selected 2 times"
+        )
+
+        application.typeKey(.escape, modifierFlags: [])
+        assertReceipt(
+            cancellationReceipt,
+            equals: "Picker cancelled 1 time"
         )
     }
 
@@ -402,7 +548,9 @@ private extension KatabroUITests {
     func launch(
         surface: String,
         state: String,
-        appearance: String = "system"
+        appearance: String = "system",
+        preferencesSuite: String? = nil,
+        resetsPreferences: Bool = false
     ) -> XCUIApplication {
         let application = XCUIApplication()
         application.launchArguments = [
@@ -413,8 +561,56 @@ private extension KatabroUITests {
             "--ui-appearance",
             appearance,
         ]
+        if let preferencesSuite {
+            application.launchArguments += [
+                "--ui-preferences-suite",
+                preferencesSuite,
+            ]
+        }
+        if resetsPreferences {
+            application.launchArguments.append(
+                "--ui-reset-preferences"
+            )
+        }
         application.launch()
         return application
+    }
+
+    @MainActor
+    func enterShortcut(
+        _ value: String,
+        in shortcutField: XCUIElement
+    ) {
+        shortcutField.click()
+        shortcutField.typeText(value)
+    }
+
+    @MainActor
+    func shortcutValue(
+        _ shortcutPicker: XCUIElement
+    ) -> String {
+        if let value = shortcutPicker.value as? String {
+            return value.isEmpty ? "—" : value
+        }
+
+        return String(describing: shortcutPicker.value)
+    }
+
+    @MainActor
+    func assertReceipt(
+        _ receipt: XCUIElement,
+        equals expectedValue: String
+    ) {
+        let predicate = NSPredicate(
+            format: "value == %@",
+            expectedValue
+        )
+        expectation(
+            for: predicate,
+            evaluatedWith: receipt
+        )
+        waitForExpectations(timeout: 5)
+        XCTAssertEqual(receipt.value as? String, expectedValue)
     }
 
     @MainActor
@@ -458,3 +654,5 @@ private extension KatabroUITests {
         )
     }
 }
+
+// swiftlint:enable file_length

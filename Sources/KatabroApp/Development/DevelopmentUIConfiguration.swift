@@ -1,3 +1,5 @@
+// Deterministic fixtures and their review window intentionally live together.
+// swiftlint:disable file_length
 #if DEBUG
     import AppKit
     import KatabroCore
@@ -57,9 +59,13 @@
         static let surfaceArgument = "--ui-review"
         static let stateArgument = "--ui-state"
         static let appearanceArgument = "--ui-appearance"
+        static let preferencesSuiteArgument = "--ui-preferences-suite"
+        static let resetPreferencesArgument = "--ui-reset-preferences"
         let surface: DevelopmentUISurface
         let state: DevelopmentUIState
         var appearance = DevelopmentUIAppearance.system
+        var preferencesSuite: String?
+        var resetsPreferences = false
 
         var windowTitle: String {
             "Katabro UI Review — \(surface.rawValue.capitalized)"
@@ -88,11 +94,19 @@
                 following: appearanceArgument,
                 in: arguments
             ).flatMap(DevelopmentUIAppearance.init(rawValue:)) ?? .system
+            let preferencesSuite = value(
+                following: preferencesSuiteArgument,
+                in: arguments
+            )
 
             return Self(
                 surface: surface,
                 state: state,
-                appearance: appearance
+                appearance: appearance,
+                preferencesSuite: preferencesSuite,
+                resetsPreferences: arguments.contains(
+                    resetPreferencesArgument
+                )
             )
         }
 
@@ -113,8 +127,11 @@
 
     @MainActor
     enum DevelopmentUIFixtures {
+        // swiftlint:disable:next function_body_length
         static func dependencies(
-            for state: DevelopmentUIState
+            for state: DevelopmentUIState,
+            preferencesSuite: String? = nil,
+            resetsPreferences: Bool = false
         ) -> AppDependencies {
             let serviceError = state == .serviceErrors
                 ? "The development fixture could not update this system setting."
@@ -152,6 +169,45 @@
                 )
             }
 
+            let initialPreferences = AppPreferences(
+                browserOrder: discoveredBrowsers.map(
+                    \.browser.bundleIdentifier
+                ),
+                pickerShortcuts: pickerShortcuts(
+                    for: state
+                ),
+                hasCompletedOnboarding: true
+            )
+            let preferencesStore: PreferencesStore
+
+            if let preferencesSuite {
+                let suiteName = "com.zbiljic.katabro.ui-review.\(preferencesSuite)"
+
+                if let userDefaults = UserDefaults(suiteName: suiteName) {
+                    if resetsPreferences {
+                        userDefaults.removePersistentDomain(
+                            forName: suiteName
+                        )
+                    }
+                    preferencesStore = PreferencesStore.live(
+                        userDefaults: userDefaults,
+                        iCloudClient: nil,
+                        defaultPreferences: initialPreferences
+                    )
+                } else {
+                    preferencesStore = PreferencesStore(
+                        initialPreferences: initialPreferences
+                    )
+                }
+            } else {
+                preferencesStore = PreferencesStore(
+                    initialPreferences: initialPreferences,
+                    initialSyncStatus: state == .serviceErrors
+                        ? .localOnly
+                        : .available
+                )
+            }
+
             return AppDependencies(
                 browserDiscovery: DevelopmentBrowserDiscovery(
                     behavior: discoveryBehavior
@@ -166,17 +222,7 @@
                     status: state == .serviceErrors ? .disabled : .enabled,
                     lastError: serviceError
                 ),
-                preferencesStore: PreferencesStore(
-                    initialPreferences: AppPreferences(
-                        browserOrder: discoveredBrowsers.map(
-                            \.browser.bundleIdentifier
-                        ),
-                        hasCompletedOnboarding: true
-                    ),
-                    initialSyncStatus: state == .serviceErrors
-                        ? .localOnly
-                        : .available
-                )
+                preferencesStore: preferencesStore
             )
         }
 
@@ -198,7 +244,8 @@
         }
 
         static func pickerStore(
-            for state: DevelopmentUIState
+            for state: DevelopmentUIState,
+            pickerShortcuts: [String: PickerShortcut]? = nil
         ) -> BrowserPickerStore {
             let destination = try? IncomingURL(
                 "https://developer.apple.com/documentation/swiftui"
@@ -208,7 +255,8 @@
                 destination: destination ?? fallbackDestination(),
                 browsers: browsers(
                     for: state
-                )
+                ),
+                pickerShortcuts: pickerShortcuts ?? self.pickerShortcuts(for: state)
             )
         }
 
@@ -254,8 +302,16 @@
                 ("com.vivaldi.Vivaldi", "Vivaldi", "v.square"),
                 ("org.chromium.Chromium", "Chromium", "gearshape.2"),
                 ("com.kagi.kagimacOS", "Orion", "sparkles"),
-                ("com.duckduckgo.macos.browser", "DuckDuckGo", "hand.raised"),
-                ("com.apple.SafariTechnologyPreview", "Safari Technology Preview", "hammer"),
+                (
+                    "com.duckduckgo.macos.browser",
+                    "DuckDuckGo Privacy Browser — Long Name Fixture",
+                    "hand.raised"
+                ),
+                (
+                    "com.apple.SafariTechnologyPreview",
+                    "Safari Technology Preview — Long Name Fixture",
+                    "hammer"
+                ),
             ]
 
             return definitions.prefix(count).map { identifier, name, symbol in
@@ -278,6 +334,36 @@
                     )
                 )
             }
+        }
+
+        private static func pickerShortcuts(
+            for state: DevelopmentUIState
+        ) -> [String: PickerShortcut] {
+            guard
+                state != .loading,
+                state != .noBrowsers,
+                state != .browserDiscoveryError
+            else {
+                return [:]
+            }
+
+            let definitions = [
+                ("com.apple.Safari", "s"),
+                ("com.google.Chrome", "c"),
+                ("org.mozilla.firefox", "f"),
+                ("company.thebrowser.Browser", "a"),
+                ("com.microsoft.edgemac", "e"),
+                ("com.brave.Browser", "b"),
+            ]
+            let assignmentCount = state == .manyBrowsers ? definitions.count : 2
+
+            return Dictionary(
+                uniqueKeysWithValues: definitions.prefix(assignmentCount).compactMap { identifier, value in
+                    PickerShortcut(value).map {
+                        (identifier, $0)
+                    }
+                }
+            )
         }
     }
 
@@ -347,7 +433,8 @@
                     ) {}
                 case .picker:
                     DevelopmentPickerReviewView(
-                        state: configuration.state
+                        state: configuration.state,
+                        preferencesStore: dependencies.preferencesStore
                     )
                 case .menu:
                     MenuBarView(
@@ -369,13 +456,20 @@
     private struct DevelopmentPickerReviewView: View {
         @State private var selectedBrowserName: String?
         @State private var selectionCount = 0
+        @State private var cancellationCount = 0
         let state: DevelopmentUIState
+        let preferencesStore: PreferencesStore
         var body: some View {
             VStack(spacing: 4) {
                 BrowserPickerView(
-                    store: DevelopmentUIFixtures.pickerStore(for: state),
+                    store: DevelopmentUIFixtures.pickerStore(
+                        for: state,
+                        pickerShortcuts: preferencesStore.pickerShortcuts
+                    ),
                     onSelect: recordSelection
-                ) {}
+                ) {
+                    cancellationCount += 1
+                }
 
                 Text(selectionReceipt)
                     .font(.caption2)
@@ -383,6 +477,13 @@
                     .accessibilityLabel("Picker selection receipt")
                     .accessibilityValue(selectionReceipt)
                     .accessibilityIdentifier(AccessibilityIdentifier.pickerSelectionReceipt)
+
+                Text(cancellationReceipt)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Picker cancellation receipt")
+                    .accessibilityValue(cancellationReceipt)
+                    .accessibilityIdentifier(AccessibilityIdentifier.pickerCancellationReceipt)
             }
             .frame(minHeight: DevelopmentUIFixtures.pickerHeight(for: state), alignment: .top)
         }
@@ -391,6 +492,12 @@
             selectedBrowserName.map {
                 "\($0) selected \(selectionCount) time\(selectionCount == 1 ? "" : "s")"
             } ?? "No browser selected"
+        }
+
+        private var cancellationReceipt: String {
+            cancellationCount == 0
+                ? "Picker not cancelled"
+                : "Picker cancelled \(cancellationCount) time\(cancellationCount == 1 ? "" : "s")"
         }
 
         private func recordSelection(_ browser: BrowserApplication) {

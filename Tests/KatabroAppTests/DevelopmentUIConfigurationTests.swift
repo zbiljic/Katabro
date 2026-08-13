@@ -103,5 +103,22 @@
 
             #expect(configuration?.appearance == appearance)
         }
+
+        @Test("parses persistent review preference arguments")
+        func parsesReviewPreferences() {
+            let configuration = DevelopmentUIConfiguration.current(
+                arguments: [
+                    "Katabro",
+                    DevelopmentUIConfiguration.surfaceArgument,
+                    DevelopmentUISurface.settings.rawValue,
+                    DevelopmentUIConfiguration.preferencesSuiteArgument,
+                    "shortcut-test",
+                    DevelopmentUIConfiguration.resetPreferencesArgument,
+                ]
+            )
+
+            #expect(configuration?.preferencesSuite == "shortcut-test")
+            #expect(configuration?.resetsPreferences == true)
+        }
     }
 #endif
