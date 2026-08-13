@@ -4,10 +4,194 @@ import KatabroCore
 import Testing
 
 // The suite covers the complete aggregate preference contract in one fixture namespace.
-// swiftlint:disable type_body_length
+// swiftlint:disable file_length type_body_length
 @MainActor
 @Suite("App preferences")
 struct PreferencesStoreTests {
+    @Test(
+        "validates and normalizes picker shortcut letters",
+        arguments: [
+            ("a", "A"),
+            ("z", "Z"),
+            ("A", "A"),
+            ("Z", "Z"),
+        ]
+    )
+    func validatesPickerShortcut(
+        input: String,
+        expected: String
+    ) throws {
+        let shortcut = try #require(PickerShortcut(input))
+
+        #expect(shortcut.rawValue == expected)
+        #expect(shortcut.displayValue == expected)
+    }
+
+    @Test(
+        "rejects invalid picker shortcut values",
+        arguments: [
+            "",
+            "aa",
+            "1",
+            "-",
+            " ",
+            "é",
+            "e\u{301}",
+        ]
+    )
+    func rejectsInvalidPickerShortcut(
+        input: String
+    ) {
+        #expect(PickerShortcut(input) == nil)
+    }
+
+    @Test("replaces picker shortcuts with the newly typed letter")
+    func replacesPickerShortcutFromEditedText() {
+        let testCases = [
+            ShortcutEditCase(currentValue: "", editedValue: "s", expected: "S"),
+            ShortcutEditCase(currentValue: "S", editedValue: "Sc", expected: "C"),
+            ShortcutEditCase(currentValue: "S", editedValue: "cS", expected: "C"),
+            ShortcutEditCase(currentValue: "S", editedValue: "Ss", expected: "S"),
+            ShortcutEditCase(currentValue: "S", editedValue: "S1", expected: nil),
+            ShortcutEditCase(currentValue: "", editedValue: "xy", expected: nil),
+        ]
+
+        for testCase in testCases {
+            #expect(
+                PickerShortcut.replacement(
+                    in: testCase.editedValue,
+                    replacing: testCase.currentValue
+                )?.rawValue == testCase.expected
+            )
+        }
+    }
+
+    @Test("picker shortcut survives a Codable round trip")
+    func pickerShortcutCodableRoundTrip() throws {
+        let shortcut = try #require(PickerShortcut("S"))
+        let data = try JSONEncoder().encode(shortcut)
+        let decoded = try JSONDecoder().decode(
+            PickerShortcut.self,
+            from: data
+        )
+
+        #expect(decoded == shortcut)
+        #expect(String(data: data, encoding: .utf8) == "\"S\"")
+    }
+
+    @Test("decodes missing and malformed picker shortcut data safely")
+    func decodesPickerShortcutCompatibility() throws {
+        let legacyData = Data(
+            """
+            {"browserOrder":["com.example.browser"]}
+            """.utf8
+        )
+        let malformedData = Data(
+            """
+            {"pickerShortcuts":{"valid.browser":"s","digit.browser":"1","long.browser":"xy"}}
+            """.utf8
+        )
+        let wrongShapeData = Data(
+            """
+            {"browserOrder":["preserved.browser"],"pickerShortcuts":["invalid"]}
+            """.utf8
+        )
+
+        let legacy = try JSONDecoder().decode(
+            AppPreferences.self,
+            from: legacyData
+        )
+        let malformed = try JSONDecoder().decode(
+            AppPreferences.self,
+            from: malformedData
+        )
+        let wrongShape = try JSONDecoder().decode(
+            AppPreferences.self,
+            from: wrongShapeData
+        )
+
+        #expect(legacy.pickerShortcuts.isEmpty)
+        #expect(malformed.pickerShortcuts == ["valid.browser": PickerShortcut("s")])
+        #expect(wrongShape.browserOrder == ["preserved.browser"])
+        #expect(wrongShape.pickerShortcuts.isEmpty)
+    }
+
+    @Test("normalizes identifiers and resolves duplicate letters deterministically")
+    func normalizesPickerShortcutAssignments() throws {
+        let shortcut = try #require(PickerShortcut("S"))
+        let store = try PreferencesStore(
+            initialPreferences: AppPreferences(
+                pickerShortcuts: [
+                    " z.browser ": shortcut,
+                    "A.browser": shortcut,
+                    "": #require(PickerShortcut("x")),
+                ]
+            )
+        )
+
+        #expect(store.pickerShortcuts == ["a.browser": shortcut])
+        #expect(store.pickerShortcut(for: " A.BROWSER ") == shortcut)
+    }
+
+    @Test("transfers and clears picker shortcuts atomically without no-op saves")
+    func transfersAndClearsPickerShortcuts() throws {
+        let shortcut = try #require(PickerShortcut("s"))
+        var saves: [AppPreferences] = []
+        let store = PreferencesStore(
+            initialPreferences: AppPreferences(
+                browserOrder: ["one", "two"],
+                hiddenBrowserIdentifiers: ["two"],
+                pickerShortcuts: ["one": shortcut],
+                hasCompletedOnboarding: true
+            )
+        ) { saves.append($0) }
+
+        #expect(!store.setPickerShortcut(shortcut, for: " ONE "))
+        #expect(saves.isEmpty)
+
+        #expect(store.setPickerShortcut(shortcut, for: "TWO"))
+        #expect(store.pickerShortcuts == ["two": shortcut])
+        #expect(store.hiddenBrowserIdentifiers == ["two"])
+        #expect(store.browserOrder == ["one", "two"])
+        #expect(store.hasCompletedOnboarding)
+        #expect(saves.count == 1)
+
+        #expect(store.setPickerShortcut(nil, for: "two"))
+        #expect(store.pickerShortcuts.isEmpty)
+        #expect(saves.count == 2)
+        #expect(!store.setPickerShortcut(nil, for: "two"))
+        #expect(saves.count == 2)
+    }
+
+    @Test("picker shortcut changes stay local when iCloud is available")
+    func keepsPickerShortcutsLocal() throws {
+        let input = "O"
+        let shortcut = try #require(PickerShortcut(input))
+        let cloudStore = PreferencesCloudStoreSpy()
+        var saves: [AppPreferences] = []
+        let store = PreferencesStore(
+            initialPreferences: AppPreferences(
+                browserOrder: ["one"]
+            ),
+            initialSyncStatus: .available,
+            iCloudClient: ICloudPreferencesClient(
+                store: cloudStore,
+                notificationCenter: NotificationCenter()
+            )
+        ) { saves.append($0) }
+
+        #expect(
+            store.setPickerShortcut(
+                shortcut,
+                for: "one"
+            )
+        )
+
+        #expect(saves.count == 1)
+        #expect(saves[0].browserOrder == ["one"])
+        #expect(cloudStore.writes.isEmpty)
+    }
+
     @Test("restores known browser order and appends new browsers")
     func reconcilesBrowserOrder() {
         var savedPreferences: [AppPreferences] = []
@@ -461,7 +645,11 @@ struct PreferencesStoreTests {
     }
 }
 
-// swiftlint:enable type_body_length
+struct ShortcutEditCase: Sendable {
+    let currentValue: String
+    let editedValue: String
+    let expected: String?
+}
 
 @MainActor
 private final class PreferencesCloudStoreSpy: ICloudKeyValueStoring {
@@ -489,3 +677,5 @@ private final class PreferencesCloudStoreSpy: ICloudKeyValueStoring {
         true
     }
 }
+
+// swiftlint:enable file_length type_body_length

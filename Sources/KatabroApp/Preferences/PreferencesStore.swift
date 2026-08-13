@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 // Visibility and iCloud reconciliation intentionally share the aggregate preference owner.
-// swiftlint:disable type_body_length
+// swiftlint:disable file_length type_body_length
 @MainActor
 @Observable
 final class PreferencesStore {
@@ -36,6 +36,10 @@ final class PreferencesStore {
         preferences.hiddenBrowserIdentifiers
     }
 
+    var pickerShortcuts: [String: PickerShortcut] {
+        preferences.pickerShortcuts
+    }
+
     var hasCompletedOnboarding: Bool {
         preferences.hasCompletedOnboarding
     }
@@ -49,6 +53,9 @@ final class PreferencesStore {
         var normalizedPreferences = initialPreferences
         normalizedPreferences.hiddenBrowserIdentifiers = Self.normalizedIdentifiers(
             initialPreferences.hiddenBrowserIdentifiers
+        )
+        normalizedPreferences.pickerShortcuts = Self.normalizedPickerShortcuts(
+            initialPreferences.pickerShortcuts
         )
         preferences = normalizedPreferences
         iCloudSyncStatus = initialSyncStatus
@@ -74,7 +81,8 @@ final class PreferencesStore {
 
     static func live(
         userDefaults: UserDefaults,
-        iCloudClient: ICloudPreferencesClient?
+        iCloudClient: ICloudPreferencesClient?,
+        defaultPreferences: AppPreferences = AppPreferences()
     ) -> PreferencesStore {
         let data = userDefaults.data(
             forKey: Key.preferences
@@ -84,7 +92,7 @@ final class PreferencesStore {
                 AppPreferences.self,
                 from: data
             )
-        } ?? AppPreferences()
+        } ?? defaultPreferences
 
         let store = Self(
             initialPreferences: preferences,
@@ -268,6 +276,46 @@ final class PreferencesStore {
         return true
     }
 
+    func pickerShortcut(
+        for bundleIdentifier: String
+    ) -> PickerShortcut? {
+        preferences.pickerShortcuts[
+            Self.normalizedIdentifier(bundleIdentifier)
+        ]
+    }
+
+    @discardableResult
+    func setPickerShortcut(
+        _ shortcut: PickerShortcut?,
+        for bundleIdentifier: String
+    ) -> Bool {
+        let identifier = Self.normalizedIdentifier(bundleIdentifier)
+
+        guard !identifier.isEmpty else {
+            return false
+        }
+
+        var preferences = preferences
+
+        if let shortcut {
+            preferences.pickerShortcuts = preferences.pickerShortcuts.filter {
+                $0.value != shortcut
+            }
+            preferences.pickerShortcuts[identifier] = shortcut
+        } else {
+            preferences.pickerShortcuts.removeValue(
+                forKey: identifier
+            )
+        }
+
+        let changed = self.preferences != preferences
+        update(
+            preferences,
+            origin: .local
+        )
+        return changed
+    }
+
     func setVisibleBrowserOrder(
         _ bundleIdentifiers: [String]
     ) {
@@ -437,6 +485,44 @@ final class PreferencesStore {
         normalizedIdentifiers(bundleIdentifiers)
     }
 
+    private static func normalizedPickerShortcuts(
+        _ assignments: [String: PickerShortcut]
+    ) -> [String: PickerShortcut] {
+        let sortedAssignments = assignments
+            .map { identifier, shortcut in
+                (
+                    identifier: normalizedIdentifier(identifier),
+                    originalIdentifier: identifier,
+                    shortcut: shortcut
+                )
+            }
+            .filter {
+                !$0.identifier.isEmpty
+            }
+            .sorted { lhs, rhs in
+                if lhs.identifier == rhs.identifier {
+                    return lhs.originalIdentifier < rhs.originalIdentifier
+                }
+
+                return lhs.identifier < rhs.identifier
+            }
+        var normalizedAssignments: [String: PickerShortcut] = [:]
+        var usedShortcuts = Set<PickerShortcut>()
+
+        for assignment in sortedAssignments {
+            guard
+                normalizedAssignments[assignment.identifier] == nil,
+                usedShortcuts.insert(assignment.shortcut).inserted
+            else {
+                continue
+            }
+
+            normalizedAssignments[assignment.identifier] = assignment.shortcut
+        }
+
+        return normalizedAssignments
+    }
+
     private func effectiveVisibleIdentifiers(
         _ discoveredBrowserIdentifiers: [String]
     ) -> [String] {
@@ -478,6 +564,16 @@ final class PreferencesStore {
             return trimmedIdentifier
         }
     }
+
+    private static func normalizedIdentifier(
+        _ bundleIdentifier: String
+    ) -> String {
+        bundleIdentifier
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            .lowercased()
+    }
 }
 
-// swiftlint:enable type_body_length
+// swiftlint:enable file_length type_body_length
