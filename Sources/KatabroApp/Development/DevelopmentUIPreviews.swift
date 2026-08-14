@@ -43,6 +43,20 @@
         )
     }
 
+    #Preview("Settings — Launcher Helper Setup") {
+        settingsPreview(
+            state: .scriptSetup,
+            pane: .browsers
+        )
+    }
+
+    #Preview("Settings — Launcher Helper Replacement") {
+        settingsPreview(
+            state: .scriptReplace,
+            pane: .browsers
+        )
+    }
+
     #Preview("Settings — About") {
         settingsPreview(
             state: .normal,

@@ -340,6 +340,76 @@ final class KatabroUITests: XCTestCase {
 }
 
 extension KatabroUITests {
+    @MainActor
+    func testLauncherHelperSetupSheet() {
+        let application = launch(
+            surface: "settings",
+            state: "script-setup"
+        )
+        defer {
+            application.terminate()
+        }
+
+        let setupButton = application.buttons["settings.profile-script.setup"]
+        assertExists(setupButton)
+        setupButton.click()
+
+        assertExists(
+            application.descendants(matching: .any)[
+                "settings.profile-script.sheet"
+            ]
+        )
+        let installButton = application.buttons["settings.profile-script.install"]
+        assertExists(installButton)
+        XCTAssertEqual(installButton.label, "Install open.sh…")
+        attachScreenshot(
+            named: "Settings-launcher-helper-setup",
+            from: application
+        )
+
+        installButton.click()
+        assertExists(
+            application.descendants(matching: .any)[
+                "settings.profile-script.installed"
+            ]
+        )
+    }
+
+    @MainActor
+    func testLauncherHelperReplacementSheet() {
+        let application = launch(
+            surface: "settings",
+            state: "script-replace"
+        )
+        defer {
+            application.terminate()
+        }
+
+        let replaceButton = application.buttons["settings.profile-script.setup"]
+        assertExists(replaceButton)
+        XCTAssertEqual(replaceButton.label, "Replace with Current Version…")
+        replaceButton.click()
+
+        let sheetTitle = application.staticTexts["settings.profile-script.sheet"]
+        assertExists(sheetTitle)
+        XCTAssertTrue(
+            sheetTitle.label.contains("Replace Launcher Helper")
+                || String(describing: sheetTitle.value).contains("Replace Launcher Helper")
+        )
+        let installButton = application.buttons["settings.profile-script.install"]
+        assertExists(installButton)
+        XCTAssertEqual(installButton.label, "Replace open.sh…")
+        XCTAssertFalse(
+            application.descendants(matching: .any)[
+                "settings.profile-script.installed"
+            ].exists
+        )
+        attachScreenshot(
+            named: "Settings-launcher-helper-replacement",
+            from: application
+        )
+    }
+
     // swiftlint:disable function_body_length
     @MainActor
     func testPickerLetterShortcuts() {

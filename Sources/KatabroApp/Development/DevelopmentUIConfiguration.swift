@@ -27,13 +27,28 @@
         case browserDiscoveryError = "browser-discovery-error"
         case serviceErrors = "service-errors"
         case manyBrowsers = "many-browsers"
+        case browserProfiles = "browser-profiles"
+        case scriptSetup = "script-setup"
+        case scriptReplace = "script-replace"
 
         var settingsInitialPane: SettingsPane {
             switch self {
             case .normal, .serviceErrors:
                 .general
-            case .loading, .noBrowsers, .browserDiscoveryError, .manyBrowsers:
+            case .loading, .noBrowsers, .browserDiscoveryError, .manyBrowsers, .browserProfiles, .scriptSetup,
+                 .scriptReplace:
                 .browsers
+            }
+        }
+
+        var launcherHelperInstallationState: LauncherHelperInstallationState {
+            switch self {
+            case .browserProfiles:
+                .current
+            case .scriptReplace:
+                .custom
+            default:
+                .missing
             }
         }
     }
@@ -160,7 +175,7 @@
                 discoveryBehavior = .browsers(
                     discoveredBrowsers
                 )
-            case .normal, .serviceErrors:
+            case .normal, .serviceErrors, .browserProfiles, .scriptSetup, .scriptReplace:
                 discoveredBrowsers = browsers(
                     count: 4
                 )
@@ -179,6 +194,15 @@
                 hasCompletedOnboarding: true
             )
             let preferencesStore: PreferencesStore
+            let profileStore = BrowserProfileStore(
+                profilesByBrowserIdentifier: state == .browserProfiles
+                    ? developmentProfiles
+                    : [:],
+                preservesUnbookmarkedProfiles: true
+            )
+            let userScriptBridge = UserScriptBridge(
+                initialInstallationState: state.launcherHelperInstallationState
+            ) { true }
 
             if let preferencesSuite {
                 let suiteName = "com.zbiljic.katabro.ui-review.\(preferencesSuite)"
@@ -222,7 +246,10 @@
                     status: state == .serviceErrors ? .disabled : .enabled,
                     lastError: serviceError
                 ),
-                preferencesStore: preferencesStore
+                browserProfileStore: profileStore,
+                preferencesStore: preferencesStore,
+                userScriptBridge: userScriptBridge,
+                allowsSystemProfileConfiguration: state == .scriptSetup || state == .scriptReplace
             )
         }
 
@@ -236,7 +263,7 @@
                 browsers(
                     count: 12
                 )
-            case .normal, .serviceErrors:
+            case .normal, .serviceErrors, .browserProfiles, .scriptSetup, .scriptReplace:
                 browsers(
                     count: 4
                 )
@@ -253,9 +280,7 @@
 
             return BrowserPickerStore(
                 destination: destination ?? fallbackDestination(),
-                browsers: browsers(
-                    for: state
-                ),
+                targets: pickerTargets(for: state),
                 pickerShortcuts: pickerShortcuts ?? self.pickerShortcuts(for: state)
             )
         }
@@ -268,9 +293,7 @@
                     560,
                     max(
                         180,
-                        92 + browsers(
-                            for: state
-                        ).count * 52
+                        92 + pickerTargets(for: state).count * 52
                     )
                 )
             )
@@ -363,6 +386,47 @@
                         (identifier, $0)
                     }
                 }
+            )
+        }
+
+        private static let developmentProfiles: [String: [BrowserProfile]] = [
+            "com.google.chrome": [
+                BrowserProfile(
+                    identifier: "Default",
+                    displayName: "Personal",
+                    launchValue: "Default",
+                    family: .chromium
+                ),
+                BrowserProfile(
+                    identifier: "Profile 2",
+                    displayName: "Work",
+                    launchValue: "Profile 2",
+                    family: .chromium
+                ),
+            ],
+            "org.mozilla.firefox": [
+                BrowserProfile(
+                    identifier: "Profiles/dev-edition-default",
+                    displayName: "Developer",
+                    launchValue: "/Users/reviewer/Library/Application Support/Firefox/Profiles/dev-edition-default",
+                    family: .firefox
+                ),
+            ],
+        ]
+
+        private static func pickerTargets(
+            for state: DevelopmentUIState
+        ) -> [BrowserLaunchTarget] {
+            let browsers = browsers(for: state)
+            let store = BrowserProfileStore(
+                profilesByBrowserIdentifier: state == .browserProfiles
+                    ? developmentProfiles
+                    : [:],
+                preservesUnbookmarkedProfiles: true
+            )
+            return store.targets(
+                for: browsers,
+                includesArgumentTargets: state == .browserProfiles
             )
         }
     }
