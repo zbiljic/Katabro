@@ -4,6 +4,6 @@ import KatabroCore
 protocol BrowserLaunching {
     func open(
         _ destination: IncomingURL,
-        with browser: BrowserApplication
+        with target: BrowserLaunchTarget
     ) async throws
 }

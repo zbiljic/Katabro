@@ -9,14 +9,14 @@ struct BrowserPickerView: View {
     @FocusState private var isFocused: Bool
 
     let store: BrowserPickerStore
-    let onSelect: (BrowserApplication) -> Void
+    let onSelect: (BrowserLaunchTarget) -> Void
     let onCancel: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
 
-            if store.browsers.isEmpty {
+            if store.targets.isEmpty {
                 ContentUnavailableView(
                     "No Browsers Available",
                     systemImage: "globe.badge.chevron.backward",
@@ -30,11 +30,11 @@ struct BrowserPickerView: View {
                 ScrollView {
                     VStack(spacing: 4) {
                         ForEach(
-                            Array(store.browsers.enumerated()),
+                            Array(store.targets.enumerated()),
                             id: \.element.id
-                        ) { index, browser in
-                            browserRow(
-                                browser,
+                        ) { index, target in
+                            targetRow(
+                                target,
                                 at: index
                             )
                         }
@@ -80,7 +80,7 @@ struct BrowserPickerView: View {
             phases: .down
         ) { keyPress in
             guard
-                let browser = store.browser(
+                let target = store.target(
                     forPickerShortcutInput: keyPress.characters,
                     modifiers: keyPress.modifiers
                 )
@@ -88,14 +88,14 @@ struct BrowserPickerView: View {
                 return .ignored
             }
 
-            onSelect(browser)
+            onSelect(target)
             return .handled
         }
     }
 
     private func activateSelection() -> KeyPress.Result {
-        if let browser = store.selectedBrowser {
-            onSelect(browser)
+        if let target = store.selectedTarget {
+            onSelect(target)
         }
         return .handled
     }
@@ -122,28 +122,37 @@ struct BrowserPickerView: View {
     // The row keeps its styling, accessibility, hover, and numeric shortcut as one unit.
     // swiftlint:disable function_body_length
     @ViewBuilder
-    private func browserRow(
-        _ browser: BrowserApplication,
+    private func targetRow(
+        _ target: BrowserLaunchTarget,
         at index: Int
     ) -> some View {
         let button = Button {
             store.select(index: index)
-            onSelect(browser)
+            onSelect(target)
         } label: {
             HStack(spacing: 10) {
-                Image(nsImage: browser.icon)
+                Image(nsImage: target.icon)
                     .resizable()
                     .scaledToFit()
                     .frame(width: 30, height: 30)
                     .accessibilityHidden(true)
 
-                Text(browser.browser.displayName)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(target.displayName)
+                        .lineLimit(1)
+
+                    if let detail = target.detail {
+                        Text(detail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
 
                 Spacer(minLength: 8)
 
                 HStack(spacing: 5) {
-                    if let shortcut = store.pickerShortcut(for: browser) {
+                    if let shortcut = store.pickerShortcut(for: target) {
                         Text(shortcut.displayValue)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.primary)
@@ -177,10 +186,10 @@ struct BrowserPickerView: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Open in \(browser.browser.displayName)")
+        .accessibilityLabel(target.accessibilityLabel)
         .accessibilityHint(
             shortcutAccessibilityHint(
-                for: browser,
+                for: target,
                 at: index
             )
         )
@@ -188,9 +197,7 @@ struct BrowserPickerView: View {
             store.selectedIndex == index ? .isSelected : []
         )
         .accessibilityIdentifier(
-            AccessibilityIdentifier.pickerBrowser(
-                bundleIdentifier: browser.browser.bundleIdentifier
-            )
+            accessibilityIdentifier(for: target)
         )
         .onHover { isHovering in
             if isHovering {
@@ -213,11 +220,11 @@ struct BrowserPickerView: View {
     // swiftlint:enable function_body_length
 
     private func shortcutAccessibilityHint(
-        for browser: BrowserApplication,
+        for target: BrowserLaunchTarget,
         at index: Int
     ) -> String {
         let letter = store.pickerShortcut(
-            for: browser
+            for: target
         )?.displayValue
         let number = index < 9 ? String(index + 1) : nil
         let shortcuts = [letter, number].compactMap(\.self)
@@ -227,5 +234,20 @@ struct BrowserPickerView: View {
         }
 
         return "Shortcuts \(shortcuts.joined(separator: " or "))."
+    }
+
+    private func accessibilityIdentifier(
+        for target: BrowserLaunchTarget
+    ) -> String {
+        switch target.kind {
+        case .standard:
+            AccessibilityIdentifier.pickerBrowser(
+                bundleIdentifier: target.browser.browser.bundleIdentifier
+            )
+        case .privateWindow, .profile:
+            AccessibilityIdentifier.pickerTarget(
+                identifier: target.id
+            )
+        }
     }
 }

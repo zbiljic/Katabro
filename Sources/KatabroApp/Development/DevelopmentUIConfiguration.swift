@@ -398,7 +398,7 @@
     private struct DevelopmentBrowserLauncher: BrowserLaunching {
         func open(
             _: IncomingURL,
-            with _: BrowserApplication
+            with _: BrowserLaunchTarget
         ) async throws {}
     }
 
@@ -500,8 +500,8 @@
                 : "Picker cancelled \(cancellationCount) time\(cancellationCount == 1 ? "" : "s")"
         }
 
-        private func recordSelection(_ browser: BrowserApplication) {
-            selectedBrowserName = browser.browser.displayName
+        private func recordSelection(_ target: BrowserLaunchTarget) {
+            selectedBrowserName = target.displayName
             selectionCount += 1
         }
     }

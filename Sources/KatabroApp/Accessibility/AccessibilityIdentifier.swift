@@ -78,4 +78,16 @@ enum AccessibilityIdentifier {
     ) -> String {
         "picker.browser.\(bundleIdentifier)"
     }
+
+    static func pickerTarget(
+        identifier: String
+    ) -> String {
+        "picker.target.\(identifier)"
+    }
+
+    static func settingsProfileBrowser(
+        bundleIdentifier: String
+    ) -> String {
+        "settings.profile-browser.\(bundleIdentifier)"
+    }
 }

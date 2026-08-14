@@ -6,43 +6,64 @@ import SwiftUI
 @Observable
 final class BrowserPickerStore {
     let destination: IncomingURL
-    let browsers: [BrowserApplication]
+    let targets: [BrowserLaunchTarget]
     let pickerShortcuts: [String: PickerShortcut]
     private(set) var selectedIndex: Int?
 
+    var browsers: [BrowserApplication] {
+        targets.map(\.browser)
+    }
+
     var selectedBrowser: BrowserApplication? {
+        selectedTarget?.browser
+    }
+
+    var selectedTarget: BrowserLaunchTarget? {
         guard let selectedIndex else {
             return nil
         }
 
-        return browsers[selectedIndex]
+        return targets[selectedIndex]
     }
 
     init(
         destination: IncomingURL,
-        browsers: [BrowserApplication],
+        targets: [BrowserLaunchTarget],
         pickerShortcuts: [String: PickerShortcut] = [:]
     ) {
         self.destination = destination
-        self.browsers = browsers
+        self.targets = targets
         self.pickerShortcuts = pickerShortcuts
-        selectedIndex = browsers.isEmpty ? nil : 0
+        selectedIndex = targets.isEmpty ? nil : 0
+    }
+
+    convenience init(
+        destination: IncomingURL,
+        browsers: [BrowserApplication],
+        pickerShortcuts: [String: PickerShortcut] = [:]
+    ) {
+        self.init(
+            destination: destination,
+            targets: browsers.map {
+                BrowserLaunchTarget(
+                    browser: $0,
+                    kind: .standard
+                )
+            },
+            pickerShortcuts: pickerShortcuts
+        )
     }
 
     func pickerShortcut(
-        for browser: BrowserApplication
+        for target: BrowserLaunchTarget
     ) -> PickerShortcut? {
-        pickerShortcuts[
-            browser.browser.bundleIdentifier
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .lowercased()
-        ]
+        pickerShortcuts[target.id]
     }
 
-    func browser(
+    func target(
         forPickerShortcutInput input: String,
         modifiers: EventModifiers
-    ) -> BrowserApplication? {
+    ) -> BrowserLaunchTarget? {
         guard
             modifiers.isDisjoint(with: [.command, .option, .control]),
             let shortcut = PickerShortcut(input)
@@ -50,15 +71,25 @@ final class BrowserPickerStore {
             return nil
         }
 
-        return browsers.first {
+        return targets.first {
             pickerShortcut(for: $0) == shortcut
         }
+    }
+
+    func browser(
+        forPickerShortcutInput input: String,
+        modifiers: EventModifiers
+    ) -> BrowserApplication? {
+        target(
+            forPickerShortcutInput: input,
+            modifiers: modifiers
+        )?.browser
     }
 
     func select(
         index: Int
     ) {
-        guard browsers.indices.contains(index) else {
+        guard targets.indices.contains(index) else {
             return
         }
 
@@ -68,17 +99,17 @@ final class BrowserPickerStore {
     func moveSelection(
         by offset: Int
     ) {
-        guard !browsers.isEmpty else {
+        guard !targets.isEmpty else {
             selectedIndex = nil
             return
         }
 
         guard let selectedIndex else {
-            selectedIndex = offset < 0 ? browsers.index(before: browsers.endIndex) : browsers.startIndex
+            selectedIndex = offset < 0 ? targets.index(before: targets.endIndex) : targets.startIndex
             return
         }
 
-        let count = browsers.count
+        let count = targets.count
         self.selectedIndex = (selectedIndex + offset % count + count) % count
     }
 }

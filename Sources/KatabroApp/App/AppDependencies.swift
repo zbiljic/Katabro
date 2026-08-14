@@ -7,18 +7,31 @@ struct AppDependencies {
     let defaultBrowserClient: DefaultBrowserClient
     let errorPresenter: any RoutingErrorPresenting
     let loginItemClient: LoginItemClient
+    var browserProfileStore = BrowserProfileStore()
     let preferencesStore: PreferencesStore
-
-    static let live = Self(
-        browserDiscovery: WorkspaceBrowserDiscovery(
-            policy: RoutingPolicy(
-                appBundleIdentifier: AppMetadata.bundleIdentifier
-            )
-        ),
-        browserLauncher: WorkspaceBrowserLauncher(),
-        defaultBrowserClient: .live(),
-        errorPresenter: AlertRoutingErrorPresenter(),
-        loginItemClient: .live(),
-        preferencesStore: .live()
+    var userScriptBridge = UserScriptBridge(
+        initialInstallationState: .missing
     )
+    var allowsSystemProfileConfiguration = true
+
+    static let live: Self = {
+        let userScriptBridge = UserScriptBridge()
+
+        return Self(
+            browserDiscovery: WorkspaceBrowserDiscovery(
+                policy: RoutingPolicy(
+                    appBundleIdentifier: AppMetadata.bundleIdentifier
+                )
+            ),
+            browserLauncher: WorkspaceBrowserLauncher(
+                userScriptBridge: userScriptBridge
+            ),
+            defaultBrowserClient: .live(),
+            errorPresenter: AlertRoutingErrorPresenter(),
+            loginItemClient: .live(),
+            browserProfileStore: .live(),
+            preferencesStore: .live(),
+            userScriptBridge: userScriptBridge
+        )
+    }()
 }

@@ -5,7 +5,7 @@ import KatabroCore
 final class BrowserPickerCoordinator: NSObject {
     typealias PanelBuilder = @MainActor (
         _ store: BrowserPickerStore,
-        _ onSelect: @escaping (BrowserApplication) -> Void,
+        _ onSelect: @escaping (BrowserLaunchTarget) -> Void,
         _ onCancel: @escaping () -> Void
     ) -> any BrowserPickerPresenting
 
@@ -35,7 +35,7 @@ final class BrowserPickerCoordinator: NSObject {
 
             return BrowserPickerPanel(
                 rootView: view,
-                browserCount: store.browsers.count
+                browserCount: store.targets.count
             )
         }
     ) {
@@ -117,6 +117,16 @@ final class BrowserPickerCoordinator: NSObject {
                 let browsers = dependencies.preferencesStore.effectiveVisibleBrowsers(
                     orderedBrowsers
                 )
+                dependencies.userScriptBridge.refresh()
+                for browser in browsers {
+                    dependencies.browserProfileStore.refresh(
+                        for: browser
+                    )
+                }
+                let targets = dependencies.browserProfileStore.targets(
+                    for: browsers,
+                    includesArgumentTargets: dependencies.userScriptBridge.isInstalled
+                )
 
                 guard
                     !Task.isCancelled,
@@ -127,7 +137,7 @@ final class BrowserPickerCoordinator: NSObject {
 
                 present(
                     request: request,
-                    browsers: browsers
+                    targets: targets
                 )
                 routingTask = nil
             } catch {
@@ -149,11 +159,11 @@ final class BrowserPickerCoordinator: NSObject {
 
     private func present(
         request: RoutingRequest,
-        browsers: [BrowserApplication]
+        targets: [BrowserLaunchTarget]
     ) {
         let store = BrowserPickerStore(
             destination: request.destination,
-            browsers: browsers,
+            targets: targets,
             pickerShortcuts: dependencies.preferencesStore.pickerShortcuts
         )
         presentedStore = store
@@ -174,7 +184,7 @@ final class BrowserPickerCoordinator: NSObject {
     }
 
     private func select(
-        _ browser: BrowserApplication
+        _ target: BrowserLaunchTarget
     ) {
         guard launchTask == nil else {
             return
@@ -195,7 +205,7 @@ final class BrowserPickerCoordinator: NSObject {
             do {
                 try await dependencies.browserLauncher.open(
                     request.destination,
-                    with: browser
+                    with: target
                 )
             } catch {
                 record(error)

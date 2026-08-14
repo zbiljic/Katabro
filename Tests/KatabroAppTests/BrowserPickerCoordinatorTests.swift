@@ -17,7 +17,7 @@ struct BrowserPickerCoordinatorTests {
             browsers: [browser]
         )
         let launcher = BrowserLauncherFake()
-        var selectionHandler: ((BrowserApplication) -> Void)?
+        var selectionHandler: ((BrowserLaunchTarget) -> Void)?
         let coordinator = makeCoordinator(
             discovery: discovery,
             launcher: launcher
@@ -37,7 +37,7 @@ struct BrowserPickerCoordinatorTests {
         #expect(coordinator.presentedStore?.browsers == [browser])
 
         let selectBrowser = try #require(selectionHandler)
-        selectBrowser(browser)
+        selectBrowser(makeTarget(browser))
         await coordinator.waitForPendingOperations()
 
         #expect(
@@ -192,7 +192,7 @@ struct BrowserPickerCoordinatorTests {
             error: TestError.expected
         )
         let errorPresenter = RoutingErrorPresenterFake()
-        var selectionHandler: ((BrowserApplication) -> Void)?
+        var selectionHandler: ((BrowserLaunchTarget) -> Void)?
         let coordinator = makeCoordinator(
             discovery: discovery,
             launcher: launcher,
@@ -211,7 +211,7 @@ struct BrowserPickerCoordinatorTests {
         await coordinator.waitForPendingOperations()
 
         let selectBrowser = try #require(selectionHandler)
-        selectBrowser(browser)
+        selectBrowser(makeTarget(browser))
         await coordinator.waitForPendingOperations()
 
         #expect(coordinator.presentedStore == nil)
@@ -225,7 +225,7 @@ extension BrowserPickerCoordinatorTests {
     func serializesSelection() async throws {
         let browser = makeBrowser()
         let launcher = SuspendedBrowserLauncher()
-        var selectionHandler: ((BrowserApplication) -> Void)?
+        var selectionHandler: ((BrowserLaunchTarget) -> Void)?
         let coordinator = makeCoordinator(
             discovery: BrowserDiscoveryFake(
                 browsers: [browser]
@@ -245,8 +245,8 @@ extension BrowserPickerCoordinatorTests {
         await coordinator.waitForPendingOperations()
 
         let selectBrowser = try #require(selectionHandler)
-        selectBrowser(browser)
-        selectBrowser(browser)
+        selectBrowser(makeTarget(browser))
+        selectBrowser(makeTarget(browser))
         await launcher.waitForRequest()
 
         #expect(launcher.requestCount == 1)
@@ -463,6 +463,15 @@ extension BrowserPickerCoordinatorTests {
                     height: 32
                 )
             )
+        )
+    }
+
+    private func makeTarget(
+        _ browser: BrowserApplication
+    ) -> BrowserLaunchTarget {
+        BrowserLaunchTarget(
+            browser: browser,
+            kind: .standard
         )
     }
 }

@@ -10,7 +10,7 @@ final class SuspendedBrowserLauncher: BrowserLaunching {
 
     func open(
         _: IncomingURL,
-        with _: BrowserApplication
+        with _: BrowserLaunchTarget
     ) async throws {
         requestCount += 1
         await withCheckedContinuation { continuation in
@@ -147,12 +147,12 @@ final class BrowserLauncherFake: BrowserLaunching {
 
     func open(
         _ destination: IncomingURL,
-        with browser: BrowserApplication
+        with target: BrowserLaunchTarget
     ) async throws {
         openedRequests.append(
             OpenedRequest(
                 destination: destination,
-                browser: browser
+                browser: target.browser
             )
         )
 
