@@ -147,12 +147,6 @@ tuist xcodebuild test \
   -only-testing:KatabroUITests
 ```
 
-## Project documentation
-
-- [Architecture](docs/ARCHITECTURE.md)
-- [Contributing](CONTRIBUTING.md)
-- [Security policy](SECURITY.md)
-
 ## License
 
 Katabro is available under the terms in [LICENSE](LICENSE).
