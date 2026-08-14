@@ -1,16 +1,46 @@
 import AppKit
+import CoreServices
 import KatabroCore
 
 @MainActor
 final class WorkspaceBrowserDiscovery: BrowserDiscovering {
-    private let policy: RoutingPolicy
-    private let workspace: NSWorkspace
+    struct ApplicationCandidate {
+        let bundleIdentifier: String
+        let applicationURL: URL
+    }
 
-    init(
+    typealias ApplicationsHandler = @MainActor (_ destinationURL: URL) -> [ApplicationCandidate]
+    typealias IconHandler = @MainActor (_ applicationPath: String) -> NSImage
+
+    private let applicationsHandler: ApplicationsHandler
+    private let iconHandler: IconHandler
+    private let policy: RoutingPolicy
+
+    convenience init(
         workspace: NSWorkspace = .shared,
         policy: RoutingPolicy = RoutingPolicy()
     ) {
-        self.workspace = workspace
+        self.init(
+            policy: policy,
+            applicationsHandler: { destinationURL in
+                Self.applicationCandidates(
+                    for: destinationURL,
+                    workspace: workspace
+                )
+            },
+            iconHandler: { applicationPath in
+                workspace.icon(forFile: applicationPath)
+            }
+        )
+    }
+
+    init(
+        policy: RoutingPolicy = RoutingPolicy(),
+        applicationsHandler: @escaping ApplicationsHandler,
+        iconHandler: @escaping IconHandler
+    ) {
+        self.applicationsHandler = applicationsHandler
+        self.iconHandler = iconHandler
         self.policy = policy
     }
 
@@ -19,10 +49,8 @@ final class WorkspaceBrowserDiscovery: BrowserDiscovering {
     ) async throws -> [BrowserApplication] {
         var applicationsByIdentifier: [String: BrowserApplication] = [:]
 
-        for applicationURL in workspace.urlsForApplications(
-            toOpen: destination.url
-        ) {
-            guard let application = application(at: applicationURL) else {
+        for candidate in applicationsHandler(destination.url) {
+            guard let application = application(from: candidate) else {
                 continue
             }
 
@@ -43,23 +71,19 @@ final class WorkspaceBrowserDiscovery: BrowserDiscovering {
     }
 
     private func application(
-        at applicationURL: URL
+        from candidate: ApplicationCandidate
     ) -> BrowserApplication? {
+        let bundleIdentifier = candidate.bundleIdentifier
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let displayName = candidate.applicationURL
+            .deletingPathExtension()
+            .lastPathComponent
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
         guard
-            let bundle = Bundle(url: applicationURL),
-            let bundleIdentifier = bundle.bundleIdentifier?
-                .trimmingCharacters(in: .whitespacesAndNewlines),
-            !bundleIdentifier.isEmpty
+            !bundleIdentifier.isEmpty,
+            !displayName.isEmpty
         else {
-            return nil
-        }
-
-        let displayName = localizedName(
-            for: bundle,
-            at: applicationURL
-        )
-
-        guard !displayName.isEmpty else {
             return nil
         }
 
@@ -68,23 +92,39 @@ final class WorkspaceBrowserDiscovery: BrowserDiscovering {
                 bundleIdentifier: bundleIdentifier,
                 displayName: displayName
             ),
-            applicationURL: applicationURL,
-            icon: workspace.icon(forFile: applicationURL.path)
+            applicationURL: candidate.applicationURL,
+            icon: iconHandler(candidate.applicationURL.path)
         )
     }
 
-    private func localizedName(
-        for bundle: Bundle,
-        at applicationURL: URL
-    ) -> String {
-        let displayName = bundle.object(
-            forInfoDictionaryKey: "CFBundleDisplayName"
-        ) as? String
-        let bundleName = bundle.object(
-            forInfoDictionaryKey: "CFBundleName"
-        ) as? String
+    private static func applicationCandidates(
+        for destinationURL: URL,
+        workspace: NSWorkspace
+    ) -> [ApplicationCandidate] {
+        // The modern NSWorkspace URL query omits registered handlers located in
+        // sandbox-inaccessible directories such as ~/Applications. Keep this
+        // deprecated identifier query isolated until AppKit exposes equivalent
+        // sandbox-safe handler metadata.
+        guard
+            let scheme = destinationURL.scheme,
+            let handlerIdentifiers = LSCopyAllHandlersForURLScheme(
+                scheme as CFString
+            )?.takeRetainedValue() as? [String]
+        else {
+            return []
+        }
 
-        return (displayName ?? bundleName ?? applicationURL.deletingPathExtension().lastPathComponent)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return handlerIdentifiers.flatMap { bundleIdentifier in
+            workspace
+                .urlsForApplications(
+                    withBundleIdentifier: bundleIdentifier
+                )
+                .map { applicationURL in
+                    ApplicationCandidate(
+                        bundleIdentifier: bundleIdentifier,
+                        applicationURL: applicationURL
+                    )
+                }
+        }
     }
 }
