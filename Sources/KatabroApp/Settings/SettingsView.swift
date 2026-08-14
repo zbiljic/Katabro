@@ -2,23 +2,32 @@ import SwiftUI
 
 struct SettingsView: View {
     let browserDiscovery: any BrowserDiscovering
+    let browserProfileStore: BrowserProfileStore
     let defaultBrowserClient: DefaultBrowserClient
     let loginItemClient: LoginItemClient
     let preferencesStore: PreferencesStore
+    let userScriptBridge: UserScriptBridge
+    let allowsSystemProfileConfiguration: Bool
 
     @State private var selectedPane: SettingsPane
 
     init(
         browserDiscovery: any BrowserDiscovering,
+        browserProfileStore: BrowserProfileStore,
         defaultBrowserClient: DefaultBrowserClient,
         loginItemClient: LoginItemClient,
         preferencesStore: PreferencesStore,
+        userScriptBridge: UserScriptBridge,
+        allowsSystemProfileConfiguration: Bool = true,
         initialPane: SettingsPane = .general
     ) {
         self.browserDiscovery = browserDiscovery
+        self.browserProfileStore = browserProfileStore
         self.defaultBrowserClient = defaultBrowserClient
         self.loginItemClient = loginItemClient
         self.preferencesStore = preferencesStore
+        self.userScriptBridge = userScriptBridge
+        self.allowsSystemProfileConfiguration = allowsSystemProfileConfiguration
         _selectedPane = State(initialValue: initialPane)
     }
 
@@ -42,7 +51,10 @@ struct SettingsView: View {
 
             BrowsersSettingsView(
                 browserDiscovery: browserDiscovery,
-                preferencesStore: preferencesStore
+                browserProfileStore: browserProfileStore,
+                preferencesStore: preferencesStore,
+                userScriptBridge: userScriptBridge,
+                allowsSystemProfileConfiguration: allowsSystemProfileConfiguration
             )
             .tabItem {
                 Label(

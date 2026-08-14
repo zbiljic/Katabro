@@ -26,6 +26,10 @@ enum AccessibilityIdentifier {
     static let settingsBrowserRefresh = "settings.browser-refresh"
     static let settingsBrowserReset = "settings.browser-reset"
     static let settingsBrowserShowAll = "settings.browser-show-all"
+    static let settingsProfileScriptSetup = "settings.profile-script.setup"
+    static let settingsProfileScriptSheet = "settings.profile-script.sheet"
+    static let settingsProfileScriptInstall = "settings.profile-script.install"
+    static let settingsProfileScriptInstalled = "settings.profile-script.installed"
 
     static let onboardingDefaultBrowserStatus = "onboarding.default-browser.status"
     static let onboardingDefaultBrowserAction = "onboarding.default-browser.action"

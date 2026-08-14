@@ -82,9 +82,12 @@
 
         return SettingsView(
             browserDiscovery: dependencies.browserDiscovery,
+            browserProfileStore: dependencies.browserProfileStore,
             defaultBrowserClient: dependencies.defaultBrowserClient,
             loginItemClient: dependencies.loginItemClient,
             preferencesStore: dependencies.preferencesStore,
+            userScriptBridge: dependencies.userScriptBridge,
+            allowsSystemProfileConfiguration: dependencies.allowsSystemProfileConfiguration,
             initialPane: pane
         )
     }

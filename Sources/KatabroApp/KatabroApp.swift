@@ -23,9 +23,12 @@ struct KatabroApp: App {
         Settings {
             SettingsView(
                 browserDiscovery: appDelegate.dependencies.browserDiscovery,
+                browserProfileStore: appDelegate.dependencies.browserProfileStore,
                 defaultBrowserClient: appDelegate.dependencies.defaultBrowserClient,
                 loginItemClient: appDelegate.dependencies.loginItemClient,
-                preferencesStore: appDelegate.dependencies.preferencesStore
+                preferencesStore: appDelegate.dependencies.preferencesStore,
+                userScriptBridge: appDelegate.dependencies.userScriptBridge,
+                allowsSystemProfileConfiguration: appDelegate.dependencies.allowsSystemProfileConfiguration
             )
         }
     }

@@ -5,7 +5,10 @@ import SwiftUI
 // swiftlint:disable type_body_length
 struct BrowserOrderView: View {
     let browserDiscovery: any BrowserDiscovering
+    let browserProfileStore: BrowserProfileStore
     let preferencesStore: PreferencesStore
+    let userScriptBridge: UserScriptBridge
+    let allowsSystemProfileConfiguration: Bool
 
     @State private var browsers: [BrowserApplication] = []
     @State private var defaultBrowsers: [BrowserApplication] = []
@@ -94,6 +97,16 @@ struct BrowserOrderView: View {
 
                 Spacer()
             }
+
+            Divider()
+                .padding(.vertical, 4)
+
+            BrowserProfilesSettingsView(
+                browsers: browsers,
+                profileStore: browserProfileStore,
+                userScriptBridge: userScriptBridge,
+                allowsConfiguration: allowsSystemProfileConfiguration
+            )
         }
         .task {
             await loadBrowsers()
