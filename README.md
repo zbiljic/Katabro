@@ -15,6 +15,8 @@ release artifacts, notarization, and an installer are not available yet.
 - Discovers compatible browsers without a hard-coded browser list.
 - Supports arrow keys, Return or Space, Escape, numeric picker shortcuts, and
   optional per-browser letter shortcuts.
+- Opens private windows and profiles for supported Chromium- and Firefox-family
+  browsers while retaining the App Sandbox, after user-authorized setup.
 - Queues simultaneous link requests instead of dropping them.
 - Provides onboarding, Settings, open-at-login control, browser ordering, and
   shortcut assignment under **Shown Browsers**.
@@ -58,6 +60,34 @@ scripts/stop
 
 The default browser, login item, and browser order can be revisited in Settings
 with Command-Comma.
+
+### Browser profiles and private windows
+
+Open **Settings > Browsers** and use **Profiles & Private Windows**:
+
+1. Choose **Set Up…** to open the launcher-helper guide.
+2. Choose **Install open.sh…**.
+3. Confirm the preselected `open.sh` location in the system Save Panel. Katabro
+   installs its bundled helper and updates the status automatically.
+4. To add named profiles, choose **Choose Folder…** for each supported browser
+   and select the browser data folder shown in Settings.
+
+Katabro compares the installed helper byte for byte with its bundled version.
+An executable helper with different contents remains usable and is shown as a
+custom or older helper; Katabro offers to replace it but never overwrites it
+automatically. Private-window entries need only the helper; named profiles also
+need access to the corresponding browser data folder.
+
+Katabro remains sandboxed. The user-installed script runs `/usr/bin/open` with
+structured arguments outside the sandbox. Security-scoped bookmarks let Katabro
+read profile metadata from folders selected by the user. The Save Panel flow
+requires the sandbox's user-selected read/write entitlement, but Katabro does
+not modify browser profile folders. Folder permissions stay local to this Mac
+and are not synced through iCloud. Safari profiles are not supported.
+
+The Application Scripts folder must be named exactly
+`~/Library/Application Scripts/com.zbiljic.katabro` because its name must match
+Katabro's bundle identifier, including capitalization.
 
 ## Command-line helper
 
@@ -128,13 +158,17 @@ scripts/run settings service-errors
 scripts/run settings many-browsers light
 scripts/run onboarding normal
 scripts/run picker normal dark
+scripts/run picker browser-profiles dark
+scripts/run settings script-setup light
+scripts/run settings script-replace dark
 scripts/run menu normal
 ```
 
 Available fixture states are `normal`, `loading`, `no-browsers`,
-`browser-discovery-error`, `service-errors`, and `many-browsers`. The optional
-appearance is `system`, `light`, or `dark`. Normal `scripts/run` behavior remains
-menu-bar only.
+`browser-discovery-error`, `service-errors`, `many-browsers`,
+`browser-profiles`, `script-setup`, and `script-replace`. The optional
+appearance is `system`, `light`, or `dark`.
+Normal `scripts/run` behavior remains menu-bar only.
 
 The `KatabroUITests` target exercises these surfaces and keeps screenshots as
 test-result attachments:
