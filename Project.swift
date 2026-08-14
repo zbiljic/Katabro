@@ -78,7 +78,10 @@ let project = Project(
             deploymentTargets: .macOS("14.0"),
             infoPlist: .file(path: "Resources/Info.plist"),
             sources: ["Sources/KatabroApp/**"],
-            resources: ["Resources/Assets.xcassets"],
+            resources: [
+                "Resources/Assets.xcassets",
+                "Resources/Scripts/**",
+            ],
             copyFiles: [
                 .wrapper(
                     name: "Embed command-line helper",
@@ -110,7 +113,10 @@ let project = Project(
             deploymentTargets: .macOS("14.0"),
             infoPlist: .file(path: "Resources/Info.plist"),
             sources: ["Sources/KatabroApp/**"],
-            resources: ["Resources/Assets.xcassets"],
+            resources: [
+                "Resources/Assets.xcassets",
+                "Resources/Scripts/**",
+            ],
             copyFiles: [
                 .wrapper(
                     name: "Embed command-line helper",
