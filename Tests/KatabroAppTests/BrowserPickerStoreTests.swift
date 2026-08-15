@@ -7,6 +7,18 @@ import Testing
 @MainActor
 @Suite("Browser picker state")
 struct BrowserPickerStoreTests {
+    @Test("remember selection defaults off and can be toggled")
+    func togglesRememberSelection() throws {
+        let store = try BrowserPickerStore(
+            destination: IncomingURL("https://example.com"),
+            browsers: []
+        )
+
+        #expect(!store.isRememberingSelection)
+        store.isRememberingSelection = true
+        #expect(store.isRememberingSelection)
+    }
+
     @Test("looks up custom picker shortcuts case-insensitively")
     func looksUpPickerShortcuts() throws {
         let first = makeBrowser(

@@ -246,6 +246,7 @@
                     status: state == .serviceErrors ? .disabled : .enabled,
                     lastError: serviceError
                 ),
+                routingDecisionClient: .exactHostRules,
                 browserProfileStore: profileStore,
                 preferencesStore: preferencesStore,
                 userScriptBridge: userScriptBridge,
@@ -288,14 +289,8 @@
         static func pickerHeight(
             for state: DevelopmentUIState
         ) -> CGFloat {
-            CGFloat(
-                min(
-                    560,
-                    max(
-                        180,
-                        92 + pickerTargets(for: state).count * 52
-                    )
-                )
+            BrowserPickerLayout.height(
+                browserCount: pickerTargets(for: state).count
             )
         }
 
@@ -567,7 +562,10 @@
                 : "Picker cancelled \(cancellationCount) time\(cancellationCount == 1 ? "" : "s")"
         }
 
-        private func recordSelection(_ target: BrowserLaunchTarget) {
+        private func recordSelection(
+            _ target: BrowserLaunchTarget,
+            remembersSelection _: Bool
+        ) {
             selectedBrowserName = target.displayName
             selectionCount += 1
         }

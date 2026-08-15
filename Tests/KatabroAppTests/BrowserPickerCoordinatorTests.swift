@@ -3,6 +3,9 @@ import AppKit
 import KatabroCore
 import Testing
 
+// Coordinator scenarios intentionally share stateful test doubles and helpers.
+// swiftlint:disable file_length
+
 @MainActor
 @Suite("Browser picker routing")
 struct BrowserPickerCoordinatorTests {
@@ -17,7 +20,7 @@ struct BrowserPickerCoordinatorTests {
             browsers: [browser]
         )
         let launcher = BrowserLauncherFake()
-        var selectionHandler: ((BrowserLaunchTarget) -> Void)?
+        var selectionHandler: ((BrowserLaunchTarget, Bool) -> Void)?
         let coordinator = makeCoordinator(
             discovery: discovery,
             launcher: launcher
@@ -37,14 +40,14 @@ struct BrowserPickerCoordinatorTests {
         #expect(coordinator.presentedStore?.browsers == [browser])
 
         let selectBrowser = try #require(selectionHandler)
-        selectBrowser(makeTarget(browser))
+        selectBrowser(makeTarget(browser), false)
         await coordinator.waitForPendingOperations()
 
         #expect(
             launcher.openedRequests == [
                 BrowserLauncherFake.OpenedRequest(
                     destination: request.destination,
-                    browser: browser
+                    target: makeTarget(browser)
                 ),
             ]
         )
@@ -192,7 +195,7 @@ struct BrowserPickerCoordinatorTests {
             error: TestError.expected
         )
         let errorPresenter = RoutingErrorPresenterFake()
-        var selectionHandler: ((BrowserLaunchTarget) -> Void)?
+        var selectionHandler: ((BrowserLaunchTarget, Bool) -> Void)?
         let coordinator = makeCoordinator(
             discovery: discovery,
             launcher: launcher,
@@ -211,7 +214,7 @@ struct BrowserPickerCoordinatorTests {
         await coordinator.waitForPendingOperations()
 
         let selectBrowser = try #require(selectionHandler)
-        selectBrowser(makeTarget(browser))
+        selectBrowser(makeTarget(browser), false)
         await coordinator.waitForPendingOperations()
 
         #expect(coordinator.presentedStore == nil)
@@ -225,7 +228,7 @@ extension BrowserPickerCoordinatorTests {
     func serializesSelection() async throws {
         let browser = makeBrowser()
         let launcher = SuspendedBrowserLauncher()
-        var selectionHandler: ((BrowserLaunchTarget) -> Void)?
+        var selectionHandler: ((BrowserLaunchTarget, Bool) -> Void)?
         let coordinator = makeCoordinator(
             discovery: BrowserDiscoveryFake(
                 browsers: [browser]
@@ -245,8 +248,8 @@ extension BrowserPickerCoordinatorTests {
         await coordinator.waitForPendingOperations()
 
         let selectBrowser = try #require(selectionHandler)
-        selectBrowser(makeTarget(browser))
-        selectBrowser(makeTarget(browser))
+        selectBrowser(makeTarget(browser), false)
+        selectBrowser(makeTarget(browser), false)
         await launcher.waitForRequest()
 
         #expect(launcher.requestCount == 1)
@@ -412,11 +415,323 @@ extension BrowserPickerCoordinatorTests {
         #expect(coordinator.lastError != nil)
     }
 
+    @Test("matching rule bypasses the picker and launches its exact target")
+    func automaticallyLaunchesMatchingRule() async throws {
+        let browser = makeBrowser()
+        let launcher = BrowserLauncherFake()
+        let request = try RoutingRequest(
+            destination: IncomingURL("https://Example.com/path"),
+            source: .system
+        )
+        let preferencesStore = PreferencesStore()
+        preferencesStore.setExactHostRoutingRule(
+            for: request.destination,
+            targetIdentifier: makeTarget(browser).id
+        )
+        var panelBuildCount = 0
+        let coordinator = makeCoordinator(
+            discovery: BrowserDiscoveryFake(browsers: [browser]),
+            launcher: launcher,
+            preferencesStore: preferencesStore
+        ) { _, _, _ in
+            panelBuildCount += 1
+            return BrowserPickerPresentationFake()
+        }
+
+        coordinator.route(request)
+        await coordinator.waitForPendingOperations()
+
+        #expect(panelBuildCount == 0)
+        #expect(launcher.openedRequests == [
+            BrowserLauncherFake.OpenedRequest(
+                destination: request.destination,
+                target: makeTarget(browser)
+            ),
+        ])
+    }
+
+    @Test("missing rule target falls back without deleting the rule")
+    func missingTargetFallsBack() async throws {
+        let browser = makeBrowser()
+        let destination = try IncomingURL("https://example.com")
+        let preferencesStore = PreferencesStore()
+        preferencesStore.setExactHostRoutingRule(
+            for: destination,
+            targetIdentifier: "com.example.missing:profile:Work"
+        )
+        let launcher = BrowserLauncherFake()
+        let coordinator = makeCoordinator(
+            discovery: BrowserDiscoveryFake(browsers: [browser]),
+            launcher: launcher,
+            preferencesStore: preferencesStore
+        )
+
+        coordinator.route(
+            RoutingRequest(destination: destination, source: .system)
+        )
+        await coordinator.waitForPendingOperations()
+
+        #expect(coordinator.presentedStore?.targets == [makeTarget(browser)])
+        #expect(launcher.openedRequests.isEmpty)
+        #expect(preferencesStore.exactHostRoutingRules.count == 1)
+    }
+
+    @Test("checked selection saves only after successful launch")
+    func checkedSelectionSavesAfterLaunch() async throws {
+        let browser = makeBrowser()
+        let preferencesStore = PreferencesStore()
+        var selectionHandler: ((BrowserLaunchTarget, Bool) -> Void)?
+        let coordinator = makeCoordinator(
+            discovery: BrowserDiscoveryFake(browsers: [browser]),
+            launcher: BrowserLauncherFake(),
+            preferencesStore: preferencesStore
+        ) { _, onSelect, _ in
+            selectionHandler = onSelect
+            return BrowserPickerPresentationFake()
+        }
+        let request = try RoutingRequest(
+            destination: IncomingURL("https://example.com/private/path"),
+            source: .system
+        )
+
+        coordinator.route(request)
+        await coordinator.waitForPendingOperations()
+        let selectBrowser = try #require(selectionHandler)
+        selectBrowser(makeTarget(browser), true)
+        await coordinator.waitForPendingOperations()
+
+        let expectedRule = try #require(
+            ExactHostRoutingRule(
+                host: "example.com",
+                targetIdentifier: makeTarget(browser).id
+            )
+        )
+        #expect(preferencesStore.exactHostRoutingRules == [expectedRule])
+    }
+
+    @Test("failed checked launch preserves an existing rule")
+    func failedCheckedLaunchPreservesRule() async throws {
+        let browser = makeBrowser()
+        let destination = try IncomingURL("https://example.com")
+        let preferencesStore = PreferencesStore()
+        preferencesStore.setExactHostRoutingRule(
+            for: destination,
+            targetIdentifier: "old-target"
+        )
+        var selectionHandler: ((BrowserLaunchTarget, Bool) -> Void)?
+        let coordinator = makeCoordinator(
+            discovery: BrowserDiscoveryFake(browsers: [browser]),
+            launcher: BrowserLauncherFake(error: TestError.expected),
+            preferencesStore: preferencesStore,
+            routingDecisionClient: RoutingDecisionClient { _, _ in .ask }
+        ) { _, onSelect, _ in
+            selectionHandler = onSelect
+            return BrowserPickerPresentationFake()
+        }
+
+        coordinator.route(
+            RoutingRequest(destination: destination, source: .system)
+        )
+        await coordinator.waitForPendingOperations()
+        let selectBrowser = try #require(selectionHandler)
+        selectBrowser(makeTarget(browser), true)
+        await coordinator.waitForPendingOperations()
+
+        #expect(preferencesStore.exactHostRoutingRules.first?.targetIdentifier == "old-target")
+    }
+
+    @Test("hidden target remains available to automatic routing")
+    func automaticallyLaunchesHiddenTarget() async throws {
+        let hidden = makeBrowser(identifier: "com.example.hidden", name: "Hidden")
+        let shown = makeBrowser(identifier: "com.example.shown", name: "Shown")
+        let destination = try IncomingURL("https://example.com")
+        let preferencesStore = PreferencesStore(
+            initialPreferences: AppPreferences(
+                hiddenBrowserIdentifiers: [hidden.browser.bundleIdentifier]
+            )
+        )
+        preferencesStore.setExactHostRoutingRule(
+            for: destination,
+            targetIdentifier: makeTarget(hidden).id
+        )
+        let launcher = BrowserLauncherFake()
+        let coordinator = makeCoordinator(
+            discovery: BrowserDiscoveryFake(browsers: [hidden, shown]),
+            launcher: launcher,
+            preferencesStore: preferencesStore
+        )
+
+        coordinator.route(RoutingRequest(destination: destination, source: .system))
+        await coordinator.waitForPendingOperations()
+
+        #expect(launcher.openedRequests.first?.target == makeTarget(hidden))
+        #expect(coordinator.presentedStore == nil)
+    }
+
+    @Test("automatic routing preserves private and profile target kinds")
+    func automaticallyLaunchesArgumentTargets() async throws {
+        let browser = makeBrowser(
+            identifier: "com.google.Chrome",
+            name: "Chrome"
+        )
+        let profile = BrowserProfile(
+            identifier: "Mixed Case",
+            displayName: "Work",
+            launchValue: "Profile 2",
+            family: .chromium
+        )
+        let profileStore = BrowserProfileStore(
+            profilesByBrowserIdentifier: [
+                browser.browser.bundleIdentifier: [profile],
+            ],
+            preservesUnbookmarkedProfiles: true
+        )
+        let bridge = UserScriptBridge(initialInstallationState: .current)
+        let targets = [
+            BrowserLaunchTarget(browser: browser, kind: .privateWindow(.chromium)),
+            BrowserLaunchTarget(browser: browser, kind: .profile(profile)),
+        ]
+
+        for (index, target) in targets.enumerated() {
+            let destination = try IncomingURL("https://example\(index).com")
+            let preferencesStore = PreferencesStore()
+            preferencesStore.setExactHostRoutingRule(
+                for: destination,
+                targetIdentifier: target.id
+            )
+            let launcher = BrowserLauncherFake()
+            let coordinator = makeCoordinator(
+                discovery: BrowserDiscoveryFake(browsers: [browser]),
+                launcher: launcher,
+                preferencesStore: preferencesStore,
+                browserProfileStore: profileStore,
+                userScriptBridge: bridge
+            )
+
+            coordinator.route(
+                RoutingRequest(destination: destination, source: .system)
+            )
+            await coordinator.waitForPendingOperations()
+
+            #expect(launcher.openedRequests.first?.target == target)
+            #expect(coordinator.presentedStore == nil)
+        }
+    }
+
+    @Test("unavailable private and profile targets fall back without substitution")
+    func unavailableArgumentTargetsFallBack() async throws {
+        let browser = makeBrowser(
+            identifier: "com.google.Chrome",
+            name: "Chrome"
+        )
+        let missingTargets = [
+            BrowserLaunchTarget(browser: browser, kind: .privateWindow(.chromium)).id,
+            BrowserLaunchTarget(
+                browser: browser,
+                kind: .profile(
+                    BrowserProfile(
+                        identifier: "Missing",
+                        displayName: "Missing",
+                        launchValue: "Missing",
+                        family: .chromium
+                    )
+                )
+            ).id,
+        ]
+
+        for (index, targetIdentifier) in missingTargets.enumerated() {
+            let destination = try IncomingURL("https://missing\(index).example")
+            let preferencesStore = PreferencesStore()
+            preferencesStore.setExactHostRoutingRule(
+                for: destination,
+                targetIdentifier: targetIdentifier
+            )
+            let launcher = BrowserLauncherFake()
+            let coordinator = makeCoordinator(
+                discovery: BrowserDiscoveryFake(browsers: [browser]),
+                launcher: launcher,
+                preferencesStore: preferencesStore
+            )
+
+            coordinator.route(
+                RoutingRequest(destination: destination, source: .system)
+            )
+            await coordinator.waitForPendingOperations()
+
+            #expect(launcher.openedRequests.isEmpty)
+            #expect(coordinator.presentedStore?.targets == [makeTarget(browser)])
+            #expect(preferencesStore.exactHostRoutingRules.first?.targetIdentifier == targetIdentifier)
+        }
+    }
+
+    @Test("queued automatic decisions launch in FIFO order")
+    func queuesAutomaticDecisionsInOrder() async throws {
+        let browser = makeBrowser()
+        let first = try IncomingURL("https://first.example")
+        let second = try IncomingURL("https://second.example")
+        let preferencesStore = PreferencesStore()
+
+        for destination in [first, second] {
+            preferencesStore.setExactHostRoutingRule(
+                for: destination,
+                targetIdentifier: makeTarget(browser).id
+            )
+        }
+
+        let launcher = BrowserLauncherFake()
+        let coordinator = makeCoordinator(
+            discovery: BrowserDiscoveryFake(browsers: [browser]),
+            launcher: launcher,
+            preferencesStore: preferencesStore
+        )
+
+        coordinator.route(RoutingRequest(destination: first, source: .system))
+        coordinator.route(RoutingRequest(destination: second, source: .system))
+        await coordinator.waitForPendingOperations()
+
+        #expect(launcher.openedRequests.map(\.destination) == [first, second])
+    }
+
+    @Test("canceled suspended decision cannot affect the next request")
+    func cancelsSuspendedDecision() async throws {
+        let browser = makeBrowser()
+        let decision = SuspendedRoutingDecision()
+        let launcher = BrowserLauncherFake()
+        let coordinator = makeCoordinator(
+            discovery: BrowserDiscoveryFake(browsers: [browser]),
+            launcher: launcher,
+            routingDecisionClient: decision.client
+        )
+        let first = try RoutingRequest(
+            destination: IncomingURL("https://first.example"),
+            source: .system
+        )
+        let second = try RoutingRequest(
+            destination: IncomingURL("https://second.example"),
+            source: .system
+        )
+
+        coordinator.route(first)
+        await decision.waitForFirstRequest()
+        coordinator.cancel()
+        coordinator.route(second)
+        decision.resumeFirst(with: .open(targetIdentifier: makeTarget(browser).id))
+        await coordinator.waitForPendingOperations()
+
+        #expect(launcher.openedRequests.isEmpty)
+        #expect(coordinator.presentedStore?.destination == second.destination)
+    }
+
     private func makeCoordinator(
         discovery: any BrowserDiscovering,
         launcher: any BrowserLaunching,
         errorPresenter: RoutingErrorPresenterFake = RoutingErrorPresenterFake(),
         preferencesStore: PreferencesStore = PreferencesStore(),
+        routingDecisionClient: RoutingDecisionClient = .exactHostRules,
+        browserProfileStore: BrowserProfileStore = BrowserProfileStore(),
+        userScriptBridge: UserScriptBridge = UserScriptBridge(
+            initialInstallationState: .missing
+        ),
         panelBuilder: @escaping BrowserPickerCoordinator.PanelBuilder = { _, _, _ in
             BrowserPickerPresentationFake()
         }
@@ -439,7 +754,10 @@ extension BrowserPickerCoordinatorTests {
                     },
                     updateHandler: { _ in }
                 ),
-                preferencesStore: preferencesStore
+                routingDecisionClient: routingDecisionClient,
+                browserProfileStore: browserProfileStore,
+                preferencesStore: preferencesStore,
+                userScriptBridge: userScriptBridge
             ),
             panelBuilder: panelBuilder
         )
@@ -475,3 +793,5 @@ extension BrowserPickerCoordinatorTests {
         )
     }
 }
+
+// swiftlint:enable file_length

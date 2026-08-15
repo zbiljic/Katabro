@@ -7,6 +7,7 @@ struct AppDependencies {
     let defaultBrowserClient: DefaultBrowserClient
     let errorPresenter: any RoutingErrorPresenting
     let loginItemClient: LoginItemClient
+    let routingDecisionClient: RoutingDecisionClient
     var browserProfileStore = BrowserProfileStore()
     let preferencesStore: PreferencesStore
     var userScriptBridge = UserScriptBridge(
@@ -29,6 +30,7 @@ struct AppDependencies {
             defaultBrowserClient: .live(),
             errorPresenter: AlertRoutingErrorPresenter(),
             loginItemClient: .live(),
+            routingDecisionClient: .exactHostRules,
             browserProfileStore: .live(),
             preferencesStore: .live(),
             userScriptBridge: userScriptBridge

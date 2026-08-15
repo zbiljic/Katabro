@@ -9,6 +9,7 @@ final class BrowserPickerStore {
     let targets: [BrowserLaunchTarget]
     let pickerShortcuts: [String: PickerShortcut]
     private(set) var selectedIndex: Int?
+    var isRememberingSelection = false
 
     var browsers: [BrowserApplication] {
         targets.map(\.browser)

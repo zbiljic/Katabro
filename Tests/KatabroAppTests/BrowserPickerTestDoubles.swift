@@ -3,6 +3,42 @@ import AppKit
 import KatabroCore
 
 @MainActor
+final class SuspendedRoutingDecision {
+    private var continuation: CheckedContinuation<RoutingDecisionClient.Decision, Never>?
+    private(set) var requestCount = 0
+
+    var client: RoutingDecisionClient {
+        RoutingDecisionClient { [weak self] _, _ in
+            guard let self else {
+                return .ask
+            }
+
+            requestCount += 1
+            guard requestCount == 1 else {
+                return .ask
+            }
+
+            return await withCheckedContinuation { continuation in
+                self.continuation = continuation
+            }
+        }
+    }
+
+    func waitForFirstRequest() async {
+        while continuation == nil {
+            await Task.yield()
+        }
+    }
+
+    func resumeFirst(
+        with decision: RoutingDecisionClient.Decision
+    ) {
+        continuation?.resume(returning: decision)
+        continuation = nil
+    }
+}
+
+@MainActor
 final class SuspendedBrowserLauncher: BrowserLaunching {
     private var continuation: CheckedContinuation<Void, Never>?
 
@@ -132,7 +168,7 @@ final class BrowserDiscoveryFake: BrowserDiscovering {
 final class BrowserLauncherFake: BrowserLaunching {
     struct OpenedRequest: Equatable {
         let destination: IncomingURL
-        let browser: BrowserApplication
+        let target: BrowserLaunchTarget
     }
 
     private let error: Error?
@@ -152,7 +188,7 @@ final class BrowserLauncherFake: BrowserLaunching {
         openedRequests.append(
             OpenedRequest(
                 destination: destination,
-                browser: target.browser
+                target: target
             )
         )
 

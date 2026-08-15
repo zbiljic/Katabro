@@ -11,19 +11,15 @@ final class BrowserPickerPanel: NSPanel {
         rootView: some View,
         browserCount: Int
     ) {
-        let height = min(
-            560,
-            max(
-                180,
-                92 + browserCount * 52
-            )
+        let height = BrowserPickerLayout.height(
+            browserCount: browserCount
         )
 
         super.init(
             contentRect: NSRect(
                 origin: .zero,
                 size: NSSize(
-                    width: 360,
+                    width: BrowserPickerLayout.width,
                     height: height
                 )
             ),

@@ -1,3 +1,4 @@
+import KatabroCore
 import SwiftUI
 
 struct BrowserPickerView: View {
@@ -9,10 +10,12 @@ struct BrowserPickerView: View {
     @FocusState private var isFocused: Bool
 
     let store: BrowserPickerStore
-    let onSelect: (BrowserLaunchTarget) -> Void
+    let onSelect: (BrowserLaunchTarget, Bool) -> Void
     let onCancel: () -> Void
 
     var body: some View {
+        @Bindable var bindableStore = store
+
         VStack(alignment: .leading, spacing: 12) {
             header
 
@@ -42,9 +45,26 @@ struct BrowserPickerView: View {
                 }
                 .scrollBounceBehavior(.basedOnSize)
             }
+
+            Divider()
+
+            Toggle(
+                "Remember this choice for \(displayHost)",
+                isOn: $bindableStore.isRememberingSelection
+            )
+            .toggleStyle(.checkbox)
+            .controlSize(.small)
+            .accessibilityHint(
+                "Future links to this exact host open with the selected option. "
+                    + "You can remove the rule in Settings, Rules."
+            )
+            .accessibilityIdentifier(
+                AccessibilityIdentifier.pickerRememberHost
+            )
+            .padding(.horizontal, 6)
         }
         .padding(12)
-        .frame(width: 360)
+        .frame(width: BrowserPickerLayout.width)
         .background {
             if reduceTransparency {
                 Color(nsColor: .windowBackgroundColor)
@@ -88,14 +108,14 @@ struct BrowserPickerView: View {
                 return .ignored
             }
 
-            onSelect(target)
+            onSelect(target, store.isRememberingSelection)
             return .handled
         }
     }
 
     private func activateSelection() -> KeyPress.Result {
         if let target = store.selectedTarget {
-            onSelect(target)
+            onSelect(target, store.isRememberingSelection)
         }
         return .handled
     }
@@ -128,7 +148,7 @@ struct BrowserPickerView: View {
     ) -> some View {
         let button = Button {
             store.select(index: index)
-            onSelect(target)
+            onSelect(target, store.isRememberingSelection)
         } label: {
             HStack(spacing: 10) {
                 Image(nsImage: target.icon)
@@ -215,6 +235,12 @@ struct BrowserPickerView: View {
         } else {
             button
         }
+    }
+
+    private var displayHost: String {
+        ExactHostRoutingRule.normalizedHost(
+            store.destination.url.host() ?? ""
+        ) ?? "this host"
     }
 
     // swiftlint:enable function_body_length

@@ -5,7 +5,7 @@ import KatabroCore
 final class BrowserPickerCoordinator: NSObject {
     typealias PanelBuilder = @MainActor (
         _ store: BrowserPickerStore,
-        _ onSelect: @escaping (BrowserLaunchTarget) -> Void,
+        _ onSelect: @escaping (BrowserLaunchTarget, Bool) -> Void,
         _ onCancel: @escaping () -> Void
     ) -> any BrowserPickerPresenting
 
@@ -89,13 +89,18 @@ final class BrowserPickerCoordinator: NSObject {
     }
 
     func waitForPendingOperations() async {
-        let pendingRoutingTask = routingTask
-        await pendingRoutingTask?.value
+        while routingTask != nil || launchTask != nil {
+            let pendingRoutingTask = routingTask
+            await pendingRoutingTask?.value
 
-        let pendingLaunchTask = launchTask
-        await pendingLaunchTask?.value
+            let pendingLaunchTask = launchTask
+            await pendingLaunchTask?.value
+        }
     }
 
+    // Discovery, decision, target construction, and stale-request guards stay
+    // together so their ordering is explicit.
+    // swiftlint:disable:next function_body_length
     private func start(
         _ request: RoutingRequest
     ) {
@@ -114,17 +119,33 @@ final class BrowserPickerCoordinator: NSObject {
                 let orderedBrowsers = dependencies.preferencesStore.orderedBrowsers(
                     discoveredBrowsers
                 )
-                let browsers = dependencies.preferencesStore.effectiveVisibleBrowsers(
-                    orderedBrowsers
+                guard
+                    !Task.isCancelled,
+                    self.request?.id == request.id
+                else {
+                    return
+                }
+
+                let decision = await dependencies.routingDecisionClient.decision(
+                    for: request,
+                    rules: dependencies.preferencesStore.exactHostRoutingRules
                 )
+
+                guard
+                    !Task.isCancelled,
+                    self.request?.id == request.id
+                else {
+                    return
+                }
+
                 dependencies.userScriptBridge.refresh()
-                for browser in browsers {
+                for browser in orderedBrowsers {
                     dependencies.browserProfileStore.refresh(
                         for: browser
                     )
                 }
-                let targets = dependencies.browserProfileStore.targets(
-                    for: browsers,
+                let allTargets = dependencies.browserProfileStore.targets(
+                    for: orderedBrowsers,
                     includesArgumentTargets: dependencies.userScriptBridge.isInstalled
                 )
 
@@ -135,11 +156,30 @@ final class BrowserPickerCoordinator: NSObject {
                     return
                 }
 
-                present(
-                    request: request,
-                    targets: targets
-                )
                 routingTask = nil
+
+                let automaticTarget: BrowserLaunchTarget? = if case let .open(targetIdentifier) = decision {
+                    allTargets.first { $0.id == targetIdentifier }
+                } else {
+                    nil
+                }
+                if let target = automaticTarget {
+                    launch(
+                        request: request,
+                        target: target,
+                        ruleIntent: nil
+                    )
+                    return
+                }
+
+                let visibleBrowsers = dependencies.preferencesStore.effectiveVisibleBrowsers(
+                    orderedBrowsers
+                )
+                let visibleTargets = dependencies.browserProfileStore.targets(
+                    for: visibleBrowsers,
+                    includesArgumentTargets: dependencies.userScriptBridge.isInstalled
+                )
+                present(request: request, targets: visibleTargets)
             } catch {
                 guard
                     !Task.isCancelled,
@@ -170,8 +210,11 @@ final class BrowserPickerCoordinator: NSObject {
 
         let panel = panelBuilder(
             store,
-            { [weak self] browser in
-                self?.select(browser)
+            { [weak self] target, remembersSelection in
+                self?.select(
+                    target,
+                    remembersSelection: remembersSelection
+                )
             },
             { [weak self] in
                 self?.cancel()
@@ -184,7 +227,8 @@ final class BrowserPickerCoordinator: NSObject {
     }
 
     private func select(
-        _ target: BrowserLaunchTarget
+        _ target: BrowserLaunchTarget,
+        remembersSelection: Bool
     ) {
         guard launchTask == nil else {
             return
@@ -192,6 +236,29 @@ final class BrowserPickerCoordinator: NSObject {
 
         guard let request else {
             finishCurrentRequest()
+            return
+        }
+
+        let ruleIntent = remembersSelection
+            ? ExactHostRoutingRule(
+                host: request.destination.url.host() ?? "",
+                targetIdentifier: target.id
+            )
+            : nil
+
+        launch(
+            request: request,
+            target: target,
+            ruleIntent: ruleIntent
+        )
+    }
+
+    private func launch(
+        request: RoutingRequest,
+        target: BrowserLaunchTarget,
+        ruleIntent: ExactHostRoutingRule?
+    ) {
+        guard launchTask == nil else {
             return
         }
 
@@ -207,8 +274,25 @@ final class BrowserPickerCoordinator: NSObject {
                     request.destination,
                     with: target
                 )
+
+                guard
+                    !Task.isCancelled,
+                    self.request?.id == request.id
+                else {
+                    launchTask = nil
+                    return
+                }
+
+                if let ruleIntent {
+                    dependencies.preferencesStore.setExactHostRoutingRule(
+                        for: request.destination,
+                        targetIdentifier: ruleIntent.targetIdentifier
+                    )
+                }
             } catch {
-                record(error)
+                if self.request?.id == request.id {
+                    record(error)
+                }
             }
 
             launchTask = nil

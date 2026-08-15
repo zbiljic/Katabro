@@ -42,6 +42,7 @@ struct AppDelegateTests {
                 defaultBrowserClient: defaultBrowserClient,
                 errorPresenter: RoutingErrorPresenterFake(),
                 loginItemClient: loginItemClient,
+                routingDecisionClient: .exactHostRules,
                 preferencesStore: PreferencesStore()
             )
         )

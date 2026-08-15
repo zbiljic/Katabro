@@ -80,7 +80,17 @@
             store: DevelopmentUIFixtures.pickerStore(
                 for: .normal
             ),
-            onSelect: { _ in },
+            onSelect: { _, _ in },
+            onCancel: {}
+        )
+    }
+
+    #Preview("Browser Picker — Many Browsers") {
+        BrowserPickerView(
+            store: DevelopmentUIFixtures.pickerStore(
+                for: .manyBrowsers
+            ),
+            onSelect: { _, _ in },
             onCancel: {}
         )
     }
