@@ -367,8 +367,23 @@ extension KatabroUITests {
         let checkbox = application.descendants(matching: .any)[
             "picker.remember-host"
         ]
+        let receipt = application.descendants(matching: .any)[
+            "picker.selection-receipt"
+        ]
 
         assertExists(checkbox)
+        assertExists(receipt)
+        XCTAssertFalse(isControlOn(checkbox))
+        application.typeKey(
+            "r",
+            modifierFlags: [.command, .shift]
+        )
+        XCTAssertTrue(isControlOn(checkbox))
+        XCTAssertEqual(receipt.value as? String, "No browser selected")
+        application.typeKey(
+            "r",
+            modifierFlags: [.command, .shift]
+        )
         XCTAssertFalse(isControlOn(checkbox))
         checkbox.click()
         XCTAssertTrue(isControlOn(checkbox))

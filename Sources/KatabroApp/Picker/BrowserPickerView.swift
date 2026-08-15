@@ -56,6 +56,7 @@ struct BrowserPickerView: View {
             .controlSize(.small)
             .accessibilityHint(
                 "Future links to this exact host open with the selected option. "
+                    + "Press Shift-Command-R to toggle. "
                     + "You can remove the rule in Settings, Rules."
             )
             .accessibilityIdentifier(
@@ -93,6 +94,17 @@ struct BrowserPickerView: View {
         }
         .onKeyPress(.escape) {
             onCancel()
+            return .handled
+        }
+        .onKeyPress(
+            characters: CharacterSet(charactersIn: "rR"),
+            phases: .down
+        ) { keyPress in
+            guard keyPress.modifiers == [.command, .shift] else {
+                return .ignored
+            }
+
+            store.isRememberingSelection.toggle()
             return .handled
         }
         .onKeyPress(

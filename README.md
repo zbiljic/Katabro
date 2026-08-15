@@ -66,7 +66,8 @@ with Command-Comma.
 ### Exact-host rules
 
 In the browser picker, select **Remember this choice for &lt;host&gt;** before
-opening a link to remember that exact host. For example, a rule for
+opening a link to remember that exact host. Press Shift-Command-R to toggle the
+option from the keyboard. For example, a rule for
 `example.com` does not apply to `www.example.com` or another subdomain. Katabro
 stores only the normalized host and the selected launch-target identifier—not
 the full URL, path, query, or browsing history. These rules remain on this Mac
