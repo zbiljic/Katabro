@@ -18,6 +18,8 @@ release artifacts, notarization, and an installer are not available yet.
 - Opens private windows and profiles for supported Chromium- and Firefox-family
   browsers while retaining the App Sandbox, after user-authorized setup.
 - Queues simultaneous link requests instead of dropping them.
+- Can remember a browser choice for one exact host and remove that local rule
+  later in **Settings > Rules**.
 - Provides onboarding, Settings, open-at-login control, browser ordering, and
   shortcut assignment under **Shown Browsers**.
 - Syncs browser order and picker shortcuts through iCloud across Macs using the
@@ -60,6 +62,19 @@ scripts/stop
 
 The default browser, login item, and browser order can be revisited in Settings
 with Command-Comma.
+
+### Exact-host rules
+
+In the browser picker, select **Remember this choice for &lt;host&gt;** before
+opening a link to remember that exact host. For example, a rule for
+`example.com` does not apply to `www.example.com` or another subdomain. Katabro
+stores only the normalized host and the selected launch-target identifier—not
+the full URL, path, query, or browsing history. These rules remain on this Mac
+and are not included in iCloud synchronization.
+
+Open **Settings > Rules** to review a rule, remove one rule, or remove them all.
+If its browser, private-window helper, or profile is unavailable, Katabro keeps
+the rule and shows the picker instead.
 
 ### Browser profiles and private windows
 

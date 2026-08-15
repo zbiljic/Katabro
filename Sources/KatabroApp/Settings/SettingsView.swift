@@ -67,6 +67,20 @@ struct SettingsView: View {
             }
             .tag(SettingsPane.browsers)
 
+            RulesSettingsView(
+                preferencesStore: preferencesStore
+            )
+            .tabItem {
+                Label(
+                    SettingsPane.rules.displayName,
+                    systemImage: SettingsPane.rules.systemImage
+                )
+                .accessibilityIdentifier(
+                    AccessibilityIdentifier.settingsRulesPane
+                )
+            }
+            .tag(SettingsPane.rules)
+
             AboutSettingsView()
                 .tabItem {
                     Label(

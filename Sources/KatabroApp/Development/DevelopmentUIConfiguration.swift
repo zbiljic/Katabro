@@ -191,7 +191,19 @@
                 pickerShortcuts: pickerShortcuts(
                     for: state
                 ),
-                hasCompletedOnboarding: true
+                hasCompletedOnboarding: true,
+                exactHostRoutingRules: state == .normal
+                    ? [
+                        ExactHostRoutingRule(
+                            host: "example.com",
+                            targetIdentifier: "com.example.browser"
+                        ),
+                        ExactHostRoutingRule(
+                            host: "developer.apple.com",
+                            targetIdentifier: "com.example.research"
+                        ),
+                    ].compactMap(\.self)
+                    : []
             )
             let preferencesStore: PreferencesStore
             let profileStore = BrowserProfileStore(

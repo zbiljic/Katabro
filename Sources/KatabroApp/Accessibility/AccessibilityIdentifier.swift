@@ -7,9 +7,13 @@ enum AccessibilityIdentifier {
 
     static let settingsGeneralPane = "settings.pane.general"
     static let settingsBrowsersPane = "settings.pane.browsers"
+    static let settingsRulesPane = "settings.pane.rules"
     static let settingsAboutPane = "settings.pane.about"
     static let settingsGeneralForm = "settings.general.form"
     static let settingsBrowsersForm = "settings.browsers.form"
+    static let settingsRulesForm = "settings.rules.form"
+    static let settingsRulesEmpty = "settings.rules.empty"
+    static let settingsRulesRemoveAll = "settings.rules.remove-all"
     static let settingsAboutContent = "settings.about.content"
     static let settingsAboutVersion = "settings.about.version"
     static let settingsAboutRepositoryLink = "settings.about.link.repository"
@@ -94,5 +98,17 @@ enum AccessibilityIdentifier {
         bundleIdentifier: String
     ) -> String {
         "settings.profile-browser.\(bundleIdentifier)"
+    }
+
+    static func settingsRule(
+        host: String
+    ) -> String {
+        "settings.rule.\(host)"
+    }
+
+    static func settingsRuleRemove(
+        host: String
+    ) -> String {
+        "settings.rule.\(host).remove"
     }
 }

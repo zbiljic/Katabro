@@ -1,7 +1,7 @@
 import XCTest
 
 // UI fixture coverage intentionally shares launch and assertion helpers.
-// swiftlint:disable file_length
+// swiftlint:disable file_length type_body_length
 final class KatabroUITests: XCTestCase {
     @MainActor
     func testSettingsNormalState() {
@@ -15,14 +15,17 @@ final class KatabroUITests: XCTestCase {
 
         let generalTab = application.radioButtons["settings.pane.general"]
         let browsersTab = application.radioButtons["settings.pane.browsers"]
+        let rulesTab = application.radioButtons["settings.pane.rules"]
         let aboutTab = application.radioButtons["settings.pane.about"]
 
         assertExists(application.scrollViews["settings.general.form"])
         assertExists(generalTab)
         assertExists(browsersTab)
+        assertExists(rulesTab)
         assertExists(aboutTab)
         XCTAssertTrue(isControlOn(generalTab))
         XCTAssertFalse(isControlOn(browsersTab))
+        XCTAssertFalse(isControlOn(rulesTab))
         XCTAssertFalse(isControlOn(aboutTab))
         assertExists(
             application.staticTexts["settings.default-browser.status"]
@@ -127,6 +130,7 @@ final class KatabroUITests: XCTestCase {
 
         let generalTab = application.radioButtons["settings.pane.general"]
         let browsersTab = application.radioButtons["settings.pane.browsers"]
+        let rulesTab = application.radioButtons["settings.pane.rules"]
         let aboutTab = application.radioButtons["settings.pane.about"]
 
         assertExists(application.scrollViews["settings.general.form"])
@@ -136,6 +140,11 @@ final class KatabroUITests: XCTestCase {
             application.descendants(matching: .any)[
                 "settings.browser-row.com.apple.Safari.visibility"
             ]
+        )
+        rulesTab.click()
+        assertExists(application.scrollViews["settings.rules.form"])
+        assertExists(
+            application.descendants(matching: .any)["settings.rule.example.com"]
         )
         aboutTab.click()
         assertExists(application.scrollViews["settings.about.content"])
@@ -169,6 +178,12 @@ final class KatabroUITests: XCTestCase {
             assertExists(application.scrollViews["settings.browsers.form"])
             attachScreenshot(
                 named: "Settings-browsers-normal-\(appearance)",
+                from: application
+            )
+            application.radioButtons["settings.pane.rules"].click()
+            assertExists(application.scrollViews["settings.rules.form"])
+            attachScreenshot(
+                named: "Settings-rules-populated-\(appearance)",
                 from: application
             )
             application.radioButtons["settings.pane.about"].click()
@@ -340,6 +355,126 @@ final class KatabroUITests: XCTestCase {
 }
 
 extension KatabroUITests {
+    @MainActor
+    func testPickerRememberHostControl() {
+        let application = launch(
+            surface: "picker",
+            state: "normal"
+        )
+        defer {
+            application.terminate()
+        }
+        let checkbox = application.descendants(matching: .any)[
+            "picker.remember-host"
+        ]
+
+        assertExists(checkbox)
+        XCTAssertFalse(isControlOn(checkbox))
+        checkbox.click()
+        XCTAssertTrue(isControlOn(checkbox))
+        application.typeKey(.downArrow, modifierFlags: [])
+        XCTAssertTrue(isControlOn(checkbox))
+    }
+
+    @MainActor
+    func testRulesManagement() {
+        let application = launch(
+            surface: "settings",
+            state: "normal",
+            preferencesSuite: "rules-\(UUID().uuidString)",
+            resetsPreferences: true
+        )
+        defer {
+            application.terminate()
+        }
+        let exampleRow = application.descendants(matching: .any)[
+            "settings.rule.example.com"
+        ]
+        let developerRow = application.descendants(matching: .any)[
+            "settings.rule.developer.apple.com"
+        ]
+
+        application.radioButtons["settings.pane.rules"].click()
+        assertExists(application.scrollViews["settings.rules.form"])
+        assertExists(exampleRow)
+        assertExists(developerRow)
+
+        let exampleRemoveButton = application
+            .descendants(matching: .any)["settings.rule.example.com.remove"]
+        exampleRemoveButton.click()
+        XCTAssertFalse(exampleRow.exists)
+        XCTAssertTrue(developerRow.exists)
+
+        let removeAll = application.buttons["settings.rules.remove-all"]
+        assertExists(removeAll)
+        removeAll.click()
+        let cancel = application.sheets.buttons["Cancel"]
+        assertExists(cancel)
+        cancel.click()
+        XCTAssertTrue(developerRow.exists)
+
+        removeAll.click()
+        let confirmRemoveAll = application.sheets.buttons["Remove All"]
+        assertExists(confirmRemoveAll)
+        confirmRemoveAll.click()
+        assertExists(
+            application.descendants(matching: .any)["settings.rules.empty"]
+        )
+    }
+
+    @MainActor
+    func testPickerAndRulesLightAndDarkScreenshots() {
+        var previousApplication: XCUIApplication?
+
+        for appearance in ["light", "dark"] {
+            for state in ["normal", "many-browsers"] {
+                previousApplication?.terminate()
+                let application = launch(
+                    surface: "picker",
+                    state: state,
+                    appearance: appearance
+                )
+                previousApplication = application
+                assertExists(
+                    application.descendants(matching: .any)["picker.remember-host"]
+                )
+                attachScreenshot(
+                    named: "Picker-\(state)-\(appearance)",
+                    from: application
+                )
+            }
+
+            previousApplication?.terminate()
+            let application = launch(
+                surface: "settings",
+                state: "normal",
+                appearance: appearance,
+                preferencesSuite: "rules-empty-\(appearance)-\(UUID().uuidString)",
+                resetsPreferences: true
+            )
+            previousApplication = application
+            application.radioButtons["settings.pane.rules"].click()
+            assertExists(application.scrollViews["settings.rules.form"])
+            attachScreenshot(
+                named: "Settings-rules-populated-standalone-\(appearance)",
+                from: application
+            )
+            application.buttons["settings.rules.remove-all"].click()
+            let confirmRemoveAll = application.sheets.buttons["Remove All"]
+            assertExists(confirmRemoveAll)
+            confirmRemoveAll.click()
+            assertExists(
+                application.descendants(matching: .any)["settings.rules.empty"]
+            )
+            attachScreenshot(
+                named: "Settings-rules-empty-\(appearance)",
+                from: application
+            )
+        }
+
+        previousApplication?.terminate()
+    }
+
     @MainActor
     func testLauncherHelperSetupSheet() {
         let application = launch(
@@ -725,4 +860,4 @@ private extension KatabroUITests {
     }
 }
 
-// swiftlint:enable file_length
+// swiftlint:enable file_length type_body_length

@@ -64,6 +64,13 @@
         )
     }
 
+    #Preview("Settings — Rules") {
+        settingsPreview(
+            state: .normal,
+            pane: .rules
+        )
+    }
+
     #Preview("Onboarding") {
         let dependencies = DevelopmentUIFixtures.dependencies(
             for: .normal
