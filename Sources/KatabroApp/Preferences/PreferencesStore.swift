@@ -1,4 +1,5 @@
 import Foundation
+import KatabroCore
 import Observation
 
 // Visibility and iCloud reconciliation intentionally share the aggregate preference owner.
@@ -45,6 +46,10 @@ final class PreferencesStore {
         preferences.hasCompletedOnboarding
     }
 
+    var exactHostRoutingRules: [ExactHostRoutingRule] {
+        preferences.exactHostRoutingRules
+    }
+
     init(
         initialPreferences: AppPreferences = AppPreferences(),
         initialSyncStatus: ICloudSyncStatus = .localOnly,
@@ -57,6 +62,9 @@ final class PreferencesStore {
         )
         normalizedPreferences.pickerShortcuts = Self.normalizedPickerShortcuts(
             initialPreferences.pickerShortcuts
+        )
+        normalizedPreferences.exactHostRoutingRules = Self.normalizedExactHostRoutingRules(
+            initialPreferences.exactHostRoutingRules
         )
         preferences = normalizedPreferences
         iCloudSyncStatus = initialSyncStatus
@@ -391,6 +399,66 @@ final class PreferencesStore {
         )
     }
 
+    @discardableResult
+    func setExactHostRoutingRule(
+        for destination: IncomingURL,
+        targetIdentifier: String
+    ) -> Bool {
+        guard
+            let host = destination.url.host(),
+            let rule = ExactHostRoutingRule(
+                host: host,
+                targetIdentifier: targetIdentifier
+            )
+        else {
+            return false
+        }
+
+        var preferences = preferences
+
+        let existingRuleIndex = preferences.exactHostRoutingRules.firstIndex {
+            $0.host == rule.host
+        }
+        if let index = existingRuleIndex {
+            preferences.exactHostRoutingRules[index] = rule
+        } else {
+            preferences.exactHostRoutingRules.append(rule)
+        }
+
+        let changed = self.preferences != preferences
+        update(preferences, origin: .local)
+        return changed
+    }
+
+    @discardableResult
+    func removeExactHostRoutingRule(
+        host: String
+    ) -> Bool {
+        guard let normalizedHost = ExactHostRoutingRule.normalizedHost(host) else {
+            return false
+        }
+
+        var preferences = preferences
+        preferences.exactHostRoutingRules.removeAll {
+            $0.host == normalizedHost
+        }
+        let changed = self.preferences != preferences
+        update(preferences, origin: .local)
+        return changed
+    }
+
+    @discardableResult
+    func removeAllExactHostRoutingRules() -> Bool {
+        guard !preferences.exactHostRoutingRules.isEmpty else {
+            return false
+        }
+
+        var preferences = preferences
+        preferences.exactHostRoutingRules = []
+        update(preferences, origin: .local)
+        return true
+    }
+
     private func update(
         _ preferences: AppPreferences,
         origin: UpdateOrigin
@@ -587,6 +655,22 @@ final class PreferencesStore {
         }
 
         return normalizedAssignments
+    }
+
+    private static func normalizedExactHostRoutingRules(
+        _ rules: [ExactHostRoutingRule]
+    ) -> [ExactHostRoutingRule] {
+        var firstIndices: [String: Int] = [:]
+        var latestRules: [String: ExactHostRoutingRule] = [:]
+
+        for (index, rule) in rules.enumerated() {
+            firstIndices[rule.host, default: index] = firstIndices[rule.host] ?? index
+            latestRules[rule.host] = rule
+        }
+
+        return latestRules.values.sorted {
+            firstIndices[$0.host, default: 0] < firstIndices[$1.host, default: 0]
+        }
     }
 
     private func effectiveVisibleIdentifiers(

@@ -4,6 +4,8 @@ import KatabroCore
 import SQLite3
 import Testing
 
+// Browser profile parsing scenarios intentionally share fixture helpers.
+// swiftlint:disable type_body_length
 @Suite("Browser profiles")
 struct BrowserProfileTests {
     @Test("parses and sorts Chromium profile metadata")
@@ -146,6 +148,33 @@ struct BrowserProfileTests {
                 destination.url.absoluteString,
             ]
         )
+    }
+
+    @MainActor
+    @Test("keeps standard, private, and profile target identifiers distinct")
+    func keepsLaunchTargetIdentifiersStable() {
+        let browser = browserApplication()
+        let standard = BrowserLaunchTarget(browser: browser, kind: .standard)
+        let privateWindow = BrowserLaunchTarget(
+            browser: browser,
+            kind: .privateWindow(.chromium)
+        )
+        let profile = BrowserLaunchTarget(
+            browser: browser,
+            kind: .profile(
+                BrowserProfile(
+                    identifier: "Mixed Case/Profile ",
+                    displayName: "Work",
+                    launchValue: "Mixed Case/Profile ",
+                    family: .chromium
+                )
+            )
+        )
+
+        #expect(standard.id == "com.google.chrome")
+        #expect(privateWindow.id == "com.google.chrome:private")
+        #expect(profile.id == "com.google.chrome:profile:Mixed Case/Profile ")
+        #expect(Set([standard.id, privateWindow.id, profile.id]).count == 3)
     }
 
     @Test(
@@ -319,3 +348,5 @@ struct BrowserProfileTests {
         )
     }
 }
+
+// swiftlint:enable type_body_length

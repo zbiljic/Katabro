@@ -647,6 +647,74 @@ struct PreferencesStoreTests {
     }
 }
 
+extension PreferencesStoreTests {
+    @Test("legacy and lossy decoding preserve valid preferences")
+    func decodesExactHostRulesLossily() throws {
+        let data = Data(
+            """
+            {
+              "browserOrder": ["com.example.browser"],
+              "exactHostRoutingRules": [
+                {"host":"Example.com.","targetIdentifier":"first"},
+                {"host":"","targetIdentifier":"invalid"},
+                {"host":"other.example","targetIdentifier":"second"}
+              ]
+            }
+            """.utf8
+        )
+        let preferences = try JSONDecoder().decode(AppPreferences.self, from: data)
+
+        #expect(preferences.browserOrder == ["com.example.browser"])
+        #expect(preferences.exactHostRoutingRules.map(\.host) == [
+            "example.com",
+            "other.example",
+        ])
+    }
+
+    @Test("normalizes duplicates and keeps the latest target in first position")
+    func normalizesExactHostRules() throws {
+        let store = try PreferencesStore(
+            initialPreferences: AppPreferences(
+                exactHostRoutingRules: [
+                    #require(ExactHostRoutingRule(host: "Example.com", targetIdentifier: "old")),
+                    #require(ExactHostRoutingRule(host: "other.example", targetIdentifier: "other")),
+                    #require(ExactHostRoutingRule(host: "example.com.", targetIdentifier: "new")),
+                ]
+            )
+        )
+
+        #expect(store.exactHostRoutingRules.map(\.host) == ["example.com", "other.example"])
+        #expect(store.exactHostRoutingRules.map(\.targetIdentifier) == ["new", "other"])
+    }
+
+    @Test("adds, replaces, removes, and clears rules with no-op saves")
+    func mutatesExactHostRulesLocally() throws {
+        var saves: [AppPreferences] = []
+        let cloudStore = PreferencesCloudStoreSpy()
+        let store = PreferencesStore(
+            initialPreferences: AppPreferences(hasCompletedOnboarding: true),
+            initialSyncStatus: .available,
+            iCloudClient: ICloudPreferencesClient(
+                store: cloudStore,
+                notificationCenter: NotificationCenter()
+            )
+        ) { saves.append($0) }
+        let destination = try IncomingURL("https://Example.com/path?q=secret")
+
+        #expect(store.setExactHostRoutingRule(for: destination, targetIdentifier: "first"))
+        #expect(!store.setExactHostRoutingRule(for: destination, targetIdentifier: "first"))
+        #expect(store.setExactHostRoutingRule(for: destination, targetIdentifier: "Second Case "))
+        #expect(store.exactHostRoutingRules.map(\.host) == ["example.com"])
+        #expect(store.exactHostRoutingRules.first?.targetIdentifier == "Second Case ")
+        #expect(store.hasCompletedOnboarding)
+        #expect(store.removeExactHostRoutingRule(host: " EXAMPLE.COM. "))
+        #expect(!store.removeExactHostRoutingRule(host: "example.com"))
+        #expect(!store.removeAllExactHostRoutingRules())
+        #expect(saves.count == 3)
+        #expect(cloudStore.writes.isEmpty)
+    }
+}
+
 struct ShortcutEditCase: Sendable {
     let currentValue: String
     let editedValue: String
