@@ -26,6 +26,19 @@ enum AccessibilityIdentifier {
     static let settingsLoginItemStatus = "settings.login-item.status"
     static let settingsLoginItemError = "settings.login-item.error"
     static let settingsICloudStatus = "settings.icloud.status"
+    static let settingsSyncMethod = "settings.sync.method"
+    // Keep the original identifier stable for UI clients while the section
+    // itself is now transport-neutral.
+    static let settingsSyncStatus = settingsICloudStatus
+    static let settingsSyncFolderName = "settings.sync.folder-name"
+    static let settingsSyncChooseFolder = "settings.sync.choose-folder"
+    static let settingsSyncDisconnect = "settings.sync.disconnect"
+    static let settingsSyncError = "settings.sync.error"
+    static let settingsSyncDisclosureContinue = "settings.sync.disclosure.continue"
+    static let settingsSyncDisclosureCancel = "settings.sync.disclosure.cancel"
+    static let settingsSyncAdopt = "settings.sync.adoption.use-folder"
+    static let settingsSyncReplace = "settings.sync.adoption.replace-file"
+    static let settingsSyncAdoptionCancel = "settings.sync.adoption.cancel"
     static let settingsBrowserList = "settings.browser-list"
     static let settingsBrowserRefresh = "settings.browser-refresh"
     static let settingsBrowserReset = "settings.browser-reset"

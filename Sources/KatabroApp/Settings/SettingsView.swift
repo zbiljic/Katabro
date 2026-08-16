@@ -6,6 +6,7 @@ struct SettingsView: View {
     let defaultBrowserClient: DefaultBrowserClient
     let loginItemClient: LoginItemClient
     let preferencesStore: PreferencesStore
+    let configurationFolderClient: ConfigurationFolderClient
     let userScriptBridge: UserScriptBridge
     let allowsSystemProfileConfiguration: Bool
 
@@ -17,6 +18,7 @@ struct SettingsView: View {
         defaultBrowserClient: DefaultBrowserClient,
         loginItemClient: LoginItemClient,
         preferencesStore: PreferencesStore,
+        configurationFolderClient: ConfigurationFolderClient = .live,
         userScriptBridge: UserScriptBridge,
         allowsSystemProfileConfiguration: Bool = true,
         initialPane: SettingsPane = .general
@@ -26,6 +28,7 @@ struct SettingsView: View {
         self.defaultBrowserClient = defaultBrowserClient
         self.loginItemClient = loginItemClient
         self.preferencesStore = preferencesStore
+        self.configurationFolderClient = configurationFolderClient
         self.userScriptBridge = userScriptBridge
         self.allowsSystemProfileConfiguration = allowsSystemProfileConfiguration
         _selectedPane = State(initialValue: initialPane)
@@ -36,7 +39,8 @@ struct SettingsView: View {
             GeneralSettingsView(
                 defaultBrowserClient: defaultBrowserClient,
                 loginItemClient: loginItemClient,
-                preferencesStore: preferencesStore
+                preferencesStore: preferencesStore,
+                configurationFolderClient: configurationFolderClient
             )
             .tabItem {
                 Label(

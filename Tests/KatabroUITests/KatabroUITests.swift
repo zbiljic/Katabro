@@ -36,6 +36,15 @@ final class KatabroUITests: XCTestCase {
         assertExists(
             application.staticTexts["settings.icloud.status"]
         )
+        let syncStatus = application.staticTexts["settings.icloud.status"]
+        XCTAssertEqual(
+            syncStatus.value as? String,
+            "Browser order, picker shortcuts, and exact-host rules sync through Shared Katabro."
+        )
+        let folderName = application.staticTexts["settings.sync.folder-name"]
+        assertExists(folderName)
+        XCTAssertEqual(folderName.value as? String, "~/Documents/Shared Katabro")
+        assertExists(application.staticTexts["Location"])
         browsersTab.click()
 
         assertExists(application.scrollViews["settings.browsers.form"])
@@ -110,11 +119,106 @@ final class KatabroUITests: XCTestCase {
         )
         let status = application.staticTexts["settings.icloud.status"]
         assertExists(status)
-        let expectedStatus =
-            "Browser order and picker shortcuts stay on this Mac because iCloud sync is unavailable for this build."
+        let expectedStatus = "Folder sync is unavailable; local settings remain active."
         XCTAssertTrue(
             status.label == expectedStatus
                 || status.value as? String == expectedStatus
+        )
+    }
+
+    @MainActor
+    func testSyncDisclosureAndAdoptionActions() {
+        let application = launch(surface: "settings", state: "normal")
+        defer { application.terminate() }
+        let choose = application.buttons["settings.sync.choose-folder"]
+        assertExists(choose)
+        choose.click()
+        dialogButton(
+            application,
+            identifier: "settings.sync.disclosure.cancel",
+            label: "Cancel"
+        ).click()
+        XCTAssertTrue(choose.exists)
+        choose.click()
+        dialogButton(
+            application,
+            identifier: "settings.sync.disclosure.continue",
+            label: "Continue"
+        ).click()
+        let adoptionCancel = dialogButton(
+            application,
+            identifier: "settings.sync.adoption.cancel",
+            label: "Cancel"
+        )
+        XCTAssertTrue(adoptionCancel.exists)
+        adoptionCancel.click()
+        XCTAssertEqual(application.popUpButtons["settings.sync.method"].value as? String, "Folder")
+    }
+
+    @MainActor
+    func testSyncAdoptsFolderSettings() {
+        let application = launch(surface: "settings", state: "normal")
+        defer { application.terminate() }
+        application.buttons["settings.sync.choose-folder"].click()
+        dialogButton(
+            application,
+            identifier: "settings.sync.disclosure.continue",
+            label: "Continue"
+        ).click()
+        dialogButton(
+            application,
+            identifier: "settings.sync.adoption.use-folder",
+            label: "Use Folder Settings"
+        ).click()
+        XCTAssertEqual(application.popUpButtons["settings.sync.method"].value as? String, "Folder")
+        XCTAssertTrue(
+            (application.staticTexts["settings.icloud.status"].value as? String)?.contains(
+                "exact-host rules sync through Shared Katabro"
+            ) == true
+        )
+    }
+
+    @MainActor
+    func testSyncReplacesFolderSettings() {
+        let application = launch(surface: "settings", state: "normal")
+        defer { application.terminate() }
+        application.buttons["settings.sync.choose-folder"].click()
+        dialogButton(
+            application,
+            identifier: "settings.sync.disclosure.continue",
+            label: "Continue"
+        ).click()
+        dialogButton(
+            application,
+            identifier: "settings.sync.adoption.replace-file",
+            label: "Replace File with This Mac"
+        ).click()
+        XCTAssertEqual(application.popUpButtons["settings.sync.method"].value as? String, "Folder")
+        XCTAssertTrue(
+            (application.staticTexts["settings.icloud.status"].value as? String)?.contains("Shared Katabro") == true
+        )
+    }
+
+    @MainActor
+    func testSyncErrorIsActionableWithoutOpeningAPanel() {
+        let application = launch(surface: "settings", state: "service-errors")
+        defer { application.terminate() }
+        let choose = application.buttons["settings.sync.choose-folder"]
+        XCTAssertTrue(choose.waitForExistence(timeout: 5))
+        choose.click()
+        let continueButton = application.buttons["settings.sync.disclosure.continue"]
+        XCTAssertTrue(continueButton.waitForExistence(timeout: 5))
+        continueButton.click()
+        let error = application.staticTexts["settings.sync.error"]
+        assertExists(error)
+        guard let errorValue = error.value as? String else {
+            XCTFail("Expected settings.sync.error to expose a string value")
+            return
+        }
+        XCTAssertFalse(errorValue.isEmpty)
+        XCTAssertEqual(
+            errorValue,
+            "Folder access is unavailable. Choose the folder again to recover."
         )
     }
 
@@ -858,6 +962,22 @@ private extension KatabroUITests {
             describing: element.value
         ).lowercased()
         return ["1", "true", "on", "checked"].contains(value)
+    }
+
+    @MainActor
+    func dialogButton(
+        _ application: XCUIApplication,
+        identifier: String,
+        label: String
+    ) -> XCUIElement {
+        let identified = application.buttons[identifier]
+        if identified.exists {
+            return identified
+        }
+        let labeled = application.buttons.matching(
+            NSPredicate(format: "label == %@", label)
+        ).allElementsBoundByIndex
+        return labeled.first ?? application.buttons[label]
     }
 
     @MainActor

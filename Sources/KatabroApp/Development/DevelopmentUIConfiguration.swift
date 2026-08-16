@@ -141,7 +141,12 @@
     }
 
     @MainActor
-    enum DevelopmentUIFixtures {
+    private final class DevelopmentFolderReadState {
+        var available = true
+    }
+
+    @MainActor
+    enum DevelopmentUIFixtures { // swiftlint:disable:this type_body_length
         // swiftlint:disable:next function_body_length
         static func dependencies(
             for state: DevelopmentUIState,
@@ -206,6 +211,7 @@
                     : []
             )
             let preferencesStore: PreferencesStore
+            let configurationFolderClient: ConfigurationFolderClient
             let profileStore = BrowserProfileStore(
                 profilesByBrowserIdentifier: state == .browserProfiles
                     ? developmentProfiles
@@ -232,7 +238,8 @@
                     )
                 } else {
                     preferencesStore = PreferencesStore(
-                        initialPreferences: initialPreferences
+                        initialPreferences: initialPreferences,
+                        syncMethod: .thisMac
                     )
                 }
             } else {
@@ -240,8 +247,58 @@
                     initialPreferences: initialPreferences,
                     initialSyncStatus: state == .serviceErrors
                         ? .localOnly
-                        : .available
+                        : .available,
+                    syncMethod: state == .serviceErrors ? .iCloud : .thisMac
                 )
+            }
+
+            if preferencesSuite == nil, state == .normal || state == .serviceErrors {
+                let snapshot = preferencesStore.browserSettingsSnapshot()
+                let fixtureReadState = DevelopmentFolderReadState()
+                let fakeClient = FilePreferencesClient(
+                    injectedRead: {
+                        !fixtureReadState.available
+                            ? .unavailable
+                            : .snapshot(snapshot, bytes: (try? snapshot.encodedData()) ?? Data())
+                    },
+                    injectedWrite: { _ in state != .serviceErrors },
+                    displayName: "Shared Katabro",
+                    displayLocation: "~/Documents/Shared Katabro"
+                )
+                _ = preferencesStore.configureFolderSync(
+                    client: fakeClient,
+                    displayName: "Shared Katabro"
+                )
+                fixtureReadState.available = state != .serviceErrors
+                if state == .serviceErrors {
+                    preferencesStore.refreshActiveSync()
+                }
+                let chooserSnapshot = BrowserSettingsSnapshot(
+                    browserOrder: ["com.example.remote"],
+                    pickerShortcuts: [:],
+                    exactHostRoutingRules: []
+                )
+                let chooserURL = URL(fileURLWithPath: "/fixture/Shared Katabro", isDirectory: true)
+                configurationFolderClient = ConfigurationFolderClient(
+                    chooseDirectory: { chooserURL },
+                    makeClient: { _ in
+                        FilePreferencesClient(
+                            injectedRead: {
+                                state == .serviceErrors
+                                    ? .unavailable
+                                    : .snapshot(
+                                        chooserSnapshot,
+                                        bytes: (try? chooserSnapshot.encodedData()) ?? Data()
+                                    )
+                            },
+                            injectedWrite: { _ in state != .serviceErrors },
+                            displayName: "Shared Katabro",
+                            displayLocation: "~/Documents/Shared Katabro"
+                        )
+                    }
+                )
+            } else {
+                configurationFolderClient = ConfigurationFolderClient { nil }
             }
 
             return AppDependencies(
@@ -261,6 +318,7 @@
                 routingDecisionClient: .exactHostRules,
                 browserProfileStore: profileStore,
                 preferencesStore: preferencesStore,
+                configurationFolderClient: configurationFolderClient,
                 userScriptBridge: userScriptBridge,
                 allowsSystemProfileConfiguration: state == .scriptSetup || state == .scriptReplace
             )
@@ -496,6 +554,7 @@
                         defaultBrowserClient: dependencies.defaultBrowserClient,
                         loginItemClient: dependencies.loginItemClient,
                         preferencesStore: dependencies.preferencesStore,
+                        configurationFolderClient: dependencies.configurationFolderClient,
                         userScriptBridge: dependencies.userScriptBridge,
                         allowsSystemProfileConfiguration: dependencies.allowsSystemProfileConfiguration,
                         initialPane: configuration.state.settingsInitialPane

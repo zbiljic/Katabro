@@ -27,6 +27,7 @@ struct KatabroApp: App {
                 defaultBrowserClient: appDelegate.dependencies.defaultBrowserClient,
                 loginItemClient: appDelegate.dependencies.loginItemClient,
                 preferencesStore: appDelegate.dependencies.preferencesStore,
+                configurationFolderClient: appDelegate.dependencies.configurationFolderClient,
                 userScriptBridge: appDelegate.dependencies.userScriptBridge,
                 allowsSystemProfileConfiguration: appDelegate.dependencies.allowsSystemProfileConfiguration
             )

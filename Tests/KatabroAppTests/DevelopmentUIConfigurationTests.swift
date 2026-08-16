@@ -1,4 +1,5 @@
 #if DEBUG
+    import Foundation
     @testable import Katabro
     import Testing
 
@@ -119,6 +120,43 @@
 
             #expect(configuration?.preferencesSuite == "shortcut-test")
             #expect(configuration?.resetsPreferences == true)
+        }
+
+        @Test("settings fixtures use an in-memory Folder transport and chooser")
+        @MainActor
+        func folderFixturesAreDeterministic() async throws {
+            let normal = DevelopmentUIFixtures.dependencies(for: .normal)
+            #expect(normal.preferencesStore.syncMethod == .folder)
+            #expect(normal.preferencesStore.folderSyncStatus == .active(displayName: "Shared Katabro"))
+            #expect(normal.configurationFolderClient.chooseDirectory()?.lastPathComponent == "Shared Katabro")
+            let normalClient = normal.configurationFolderClient.makeClient(
+                for: URL(fileURLWithPath: "/fixture/Shared Katabro", isDirectory: true)
+            )
+            #expect(try normalClient.bookmarkDataForDirectory() == nil)
+            let normalStarted = normalClient.start(onEvent: { _ in }, refreshImmediately: false)
+            #expect(normalStarted)
+            normalClient.stop()
+
+            let errors = DevelopmentUIFixtures.dependencies(for: .serviceErrors)
+            let clock = ContinuousClock()
+            let deadline = clock.now.advanced(by: .seconds(2))
+            while errors.preferencesStore.folderSyncStatus != .unavailable, clock.now < deadline {
+                try await Task.sleep(for: .milliseconds(20))
+            }
+            #expect(errors.preferencesStore.syncMethod == .folder)
+            #expect(errors.preferencesStore.folderSyncStatus == .unavailable)
+            #expect(errors.configurationFolderClient.chooseDirectory()?.lastPathComponent == "Shared Katabro")
+            let errorClient = errors.configurationFolderClient.makeClient(
+                for: URL(fileURLWithPath: "/fixture/Shared Katabro", isDirectory: true)
+            )
+            #expect(try errorClient.bookmarkDataForDirectory() == nil)
+            let errorStarted = errorClient.start(onEvent: { _ in }, refreshImmediately: false)
+            #expect(errorStarted)
+            errorClient.stop()
+            #expect(
+                GeneralSettingsView.folderUnavailableMessage
+                    == "Folder access is unavailable. Choose the folder again to recover."
+            )
         }
     }
 #endif
