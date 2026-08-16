@@ -22,8 +22,8 @@ release artifacts, notarization, and an installer are not available yet.
   later in **Settings > Rules**.
 - Provides onboarding, Settings, open-at-login control, browser ordering, and
   shortcut assignment under **Shown Browsers**.
-- Syncs browser order and picker shortcuts through iCloud across Macs using the
-  same Apple Account.
+- Syncs browser order and picker shortcuts through iCloud, or those settings
+  plus exact-host rules through a user-selected folder.
 - Bundles a `katabro` command-line helper inside the application.
 - Keeps URL validation and routing policy in a portable Swift package.
 
@@ -76,6 +76,49 @@ and are not included in iCloud synchronization.
 Open **Settings > Rules** to review a rule, remove one rule, or remove them all.
 If its browser, private-window helper, or profile is unavailable, Katabro keeps
 the rule and shows the picker instead.
+
+### Settings sync
+
+Open **Settings > General > Sync** to keep settings on this Mac, sync through
+iCloud, or use a folder managed by a provider of your choice.
+
+| Setting | This Mac | iCloud | Folder |
+| --- | --- | --- | --- |
+| Browser order | local | sync | sync |
+| Picker shortcuts | local | sync | sync |
+| Exact-host rules | local | local only | sync after disclosure |
+| Hidden browsers, onboarding, profiles, helper state | local | local | local |
+
+Folder sync writes `katabro-settings.json` to the selected folder. Choose the
+same folder separately on each Mac. An empty folder is initialized from the
+current Mac; when a valid file already exists, Katabro offers to use it or
+replace it with this Mac's settings.
+
+Exact-host rules contain normalized hostnames and opaque target identifiers, so
+Katabro asks for confirmation before enabling Folder sync. Folder access and
+its security-scoped bookmark remain local to each Mac.
+
+The shared file uses this version 1 JSON format:
+
+```json
+{
+  "version": 1,
+  "order": ["com.apple.Safari"],
+  "shortcuts": {"com.apple.safari": "S"},
+  "routingRules": [{
+    "matchHost": "example.com",
+    "targetIdentifier": "com.apple.safari"
+  }]
+}
+```
+
+Folder sync uses snapshot-level last-writer-wins. Invalid, unsupported, or
+unavailable files are left untouched and local settings continue to work. If a
+folder moves or its permissions change, choose it again. Disconnecting selects
+**This Mac** without deleting the shared file or local rules.
+
+Target identifiers are treated as opaque. If a browser or profile is unavailable
+on another Mac, Katabro keeps its rule and opens the browser picker instead.
 
 ### Browser profiles and private windows
 
