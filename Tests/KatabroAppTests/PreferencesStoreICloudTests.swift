@@ -1,5 +1,6 @@
 import Foundation
 @testable import Katabro
+import KatabroCore
 import Testing
 
 // The suite keeps the complete multi-key synchronization contract in one harness.
@@ -328,6 +329,44 @@ struct PreferencesStoreICloudTests {
 
         #expect(store.hasCompletedOnboarding)
         #expect(saves.count == 1)
+        #expect(harness.keyValueStore.writes.isEmpty)
+    }
+
+    @Test("rule mutations produce zero iCloud writes")
+    func rulesNeverUpload() throws {
+        let harness = PreferencesCloudHarness(cloudValue: ["browser"])
+        let store = harness.makeStore(
+            preferences: AppPreferences(browserOrder: ["browser"])
+        ) { _ in }
+        store.startICloudSync()
+        harness.keyValueStore.writes.removeAll()
+
+        #expect(
+            try store.setExactHostRoutingRule(
+                for: IncomingURL("https://fictional.example"),
+                targetIdentifier: "com.example.browser"
+            )
+        )
+        #expect(harness.keyValueStore.writes.isEmpty)
+    }
+
+    @Test("iCloud observation can stop and restart without duplicate writes")
+    func stopsAndRestartsObservation() async {
+        let harness = PreferencesCloudHarness(cloudValue: ["one"])
+        let store = harness.makeStore(
+            preferences: AppPreferences(browserOrder: ["one"])
+        ) { _ in }
+        #expect(store.startICloudSync())
+        store.stopICloudSync()
+        #expect(store.iCloudSyncStatus == .localOnly)
+        #expect(store.startICloudSync())
+        harness.setCloudValue(["two"])
+        harness.post(
+            reason: NSUbiquitousKeyValueStoreServerChange,
+            keys: [ICloudPreferencesClient.browserOrderKey]
+        )
+        await Task.yield()
+        #expect(store.browserOrder == ["two"])
         #expect(harness.keyValueStore.writes.isEmpty)
     }
 

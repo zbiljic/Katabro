@@ -114,6 +114,18 @@ struct ICloudPreferencesClientTests {
         )
     }
 
+    @Test("stops observation and permits an idempotent restart")
+    func stopsAndRestarts() {
+        let store = InMemoryKeyValueStore()
+        let client = makeClient(store: store)
+        #expect(client.start { _ in })
+        client.stop()
+        #expect(client.start { _ in })
+        #expect(store.synchronizeCallCount == 2)
+        client.stop()
+        client.stop()
+    }
+
     @Test("returns a failed synchronization result")
     func reportsSynchronizationFailure() {
         let store = InMemoryKeyValueStore()

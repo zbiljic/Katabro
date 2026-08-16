@@ -7,6 +7,29 @@ import Observation
 @MainActor
 @Observable
 final class PreferencesStore {
+    enum SyncMethod: String, Codable, Equatable, Sendable, CaseIterable {
+        case thisMac
+        case iCloud
+        case folder
+
+        var displayName: String {
+            switch self {
+            case .thisMac: "This Mac"
+            case .iCloud: "iCloud"
+            case .folder: "Folder"
+            }
+        }
+    }
+
+    enum FolderSyncStatus: Equatable, Sendable {
+        case inactive
+        case active(displayName: String)
+        case missingFile
+        case invalid
+        case unavailable
+        case lostAuthorization
+    }
+
     enum ICloudSyncStatus: Equatable, Sendable {
         case available
         case localOnly
@@ -15,20 +38,46 @@ final class PreferencesStore {
 
     private enum Key {
         static let preferences = "app.preferences"
+        static let syncMethod = "preferences.syncMethod.v1"
+        static let folderBookmark = "preferences.folderBookmark.v1"
     }
 
     private enum UpdateOrigin: Equatable {
         case browserOrder
         case pickerShortcuts
+        case folderBrowserOrder
+        case folderPickerShortcuts
+        case folderRules
         case remote
         case local
     }
 
+    private struct TransportState {
+        let method: SyncMethod
+        let client: FilePreferencesClient?
+        let displayName: String
+        let location: String
+        let folderStatus: FolderSyncStatus
+        let cloudWasActive: Bool
+    }
+
     @ObservationIgnored private let save: (AppPreferences) -> Void
     @ObservationIgnored private let iCloudClient: ICloudPreferencesClient?
+    @ObservationIgnored private var fileClient: FilePreferencesClient?
+    private(set) var activeFolderDisplayName = ""
+    private(set) var activeFolderLocation = ""
+    @ObservationIgnored private let saveSyncMethod: (SyncMethod) -> Void
+    @ObservationIgnored private let saveFolderBookmark: (Data?) -> Void
 
     private(set) var preferences: AppPreferences
     private(set) var iCloudSyncStatus: ICloudSyncStatus
+    private(set) var syncMethod: SyncMethod
+    private(set) var folderSyncStatus: FolderSyncStatus
+    private(set) var iCloudSelectionUnavailable = false
+
+    var iCloudSyncAvailable: Bool {
+        iCloudClient != nil
+    }
 
     var browserOrder: [String] {
         preferences.browserOrder
@@ -50,10 +99,13 @@ final class PreferencesStore {
         preferences.exactHostRoutingRules
     }
 
-    init(
+    private init(
         initialPreferences: AppPreferences = AppPreferences(),
         initialSyncStatus: ICloudSyncStatus = .localOnly,
         iCloudClient: ICloudPreferencesClient? = nil,
+        resolvedSyncMethod: SyncMethod,
+        saveSyncMethod: @escaping (SyncMethod) -> Void = { _ in },
+        saveFolderBookmark: @escaping (Data?) -> Void = { _ in },
         save: @escaping (AppPreferences) -> Void = { _ in }
     ) {
         var normalizedPreferences = initialPreferences
@@ -69,7 +121,48 @@ final class PreferencesStore {
         preferences = normalizedPreferences
         iCloudSyncStatus = initialSyncStatus
         self.iCloudClient = iCloudClient
+        syncMethod = resolvedSyncMethod
+        folderSyncStatus = .inactive
+        self.saveSyncMethod = saveSyncMethod
+        self.saveFolderBookmark = saveFolderBookmark
         self.save = save
+    }
+
+    convenience init(
+        initialPreferences: AppPreferences = AppPreferences(),
+        initialSyncStatus: ICloudSyncStatus = .localOnly,
+        iCloudClient: ICloudPreferencesClient? = nil,
+        save: @escaping (AppPreferences) -> Void = { _ in }
+    ) {
+        self.init(
+            initialPreferences: initialPreferences,
+            initialSyncStatus: initialSyncStatus,
+            iCloudClient: iCloudClient,
+            resolvedSyncMethod: iCloudClient == nil ? .thisMac : .iCloud,
+            saveSyncMethod: { _ in },
+            saveFolderBookmark: { _ in },
+            save: save
+        )
+    }
+
+    convenience init(
+        initialPreferences: AppPreferences = AppPreferences(),
+        initialSyncStatus: ICloudSyncStatus = .localOnly,
+        iCloudClient: ICloudPreferencesClient? = nil,
+        syncMethod: SyncMethod,
+        saveSyncMethod: @escaping (SyncMethod) -> Void = { _ in },
+        saveFolderBookmark: @escaping (Data?) -> Void = { _ in },
+        save: @escaping (AppPreferences) -> Void = { _ in }
+    ) {
+        self.init(
+            initialPreferences: initialPreferences,
+            initialSyncStatus: initialSyncStatus,
+            iCloudClient: iCloudClient,
+            resolvedSyncMethod: syncMethod,
+            saveSyncMethod: saveSyncMethod,
+            saveFolderBookmark: saveFolderBookmark,
+            save: save
+        )
     }
 
     static func live(
@@ -91,7 +184,10 @@ final class PreferencesStore {
     static func live(
         userDefaults: UserDefaults,
         iCloudClient: ICloudPreferencesClient?,
-        defaultPreferences: AppPreferences = AppPreferences()
+        defaultPreferences: AppPreferences = AppPreferences(),
+        folderClient: (Data) -> FilePreferencesClient = { bookmark in
+            FilePreferencesClient(bookmarkData: bookmark)
+        }
     ) -> PreferencesStore {
         let data = userDefaults.data(
             forKey: Key.preferences
@@ -105,21 +201,207 @@ final class PreferencesStore {
 
         let store = Self(
             initialPreferences: preferences,
-            iCloudClient: iCloudClient
-        ) { preferences in
-            guard let data = try? JSONEncoder().encode(preferences) else {
-                return
-            }
+            iCloudClient: iCloudClient,
+            resolvedSyncMethod: {
+                let saved = userDefaults.string(forKey: Key.syncMethod).flatMap(SyncMethod.init(rawValue:))
+                if saved == .iCloud, iCloudClient == nil {
+                    return .thisMac
+                }
+                return saved ?? (iCloudClient == nil ? .thisMac : .iCloud)
+            }(),
+            saveSyncMethod: { method in
+                userDefaults.set(method.rawValue, forKey: Key.syncMethod)
+            },
+            saveFolderBookmark: { bookmark in
+                userDefaults.set(bookmark, forKey: Key.folderBookmark)
+            },
+            save: { preferences in
+                guard let data = try? JSONEncoder().encode(preferences) else {
+                    return
+                }
 
-            userDefaults.set(
-                data,
-                forKey: Key.preferences
-            )
+                userDefaults.set(
+                    data,
+                    forKey: Key.preferences
+                )
+            }
+        )
+        let savedICloudWithoutClient = userDefaults.string(forKey: Key.syncMethod) == SyncMethod.iCloud.rawValue
+            && iCloudClient == nil
+        if savedICloudWithoutClient {
+            store.iCloudSelectionUnavailable = true
         }
-        if iCloudClient != nil {
+        if store.syncMethod == .iCloud, iCloudClient != nil {
             store.startICloudSync()
         }
+        if store.syncMethod == .folder {
+            restoreFolderSync(store, userDefaults: userDefaults, folderClient: folderClient)
+        }
         return store
+    }
+
+    private static func restoreFolderSync(
+        _ store: PreferencesStore,
+        userDefaults: UserDefaults,
+        folderClient: (Data) -> FilePreferencesClient
+    ) {
+        guard let bookmark = userDefaults.data(forKey: Key.folderBookmark) else {
+            store.folderSyncStatus = .lostAuthorization
+            return
+        }
+        let client = folderClient(bookmark)
+        guard let resolved = try? client.resolveBookmark() else {
+            store.folderSyncStatus = .lostAuthorization
+            return
+        }
+        let displayName = resolved.url.lastPathComponent
+        store.activeFolderDisplayName = displayName
+        store.activeFolderLocation = client.displayLocation
+        if !store.configureFolderSync(client: client, displayName: displayName) {
+            store.folderSyncStatus = .unavailable
+        }
+        if let refreshed = resolved.refreshedBookmark {
+            userDefaults.set(refreshed, forKey: Key.folderBookmark)
+        }
+    }
+
+    func browserSettingsSnapshot() -> BrowserSettingsSnapshot {
+        BrowserSettingsSnapshot(
+            browserOrder: Self.normalizedOrder(browserOrder),
+            pickerShortcuts: Self.normalizedPickerShortcuts(pickerShortcuts),
+            exactHostRoutingRules: Self.normalizedExactHostRoutingRules(exactHostRoutingRules)
+        )
+    }
+
+    func applyBrowserSettingsSnapshot(_ snapshot: BrowserSettingsSnapshot) {
+        var updated = preferences
+        updated.browserOrder = Self.normalizedOrder(snapshot.browserOrder)
+        updated.pickerShortcuts = Self.normalizedPickerShortcuts(snapshot.pickerShortcuts)
+        updated.exactHostRoutingRules = Self.normalizedExactHostRoutingRules(snapshot.exactHostRoutingRules)
+        update(updated, origin: .remote)
+    }
+
+    @discardableResult
+    func configureFolderSync(
+        client: FilePreferencesClient,
+        displayName: String
+    ) -> Bool {
+        let previousTransport = transportState
+
+        let bookmark: Data?
+        do {
+            bookmark = try client.bookmarkDataForDirectory()
+        } catch {
+            return false
+        }
+
+        stopICloudSync()
+        previousTransport.client?.stop()
+        fileClient = nil
+        guard
+            client.start(onEvent: { [weak self] event in
+                self?.handleFolderEvent(event)
+            }, refreshImmediately: false)
+        else {
+            client.stop()
+            restoreTransport(previousTransport)
+            return false
+        }
+
+        let initialRead = client.read()
+        guard initialRead != .unavailable else {
+            client.stop()
+            restoreTransport(previousTransport)
+            return false
+        }
+
+        fileClient = client
+        activeFolderDisplayName = displayName
+        activeFolderLocation = client.displayLocation
+        syncMethod = .folder
+        saveSyncMethod(.folder)
+        saveFolderBookmark(bookmark)
+        client.setEventHandler { [weak self] event in
+            self?.handleFolderEvent(event)
+        }
+        client.refresh()
+        switch initialRead {
+        case .unavailable:
+            folderSyncStatus = .unavailable
+        case .invalid:
+            folderSyncStatus = .invalid
+        case .missing:
+            folderSyncStatus = .missingFile
+        case .snapshot:
+            folderSyncStatus = .active(displayName: displayName)
+        }
+        return true
+    }
+
+    private var transportState: TransportState {
+        TransportState(
+            method: syncMethod,
+            client: fileClient,
+            displayName: activeFolderDisplayName,
+            location: activeFolderLocation,
+            folderStatus: folderSyncStatus,
+            cloudWasActive: iCloudSyncStatus == .available
+        )
+    }
+
+    private func restoreTransport(_ state: TransportState) {
+        syncMethod = state.method
+        activeFolderDisplayName = state.displayName
+        activeFolderLocation = state.location
+        folderSyncStatus = state.folderStatus
+        fileClient = state.client
+        if state.method == .folder, let client = state.client {
+            _ = client.start { [weak self] event in
+                self?.handleFolderEvent(event)
+            }
+        } else if state.method == .iCloud, state.cloudWasActive {
+            _ = startICloudSync()
+        }
+    }
+
+    func stopFolderSync() {
+        fileClient?.stop()
+        fileClient = nil
+        folderSyncStatus = .inactive
+    }
+
+    @discardableResult
+    func setSyncMethod(_ method: SyncMethod) -> Bool {
+        guard method != syncMethod else { return true }
+        switch method {
+        case .thisMac:
+            stopICloudSync()
+            stopFolderSync()
+            syncMethod = .thisMac
+            saveSyncMethod(.thisMac)
+            return true
+        case .iCloud:
+            guard iCloudClient != nil else { return false }
+            let previousTransport = transportState
+            stopICloudSync()
+            previousTransport.client?.stop()
+            fileClient = nil
+            syncMethod = .iCloud
+            guard startICloudSync() else {
+                restoreTransport(previousTransport)
+                return false
+            }
+            saveSyncMethod(.iCloud)
+            return true
+        case .folder:
+            return false
+        }
+    }
+
+    func refreshActiveSync() {
+        if syncMethod == .folder {
+            fileClient?.refresh()
+        }
     }
 
     func orderedBrowsers(
@@ -320,7 +602,7 @@ final class PreferencesStore {
         let changed = self.preferences != preferences
         update(
             preferences,
-            origin: .pickerShortcuts
+            origin: syncMethod == .folder ? .folderPickerShortcuts : .pickerShortcuts
         )
         return changed
     }
@@ -370,7 +652,7 @@ final class PreferencesStore {
         )
         update(
             preferences,
-            origin: .browserOrder
+            origin: syncMethod == .folder ? .folderBrowserOrder : .browserOrder
         )
     }
 
@@ -426,7 +708,10 @@ final class PreferencesStore {
         }
 
         let changed = self.preferences != preferences
-        update(preferences, origin: .local)
+        update(
+            preferences,
+            origin: syncMethod == .folder ? .folderRules : .local
+        )
         return changed
     }
 
@@ -443,7 +728,10 @@ final class PreferencesStore {
             $0.host == normalizedHost
         }
         let changed = self.preferences != preferences
-        update(preferences, origin: .local)
+        update(
+            preferences,
+            origin: syncMethod == .folder ? .folderRules : .local
+        )
         return changed
     }
 
@@ -455,7 +743,10 @@ final class PreferencesStore {
 
         var preferences = preferences
         preferences.exactHostRoutingRules = []
-        update(preferences, origin: .local)
+        update(
+            preferences,
+            origin: syncMethod == .folder ? .folderRules : .local
+        )
         return true
     }
 
@@ -470,23 +761,28 @@ final class PreferencesStore {
         self.preferences = preferences
         save(preferences)
 
-        guard iCloudSyncStatus == .available else {
-            return
-        }
-
         switch origin {
         case .browserOrder:
+            guard iCloudSyncStatus == .available else { return }
             iCloudClient?.writeBrowserOrder(preferences.browserOrder)
         case .pickerShortcuts:
+            guard iCloudSyncStatus == .available else { return }
             iCloudClient?.writePickerShortcuts(preferences.pickerShortcuts)
+        case .folderBrowserOrder:
+            writeFolderField(.browserOrder)
+        case .folderPickerShortcuts:
+            writeFolderField(.pickerShortcuts)
+        case .folderRules:
+            writeFolderField(.exactHostRoutingRules)
         case .remote, .local:
             break
         }
     }
 
-    func startICloudSync() {
-        guard let iCloudClient else {
-            return
+    @discardableResult
+    func startICloudSync() -> Bool {
+        guard syncMethod == .iCloud, let iCloudClient else {
+            return false
         }
 
         let didStart = iCloudClient.start { [weak self] event in
@@ -495,12 +791,76 @@ final class PreferencesStore {
 
         guard didStart else {
             iCloudSyncStatus = .localOnly
-            return
+            return false
         }
 
         applyCloudPreferences(
             seedWhenMissing: true
         )
+        return true
+    }
+
+    func stopICloudSync() {
+        iCloudClient?.stop()
+        iCloudSyncStatus = .localOnly
+    }
+
+    private enum FolderField {
+        case browserOrder
+        case pickerShortcuts
+        case exactHostRoutingRules
+    }
+
+    private func handleFolderEvent(_ event: FilePreferencesClient.Event) {
+        switch event {
+        case let .snapshot(snapshot):
+            applyBrowserSettingsSnapshot(snapshot)
+            folderSyncStatus = .active(displayName: activeFolderDisplayName)
+        case .missing:
+            folderSyncStatus = .missingFile
+        case .invalid:
+            folderSyncStatus = .invalid
+        case .unavailable:
+            folderSyncStatus = .unavailable
+        }
+    }
+
+    private func writeFolderField(_ field: FolderField) {
+        guard syncMethod == .folder, let fileClient else { return }
+        let currentRead = fileClient.read()
+        guard case let .snapshot(remote, _) = currentRead else {
+            switch currentRead {
+            case .missing: folderSyncStatus = .missingFile
+            case .invalid: folderSyncStatus = .invalid
+            case .unavailable: folderSyncStatus = .unavailable
+            case .snapshot: break
+            }
+            return
+        }
+        let local = browserSettingsSnapshot()
+        let merged = switch field {
+        case .browserOrder:
+            BrowserSettingsSnapshot(
+                browserOrder: local.browserOrder,
+                pickerShortcuts: remote.pickerShortcuts,
+                exactHostRoutingRules: remote.exactHostRoutingRules
+            )
+        case .pickerShortcuts:
+            BrowserSettingsSnapshot(
+                browserOrder: remote.browserOrder,
+                pickerShortcuts: local.pickerShortcuts,
+                exactHostRoutingRules: remote.exactHostRoutingRules
+            )
+        case .exactHostRoutingRules:
+            BrowserSettingsSnapshot(
+                browserOrder: remote.browserOrder,
+                pickerShortcuts: remote.pickerShortcuts,
+                exactHostRoutingRules: local.exactHostRoutingRules
+            )
+        }
+        folderSyncStatus = fileClient.write(merged)
+            ? .active(displayName: activeFolderDisplayName)
+            : .unavailable
     }
 
     private func handleICloudEvent(

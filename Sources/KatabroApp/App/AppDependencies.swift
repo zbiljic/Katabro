@@ -10,6 +10,7 @@ struct AppDependencies {
     let routingDecisionClient: RoutingDecisionClient
     var browserProfileStore = BrowserProfileStore()
     let preferencesStore: PreferencesStore
+    var configurationFolderClient = ConfigurationFolderClient.live
     var userScriptBridge = UserScriptBridge(
         initialInstallationState: .missing
     )

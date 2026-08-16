@@ -62,6 +62,43 @@ struct AppDelegateTests {
         #expect(defaultBrowserClient.status == .current)
         #expect(loginItemClient.status == .enabled)
     }
+
+    @Test("becoming active refreshes the selected Folder transport")
+    func refreshesFolderTransport() {
+        var refreshCount = 0
+        let snapshot = BrowserSettingsSnapshot(
+            browserOrder: [],
+            pickerShortcuts: [:],
+            exactHostRoutingRules: []
+        )
+        // swiftlint:disable trailing_closure
+        let client = FilePreferencesClient(
+            injectedRead: {
+                refreshCount += 1
+                return .snapshot(snapshot, bytes: (try? snapshot.encodedData()) ?? Data())
+            }
+        )
+        // swiftlint:enable trailing_closure
+        let store = PreferencesStore(syncMethod: .thisMac)
+        #expect(store.configureFolderSync(client: client, displayName: "Fixture"))
+        refreshCount = 0
+        let delegate = AppDelegate(
+            dependencies: AppDependencies(
+                browserDiscovery: BrowserDiscoveryFake(),
+                browserLauncher: BrowserLauncherFake(),
+                defaultBrowserClient: .development(status: .notCurrent),
+                errorPresenter: RoutingErrorPresenterFake(),
+                loginItemClient: .development(status: .disabled),
+                routingDecisionClient: .exactHostRules,
+                preferencesStore: store
+            )
+        )
+
+        delegate.applicationDidBecomeActive(
+            Notification(name: NSApplication.didBecomeActiveNotification)
+        )
+        #expect(refreshCount == 1)
+    }
 }
 
 @MainActor

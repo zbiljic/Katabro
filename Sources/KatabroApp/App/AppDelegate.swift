@@ -84,6 +84,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ) {
         dependencies.defaultBrowserClient.refresh()
         dependencies.loginItemClient.refresh()
+        dependencies.preferencesStore.refreshActiveSync()
     }
 
     func application(

@@ -147,6 +147,18 @@ final class ICloudPreferencesClient: NSObject {
         return result
     }
 
+    /// Stop observation without discarding the client. This makes transport
+    /// switching deterministic and permits a later restart.
+    func stop() {
+        notificationCenter.removeObserver(
+            self,
+            name: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+            object: store
+        )
+        eventHandler = nil
+        startResult = nil
+    }
+
     // swiftformat:disable modifierOrder
     @objc
     nonisolated private func receiveExternalChange(
