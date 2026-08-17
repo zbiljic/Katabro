@@ -460,6 +460,51 @@ final class KatabroUITests: XCTestCase {
 
 extension KatabroUITests {
     @MainActor
+    func testFilePickerLightAndDark() {
+        var previousApplication: XCUIApplication?
+
+        for appearance in ["light", "dark"] {
+            previousApplication?.terminate()
+            let application = launch(
+                surface: "picker",
+                state: "file-url",
+                appearance: appearance
+            )
+            previousApplication = application
+
+            let destination = application.descendants(matching: .any)[
+                "picker.destination"
+            ]
+            let remember = application.descendants(matching: .any)[
+                "picker.remember-host"
+            ]
+            let safari = application.descendants(matching: .any)[
+                "picker.browser.com.apple.Safari"
+            ]
+            let receipt = application.descendants(matching: .any)[
+                "picker.selection-receipt"
+            ]
+
+            assertExists(destination)
+            XCTAssertTrue(
+                (destination.value as? String)?.contains("file:///fixture/index.html") == true
+                    || destination.label.contains("file:///fixture/index.html")
+            )
+            XCTAssertFalse(remember.exists)
+            assertExists(safari)
+            assertExists(receipt)
+            safari.click()
+            assertReceipt(receipt, equals: "Safari selected 1 time")
+            attachScreenshot(
+                named: "Picker-file-url-\(appearance)",
+                from: application
+            )
+        }
+
+        previousApplication?.terminate()
+    }
+
+    @MainActor
     func testPickerRememberHostControl() {
         let application = launch(
             surface: "picker",

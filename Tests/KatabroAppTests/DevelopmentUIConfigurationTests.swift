@@ -122,6 +122,24 @@
             #expect(configuration?.resetsPreferences == true)
         }
 
+        @MainActor
+        @Test("file picker fixture is deterministic and omits the Remember footer")
+        func filePickerFixture() {
+            let fileStore = DevelopmentUIFixtures.pickerStore(for: .fileURL)
+            let webStore = DevelopmentUIFixtures.pickerStore(for: .normal)
+
+            #expect(fileStore.destination.url.absoluteString == "file:///fixture/index.html")
+            #expect(!fileStore.canRememberSelection)
+            #expect(
+                Double(DevelopmentUIFixtures.pickerHeight(for: .normal)).bitPattern
+                    == Double(
+                        DevelopmentUIFixtures.pickerHeight(for: .fileURL)
+                            + BrowserPickerLayout.rememberFooterHeight
+                    ).bitPattern
+            )
+            #expect(fileStore.targets.count == webStore.targets.count)
+        }
+
         @Test("settings fixtures use an in-memory Folder transport and chooser")
         @MainActor
         func folderFixturesAreDeterministic() async throws {

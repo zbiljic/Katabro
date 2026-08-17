@@ -27,6 +27,7 @@
         case browserDiscoveryError = "browser-discovery-error"
         case serviceErrors = "service-errors"
         case manyBrowsers = "many-browsers"
+        case fileURL = "file-url"
         case browserProfiles = "browser-profiles"
         case scriptSetup = "script-setup"
         case scriptReplace = "script-replace"
@@ -35,7 +36,7 @@
             switch self {
             case .normal, .serviceErrors:
                 .general
-            case .loading, .noBrowsers, .browserDiscoveryError, .manyBrowsers, .browserProfiles, .scriptSetup,
+            case .loading, .noBrowsers, .browserDiscoveryError, .manyBrowsers, .fileURL, .browserProfiles, .scriptSetup,
                  .scriptReplace:
                 .browsers
             }
@@ -180,7 +181,7 @@
                 discoveryBehavior = .browsers(
                     discoveredBrowsers
                 )
-            case .normal, .serviceErrors, .browserProfiles, .scriptSetup, .scriptReplace:
+            case .normal, .serviceErrors, .fileURL, .browserProfiles, .scriptSetup, .scriptReplace:
                 discoveredBrowsers = browsers(
                     count: 4
                 )
@@ -334,7 +335,7 @@
                 browsers(
                     count: 12
                 )
-            case .normal, .serviceErrors, .browserProfiles, .scriptSetup, .scriptReplace:
+            case .normal, .serviceErrors, .fileURL, .browserProfiles, .scriptSetup, .scriptReplace:
                 browsers(
                     count: 4
                 )
@@ -345,9 +346,10 @@
             for state: DevelopmentUIState,
             pickerShortcuts: [String: PickerShortcut]? = nil
         ) -> BrowserPickerStore {
-            let destination = try? IncomingURL(
-                "https://developer.apple.com/documentation/swiftui"
-            )
+            let rawDestination = state == .fileURL
+                ? "file:///fixture/index.html"
+                : "https://developer.apple.com/documentation/swiftui"
+            let destination = try? IncomingURL(rawDestination)
 
             return BrowserPickerStore(
                 destination: destination ?? fallbackDestination(),
@@ -359,8 +361,10 @@
         static func pickerHeight(
             for state: DevelopmentUIState
         ) -> CGFloat {
-            BrowserPickerLayout.height(
-                browserCount: pickerTargets(for: state).count
+            let store = pickerStore(for: state)
+            return BrowserPickerLayout.height(
+                browserCount: store.targets.count,
+                includesRememberFooter: store.canRememberSelection
             )
         }
 

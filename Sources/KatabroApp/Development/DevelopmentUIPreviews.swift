@@ -102,6 +102,16 @@
         )
     }
 
+    #Preview("Browser Picker — File URL") {
+        BrowserPickerView(
+            store: DevelopmentUIFixtures.pickerStore(
+                for: .fileURL
+            ),
+            onSelect: { _, _ in },
+            onCancel: {}
+        )
+    }
+
     @MainActor
     private func settingsPreview(
         state: DevelopmentUIState,
