@@ -42,6 +42,10 @@ public struct ExactHostRoutingRule: Codable, Equatable, Hashable, Identifiable, 
     public func matches(
         _ destination: IncomingURL
     ) -> Bool {
+        guard destination.scheme == .http || destination.scheme == .https else {
+            return false
+        }
+
         guard let destinationHost = destination.url.host() else {
             return false
         }

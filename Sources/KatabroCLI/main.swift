@@ -27,7 +27,7 @@ do {
     }
 } catch let error as CommandLineRequest.ParsingError {
     writeError("katabro: \(error.description)")
-    writeError("Usage: katabro <http-or-https-url>")
+    writeError("Usage: katabro <http-https-or-file-url>")
     exit(EXIT_FAILURE)
 } catch {
     writeError("katabro: \(error)")

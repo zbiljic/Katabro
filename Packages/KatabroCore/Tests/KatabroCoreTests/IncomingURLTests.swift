@@ -7,7 +7,7 @@ struct IncomingURLTests {
     struct AcceptedCase: Sendable {
         let rawValue: String
         let scheme: IncomingURL.Scheme
-        let host: String
+        let host: String?
     }
 
     struct RejectedCase: Sendable {
@@ -39,7 +39,28 @@ struct IncomingURLTests {
         let incomingURL = try IncomingURL(testCase.rawValue)
 
         #expect(incomingURL.scheme == testCase.scheme)
-        #expect(incomingURL.url.host()?.lowercased() == testCase.host)
+        #expect(incomingURL.url.host()?.lowercased() == testCase.host?.lowercased())
+    }
+
+    @Test(
+        "accepts local absolute file URLs without rewriting",
+        arguments: [
+            AcceptedCase(rawValue: "file:///tmp/example.html", scheme: .file, host: nil),
+            AcceptedCase(rawValue: "FILE:///tmp/example.html", scheme: .file, host: nil),
+            AcceptedCase(rawValue: "file://LOCALHOST/tmp/example.html", scheme: .file, host: "localhost"),
+            AcceptedCase(
+                rawValue: "file:///tmp/example%20page.html?preview=true#section",
+                scheme: .file,
+                host: nil
+            ),
+        ]
+    )
+    func acceptsFileURL(testCase: AcceptedCase) throws {
+        let incomingURL = try IncomingURL(testCase.rawValue)
+
+        #expect(incomingURL.scheme == testCase.scheme)
+        #expect(incomingURL.url.host()?.lowercased() == testCase.host?.lowercased())
+        #expect(incomingURL.url.absoluteString == testCase.rawValue)
     }
 
     @Test(
@@ -65,6 +86,24 @@ struct IncomingURLTests {
                 rawValue: "http://[invalid",
                 error: .malformed
             ),
+            RejectedCase(rawValue: "file:relative.html", error: .relative),
+            RejectedCase(rawValue: "file:", error: .invalidFilePath),
+            RejectedCase(rawValue: "file://", error: .invalidFilePath),
+            RejectedCase(rawValue: "file:///", error: .invalidFilePath),
+            RejectedCase(rawValue: "file:////server/share/page.html", error: .invalidFilePath),
+            RejectedCase(
+                rawValue: "file://server/share/page.html",
+                error: .remoteFileAuthority("server")
+            ),
+            RejectedCase(
+                rawValue: "file://user@localhost/page.html",
+                error: .invalidFileAuthority
+            ),
+            RejectedCase(
+                rawValue: "file://localhost:1234/page.html",
+                error: .invalidFileAuthority
+            ),
+            RejectedCase(rawValue: "mailto:test@example.com", error: .unsupportedScheme("mailto")),
         ]
     )
     func rejectsInvalidURL(testCase: RejectedCase) {

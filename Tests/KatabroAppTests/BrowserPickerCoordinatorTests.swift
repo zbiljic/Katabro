@@ -399,20 +399,35 @@ extension BrowserPickerCoordinatorTests {
         #expect(coordinator.presentedStore == nil)
     }
 
-    @Test("reports invalid incoming URLs to the user")
-    func reportsInvalidURL() throws {
-        let errorPresenter = RoutingErrorPresenterFake()
+    @Test("routes file URLs and ignores a forced remember request")
+    func routesFileURLWithoutRemembering() async throws {
+        let browser = makeBrowser()
+        let launcher = BrowserLauncherFake()
+        let preferencesStore = PreferencesStore()
+        var selectionHandler: ((BrowserLaunchTarget, Bool) -> Void)?
         let coordinator = makeCoordinator(
-            discovery: BrowserDiscoveryFake(),
-            launcher: BrowserLauncherFake(),
-            errorPresenter: errorPresenter
-        )
-        let invalidURL = try #require(URL(string: "file:///tmp/example"))
+            discovery: BrowserDiscoveryFake(browsers: [browser]),
+            launcher: launcher,
+            preferencesStore: preferencesStore
+        ) { _, onSelect, _ in
+            selectionHandler = onSelect
+            return BrowserPickerPresentationFake()
+        }
+        let fileURL = try #require(URL(string: "file://localhost/tmp/example%20page.html"))
 
-        coordinator.handle(invalidURL)
+        coordinator.handle(fileURL)
+        await coordinator.waitForPendingOperations()
 
-        #expect(errorPresenter.presentedErrors.count == 1)
-        #expect(coordinator.lastError != nil)
+        #expect(coordinator.presentedStore?.destination.url.absoluteString == fileURL.absoluteString)
+        #expect(coordinator.presentedStore?.canRememberSelection == false)
+
+        let selectBrowser = try #require(selectionHandler)
+        selectBrowser(makeTarget(browser), true)
+        await coordinator.waitForPendingOperations()
+
+        #expect(launcher.openedRequests.first?.destination.url.absoluteString == fileURL.absoluteString)
+        #expect(preferencesStore.exactHostRoutingRules.isEmpty)
+        #expect(coordinator.lastError == nil)
     }
 
     @Test("matching rule bypasses the picker and launches its exact target")

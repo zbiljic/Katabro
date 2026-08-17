@@ -15,8 +15,22 @@ struct BrowserPickerStoreTests {
         )
 
         #expect(!store.isRememberingSelection)
-        store.isRememberingSelection = true
+        store.setRememberingSelection(true)
         #expect(store.isRememberingSelection)
+    }
+
+    @Test("file destinations cannot remember a selection")
+    func fileDestinationCannotRememberSelection() throws {
+        let store = try BrowserPickerStore(
+            destination: IncomingURL("file://localhost/tmp/example.html"),
+            browsers: []
+        )
+
+        #expect(!store.canRememberSelection)
+        store.setRememberingSelection(true)
+        store.toggleRememberingSelection()
+        #expect(!store.isRememberingSelection)
+        #expect(!store.effectiveRememberingSelection)
     }
 
     @Test("looks up custom picker shortcuts case-insensitively")

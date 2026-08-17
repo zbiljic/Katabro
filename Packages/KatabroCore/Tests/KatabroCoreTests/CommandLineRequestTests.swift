@@ -21,17 +21,29 @@ struct CommandLineRequestTests {
         }
     }
 
-    @Test("rejects unsupported URLs with the core validation error")
+    @Test("rejects relative file URLs with the core validation error")
     func rejectsInvalidURL() {
         #expect(
             throws: CommandLineRequest.ParsingError.invalidURL(
-                .unsupportedScheme("file")
+                .relative
             )
         ) {
             try CommandLineRequest(
-                arguments: ["file:///tmp/example"]
+                arguments: ["file:relative.html"]
             )
         }
+    }
+
+    @Test("creates a transport envelope for a valid file URL")
+    func createsFileTransportEnvelope() throws {
+        let request = try CommandLineRequest(
+            arguments: ["file:///tmp/example%20page.html"]
+        )
+
+        let decoded = try KatabroURL.decode(request.transportURL())
+
+        #expect(decoded == request.destination)
+        #expect(decoded.url.absoluteString == "file:///tmp/example%20page.html")
     }
 
     @Test("creates a transport envelope for a valid web URL")

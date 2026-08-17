@@ -9,7 +9,11 @@ final class BrowserPickerStore {
     let targets: [BrowserLaunchTarget]
     let pickerShortcuts: [String: PickerShortcut]
     private(set) var selectedIndex: Int?
-    var isRememberingSelection = false
+    private(set) var isRememberingSelection = false
+
+    var canRememberSelection: Bool {
+        destination.scheme == .http || destination.scheme == .https
+    }
 
     var browsers: [BrowserApplication] {
         targets.map(\.browser)
@@ -59,6 +63,20 @@ final class BrowserPickerStore {
         for target: BrowserLaunchTarget
     ) -> PickerShortcut? {
         pickerShortcuts[target.id]
+    }
+
+    func setRememberingSelection(
+        _ isRemembering: Bool
+    ) {
+        isRememberingSelection = canRememberSelection && isRemembering
+    }
+
+    func toggleRememberingSelection() {
+        setRememberingSelection(!isRememberingSelection)
+    }
+
+    var effectiveRememberingSelection: Bool {
+        canRememberSelection && isRememberingSelection
     }
 
     func target(

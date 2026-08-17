@@ -12,6 +12,8 @@ release artifacts, notarization, and an installer are not available yet.
 
 - Handles HTTP and HTTPS links after macOS confirms Katabro as the default
   browser.
+- Routes local HTML and XHTML documents to a selected browser without treating
+  file URLs as default-browser schemes.
 - Discovers compatible browsers without a hard-coded browser list.
 - Supports arrow keys, Return or Space, Escape, numeric picker shortcuts, and
   optional per-browser letter shortcuts.
@@ -161,11 +163,16 @@ its arguments:
 
 ```sh
 scripts/katabro 'https://example.com/path?q=swift'
+scripts/katabro 'file:///tmp/example%20page.html'
 ```
 
-The helper accepts exactly one absolute HTTP or HTTPS URL. It validates the URL,
+The helper accepts exactly one absolute HTTP, HTTPS, or local file URL. It validates the URL,
 encodes it as a `katabro://open` request, and asks macOS to deliver it to the
 application. Invalid input and launch failures return a nonzero exit status.
+
+macOS document delivery is registered only for HTML and XHTML documents.
+HTTP and HTTPS remain the only default-browser schemes; Katabro does not claim
+generic files or use file associations for default-browser status.
 
 ## Development commands
 

@@ -6,19 +6,42 @@ import Testing
 @MainActor
 @Suite("Workspace browser discovery")
 struct WorkspaceBrowserDiscoveryTests {
-    @Test("forwards the exact destination URL to Launch Services")
-    func forwardsDestinationURL() async throws {
+    @Test("queries only the destination web scheme")
+    func queriesDestinationScheme() async throws {
         let destination = try IncomingURL("https://example.com/path?query=value")
         let state = QueryState()
-        let discovery = makeDiscovery { receivedURL in
-            state.receivedURLs.append(receivedURL)
+        let discovery = makeDiscovery { schemes in
+            state.receivedSchemes.append(schemes)
             return []
         }
 
         let browsers = try await discovery.browsers(for: destination)
 
-        #expect(state.receivedURLs == [destination.url])
+        #expect(state.receivedSchemes == [["https"]])
         #expect(browsers.isEmpty)
+    }
+
+    @Test("queries the HTTP and HTTPS browser universe for file destinations")
+    func queriesWebSchemesForFileDestination() async throws {
+        let state = QueryState()
+        let discovery = makeDiscovery { schemes in
+            state.receivedSchemes.append(schemes)
+            return [
+                application(
+                    path: "/Applications/Browser.app",
+                    name: "Browser",
+                    bundleIdentifier: "com.example.browser"
+                ),
+            ]
+        }
+
+        let browsers = try await discovery.browsers(
+            for: IncomingURL("file:///tmp/example.html")
+        )
+
+        #expect(state.receivedSchemes == [["http", "https"]])
+        #expect(browsers.map(\.browser.bundleIdentifier) == ["com.example.browser"])
+        #expect(!state.receivedSchemes.flatMap(\.self).contains("file"))
     }
 
     @Test("accepts every application location returned by Launch Services")
@@ -143,5 +166,5 @@ private func application(
 
 @MainActor
 private final class QueryState {
-    var receivedURLs: [URL] = []
+    var receivedSchemes: [[String]] = []
 }

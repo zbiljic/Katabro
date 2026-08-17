@@ -713,6 +713,15 @@ extension PreferencesStoreTests {
         #expect(saves.count == 3)
         #expect(cloudStore.writes.isEmpty)
     }
+
+    @Test("rejects exact-host rules for file destinations")
+    func rejectsFileExactHostRules() throws {
+        let store = PreferencesStore()
+        let destination = try IncomingURL("file://localhost/tmp/example.html")
+
+        #expect(!store.setExactHostRoutingRule(for: destination, targetIdentifier: "browser"))
+        #expect(store.exactHostRoutingRules.isEmpty)
+    }
 }
 
 struct ShortcutEditCase: Sendable {

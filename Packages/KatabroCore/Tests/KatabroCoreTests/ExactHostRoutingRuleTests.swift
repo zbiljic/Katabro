@@ -20,6 +20,7 @@ struct ExactHostRoutingRuleTests {
         #expect(try !rule.matches(IncomingURL("https://www.example.com")))
         #expect(try !rule.matches(IncomingURL("https://sub.example.com")))
         #expect(try !rule.matches(IncomingURL("https://example.net")))
+        #expect(try !rule.matches(IncomingURL("file://localhost/tmp/example.html")))
     }
 
     @Test("removes at most one trailing dot")

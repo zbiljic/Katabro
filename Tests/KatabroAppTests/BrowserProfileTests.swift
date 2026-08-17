@@ -151,6 +151,60 @@ struct BrowserProfileTests {
     }
 
     @MainActor
+    @Test("preserves file URLs in private and profile arguments")
+    func constructsFileLaunchArguments() throws {
+        let destination = try IncomingURL("file:///tmp/example%20page.html")
+        let browser = browserApplication()
+        let privateTarget = BrowserLaunchTarget(
+            browser: browser,
+            kind: .privateWindow(.chromium)
+        )
+        let profileTarget = BrowserLaunchTarget(
+            browser: browser,
+            kind: .profile(
+                BrowserProfile(
+                    identifier: "Profile 2",
+                    displayName: "Work",
+                    launchValue: "Profile 2",
+                    family: .chromium
+                )
+            )
+        )
+        let firefoxTarget = BrowserLaunchTarget(
+            browser: browser,
+            kind: .profile(
+                BrowserProfile(
+                    identifier: "Profiles/work",
+                    displayName: "Work",
+                    launchValue: "/Browser Data/Profiles/work",
+                    family: .firefox
+                )
+            )
+        )
+
+        #expect(
+            privateTarget.browserArguments(for: destination) == [
+                "--incognito",
+                "file:///tmp/example%20page.html",
+            ]
+        )
+        #expect(
+            profileTarget.browserArguments(for: destination) == [
+                "--profile-directory=Profile 2",
+                "file:///tmp/example%20page.html",
+            ]
+        )
+        #expect(
+            firefoxTarget.browserArguments(for: destination) == [
+                "-profile",
+                "/Browser Data/Profiles/work",
+                "-no-remote",
+                "file:///tmp/example%20page.html",
+            ]
+        )
+    }
+
+    @MainActor
     @Test("keeps standard, private, and profile target identifiers distinct")
     func keepsLaunchTargetIdentifiersStable() {
         let browser = browserApplication()

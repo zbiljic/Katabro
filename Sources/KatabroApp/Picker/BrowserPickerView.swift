@@ -14,8 +14,6 @@ struct BrowserPickerView: View {
     let onCancel: () -> Void
 
     var body: some View {
-        @Bindable var bindableStore = store
-
         VStack(alignment: .leading, spacing: 12) {
             header
 
@@ -46,23 +44,30 @@ struct BrowserPickerView: View {
                 .scrollBounceBehavior(.basedOnSize)
             }
 
-            Divider()
+            if store.canRememberSelection {
+                Divider()
 
-            Toggle(
-                "Remember this choice for \(displayHost)",
-                isOn: $bindableStore.isRememberingSelection
-            )
-            .toggleStyle(.checkbox)
-            .controlSize(.small)
-            .accessibilityHint(
-                "Future links to this exact host open with the selected option. "
-                    + "Press Shift-Command-R to toggle. "
-                    + "You can remove the rule in Settings, Rules."
-            )
-            .accessibilityIdentifier(
-                AccessibilityIdentifier.pickerRememberHost
-            )
-            .padding(.horizontal, 6)
+                Toggle(
+                    "Remember this choice for \(displayHost)",
+                    isOn: Binding(
+                        get: { store.isRememberingSelection },
+                        set: { isRemembering in
+                            store.setRememberingSelection(isRemembering)
+                        }
+                    )
+                )
+                .toggleStyle(.checkbox)
+                .controlSize(.small)
+                .accessibilityHint(
+                    "Future links to this exact host open with the selected option. "
+                        + "Press Shift-Command-R to toggle. "
+                        + "You can remove the rule in Settings, Rules."
+                )
+                .accessibilityIdentifier(
+                    AccessibilityIdentifier.pickerRememberHost
+                )
+                .padding(.horizontal, 6)
+            }
         }
         .padding(12)
         .frame(width: BrowserPickerLayout.width)
@@ -104,7 +109,11 @@ struct BrowserPickerView: View {
                 return .ignored
             }
 
-            store.isRememberingSelection.toggle()
+            guard store.canRememberSelection else {
+                return .ignored
+            }
+
+            store.toggleRememberingSelection()
             return .handled
         }
         .onKeyPress(
@@ -120,14 +129,14 @@ struct BrowserPickerView: View {
                 return .ignored
             }
 
-            onSelect(target, store.isRememberingSelection)
+            onSelect(target, store.effectiveRememberingSelection)
             return .handled
         }
     }
 
     private func activateSelection() -> KeyPress.Result {
         if let target = store.selectedTarget {
-            onSelect(target, store.isRememberingSelection)
+            onSelect(target, store.effectiveRememberingSelection)
         }
         return .handled
     }

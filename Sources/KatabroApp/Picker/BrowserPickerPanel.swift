@@ -9,10 +9,12 @@ final class BrowserPickerPanel: NSPanel {
 
     init(
         rootView: some View,
-        browserCount: Int
+        browserCount: Int,
+        includesRememberFooter: Bool = true
     ) {
         let height = BrowserPickerLayout.height(
-            browserCount: browserCount
+            browserCount: browserCount,
+            includesRememberFooter: includesRememberFooter
         )
 
         super.init(

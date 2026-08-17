@@ -35,7 +35,8 @@ final class BrowserPickerCoordinator: NSObject {
 
             return BrowserPickerPanel(
                 rootView: view,
-                browserCount: store.targets.count
+                browserCount: store.targets.count,
+                includesRememberFooter: store.canRememberSelection
             )
         }
     ) {
@@ -240,6 +241,7 @@ final class BrowserPickerCoordinator: NSObject {
         }
 
         let ruleIntent = remembersSelection
+            && (request.destination.scheme == .http || request.destination.scheme == .https)
             ? ExactHostRoutingRule(
                 host: request.destination.url.host() ?? "",
                 targetIdentifier: target.id

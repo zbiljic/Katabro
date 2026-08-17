@@ -687,6 +687,7 @@ final class PreferencesStore {
         targetIdentifier: String
     ) -> Bool {
         guard
+            destination.scheme == .http || destination.scheme == .https,
             let host = destination.url.host(),
             let rule = ExactHostRoutingRule(
                 host: host,

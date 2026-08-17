@@ -9,13 +9,16 @@ enum BrowserPickerLayout {
     static let rememberFooterHeight: CGFloat = 36
 
     static func height(
-        browserCount: Int
+        browserCount: Int,
+        includesRememberFooter: Bool = true
     ) -> CGFloat {
-        min(
+        let footerHeight = includesRememberFooter ? rememberFooterHeight : 0
+
+        return min(
             maximumHeight,
             max(
                 minimumHeight,
-                baseHeight + rememberFooterHeight + CGFloat(browserCount) * rowHeight
+                baseHeight + footerHeight + CGFloat(browserCount) * rowHeight
             )
         )
     }

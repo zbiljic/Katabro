@@ -18,6 +18,20 @@ struct KatabroURLTests {
         #expect(decodedDestination == destination)
     }
 
+    @Test("round-trips a file destination without rewriting")
+    func fileRoundTrip() throws {
+        let destination = try IncomingURL(
+            "file:///tmp/example%20page.html?preview=true#section"
+        )
+
+        let decodedDestination = try KatabroURL.decode(
+            KatabroURL.encode(destination)
+        )
+
+        #expect(decodedDestination == destination)
+        #expect(decodedDestination.url.absoluteString == destination.url.absoluteString)
+    }
+
     @Test("rejects a non-Katabro scheme")
     func rejectsWrongScheme() throws {
         let url = try #require(URL(string: "https://example.com"))

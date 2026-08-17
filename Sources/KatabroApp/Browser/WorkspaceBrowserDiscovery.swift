@@ -9,7 +9,7 @@ final class WorkspaceBrowserDiscovery: BrowserDiscovering {
         let applicationURL: URL
     }
 
-    typealias ApplicationsHandler = @MainActor (_ destinationURL: URL) -> [ApplicationCandidate]
+    typealias ApplicationsHandler = @MainActor (_ schemes: [String]) -> [ApplicationCandidate]
     typealias IconHandler = @MainActor (_ applicationPath: String) -> NSImage
 
     private let applicationsHandler: ApplicationsHandler
@@ -22,9 +22,9 @@ final class WorkspaceBrowserDiscovery: BrowserDiscovering {
     ) {
         self.init(
             policy: policy,
-            applicationsHandler: { destinationURL in
+            applicationsHandler: { schemes in
                 Self.applicationCandidates(
-                    for: destinationURL,
+                    forSchemes: schemes,
                     workspace: workspace
                 )
             },
@@ -49,7 +49,7 @@ final class WorkspaceBrowserDiscovery: BrowserDiscovering {
     ) async throws -> [BrowserApplication] {
         var applicationsByIdentifier: [String: BrowserApplication] = [:]
 
-        for candidate in applicationsHandler(destination.url) {
+        for candidate in applicationsHandler(Self.handlerSchemes(for: destination.scheme)) {
             guard let application = application(from: candidate) else {
                 continue
             }
@@ -97,24 +97,39 @@ final class WorkspaceBrowserDiscovery: BrowserDiscovering {
         )
     }
 
+    static func handlerSchemes(
+        for scheme: IncomingURL.Scheme
+    ) -> [String] {
+        switch scheme {
+        case .file:
+            [IncomingURL.Scheme.http.rawValue, IncomingURL.Scheme.https.rawValue]
+        case .http, .https:
+            [scheme.rawValue]
+        }
+    }
+
     private static func applicationCandidates(
-        for destinationURL: URL,
+        forSchemes schemes: [String],
         workspace: NSWorkspace
     ) -> [ApplicationCandidate] {
         // The modern NSWorkspace URL query omits registered handlers located in
         // sandbox-inaccessible directories such as ~/Applications. Keep this
         // deprecated identifier query isolated until AppKit exposes equivalent
         // sandbox-safe handler metadata.
-        guard
-            let scheme = destinationURL.scheme,
-            let handlerIdentifiers = LSCopyAllHandlersForURLScheme(
+        var identifiers: [String] = []
+        var seenIdentifiers: Set<String> = []
+
+        for scheme in schemes {
+            let schemeIdentifiers = LSCopyAllHandlersForURLScheme(
                 scheme as CFString
-            )?.takeRetainedValue() as? [String]
-        else {
-            return []
+            )?.takeRetainedValue() as? [String] ?? []
+
+            for identifier in schemeIdentifiers where seenIdentifiers.insert(identifier.lowercased()).inserted {
+                identifiers.append(identifier)
+            }
         }
 
-        return handlerIdentifiers.flatMap { bundleIdentifier in
+        return identifiers.flatMap { bundleIdentifier in
             workspace
                 .urlsForApplications(
                     withBundleIdentifier: bundleIdentifier
