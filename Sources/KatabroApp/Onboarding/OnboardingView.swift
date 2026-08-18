@@ -24,25 +24,16 @@ struct OnboardingView: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 12) {
-                setupStep(
-                    number: 1,
-                    title: "Make Katabro your default browser",
-                    detail: "macOS may ask you to confirm changes for both HTTP and HTTPS links."
+            VStack(alignment: .leading, spacing: 8) {
+                Text(
+                    "Katabro becomes your system default browser so it can receive web links."
                 )
 
-                setupStep(
-                    number: 2,
-                    title: "Open any web link",
-                    detail: "Katabro shows the browser picker near the pointer."
-                )
-
-                setupStep(
-                    number: 3,
-                    title: "Choose with the mouse or keyboard",
-                    detail: "Use the arrow keys and Return or Space, or press a displayed number."
+                Text(
+                    "Choose where links open, or remember a browser for a specific website."
                 )
             }
+            .foregroundStyle(.secondary)
 
             statusView
 
@@ -109,27 +100,5 @@ struct OnboardingView: View {
         .accessibilityIdentifier(
             AccessibilityIdentifier.onboardingDefaultBrowserStatus
         )
-    }
-
-    private func setupStep(
-        number: Int,
-        title: String,
-        detail: String
-    ) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Text("\(number)")
-                .font(.headline.monospacedDigit())
-                .frame(width: 28, height: 28)
-                .background(.quaternary, in: .circle)
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.headline)
-
-                Text(detail)
-                    .foregroundStyle(.secondary)
-            }
-        }
     }
 }

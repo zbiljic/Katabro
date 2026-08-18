@@ -455,6 +455,7 @@ final class KatabroUITests: XCTestCase {
             application.terminate()
         }
 
+        assertOnboardingExplanation(application)
         assertExists(
             application.staticTexts["onboarding.default-browser.status"]
         )
@@ -480,6 +481,7 @@ final class KatabroUITests: XCTestCase {
             application.terminate()
         }
 
+        assertOnboardingExplanation(application)
         for identifier in [
             "onboarding.default-browser.status",
             "onboarding.default-browser.action",
@@ -496,6 +498,26 @@ final class KatabroUITests: XCTestCase {
             named: "Onboarding-service-errors",
             from: application
         )
+    }
+
+    @MainActor
+    private func assertOnboardingExplanation(
+        _ application: XCUIApplication
+    ) {
+        for paragraph in [
+            "Katabro becomes your system default browser so it can receive web links.",
+            "Choose where links open, or remember a browser for a specific website.",
+        ] {
+            assertExists(application.staticTexts[paragraph])
+        }
+
+        for oldTitle in [
+            "Make Katabro your default browser",
+            "Open any web link",
+            "Choose with the mouse or keyboard",
+        ] {
+            assertDoesNotExist(application.staticTexts[oldTitle])
+        }
     }
 }
 
