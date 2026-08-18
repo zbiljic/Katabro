@@ -9,20 +9,14 @@ final class BrowserPickerPanel: NSPanel {
 
     init(
         rootView: some View,
-        browserCount: Int,
-        includesRememberFooter: Bool = true
+        layout: BrowserPickerLayout
     ) {
-        let height = BrowserPickerLayout.height(
-            browserCount: browserCount,
-            includesRememberFooter: includesRememberFooter
-        )
-
         super.init(
             contentRect: NSRect(
                 origin: .zero,
                 size: NSSize(
-                    width: BrowserPickerLayout.width,
-                    height: height
+                    width: layout.width,
+                    height: layout.height
                 )
             ),
             styleMask: [.borderless],
@@ -33,7 +27,8 @@ final class BrowserPickerPanel: NSPanel {
         contentViewController = NSHostingController(
             rootView: rootView
                 .frame(
-                    minHeight: CGFloat(height),
+                    minWidth: layout.width,
+                    minHeight: layout.height,
                     alignment: .top
                 )
         )

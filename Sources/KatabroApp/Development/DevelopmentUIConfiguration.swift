@@ -344,28 +344,37 @@
 
         static func pickerStore(
             for state: DevelopmentUIState,
-            pickerShortcuts: [String: PickerShortcut]? = nil
+            pickerShortcuts: [String: PickerShortcut]? = nil,
+            pickerPreferences: BrowserPickerPreferences = BrowserPickerPreferences()
         ) -> BrowserPickerStore {
-            let rawDestination = state == .fileURL
-                ? "file:///fixture/index.html"
-                : "https://developer.apple.com/documentation/swiftui"
+            let rawDestination = switch state {
+            case .fileURL:
+                "file:///fixture/index.html"
+            case .manyBrowsers:
+                "https://documentation.preview.long-subdomain.example.com/guides/browser-routing?source=fixture"
+            default:
+                "https://example.com"
+            }
             let destination = try? IncomingURL(rawDestination)
 
             return BrowserPickerStore(
                 destination: destination ?? fallbackDestination(),
                 targets: pickerTargets(for: state),
-                pickerShortcuts: pickerShortcuts ?? self.pickerShortcuts(for: state)
+                pickerShortcuts: pickerShortcuts ?? self.pickerShortcuts(for: state),
+                pickerPreferences: pickerPreferences
             )
         }
 
         static func pickerHeight(
-            for state: DevelopmentUIState
+            for state: DevelopmentUIState,
+            pickerPreferences: BrowserPickerPreferences = BrowserPickerPreferences()
         ) -> CGFloat {
-            let store = pickerStore(for: state)
-            return BrowserPickerLayout.height(
-                browserCount: store.targets.count,
+            let store = pickerStore(for: state, pickerPreferences: pickerPreferences)
+            return BrowserPickerLayout(
+                preferences: store.pickerPreferences,
+                targetCount: store.targets.count,
                 includesRememberFooter: store.canRememberSelection
-            )
+            ).height
         }
 
         private static func fallbackDestination() -> IncomingURL {
@@ -591,18 +600,27 @@
     }
 
     private struct DevelopmentPickerReviewView: View {
+        @State private var store: BrowserPickerStore
         @State private var selectedBrowserName: String?
         @State private var selectionCount = 0
         @State private var cancellationCount = 0
-        let state: DevelopmentUIState
         let preferencesStore: PreferencesStore
+
+        init(state: DevelopmentUIState, preferencesStore: PreferencesStore) {
+            self.preferencesStore = preferencesStore
+            _store = State(
+                initialValue: DevelopmentUIFixtures.pickerStore(
+                    for: state,
+                    pickerShortcuts: preferencesStore.pickerShortcuts,
+                    pickerPreferences: preferencesStore.pickerPreferences
+                )
+            )
+        }
+
         var body: some View {
             VStack(spacing: 4) {
                 BrowserPickerView(
-                    store: DevelopmentUIFixtures.pickerStore(
-                        for: state,
-                        pickerShortcuts: preferencesStore.pickerShortcuts
-                    ),
+                    store: store,
                     onSelect: recordSelection
                 ) {
                     cancellationCount += 1
@@ -622,7 +640,15 @@
                     .accessibilityValue(cancellationReceipt)
                     .accessibilityIdentifier(AccessibilityIdentifier.pickerCancellationReceipt)
             }
-            .frame(minHeight: DevelopmentUIFixtures.pickerHeight(for: state), alignment: .top)
+            .frame(minHeight: pickerLayout.height, alignment: .top)
+        }
+
+        private var pickerLayout: BrowserPickerLayout {
+            BrowserPickerLayout(
+                preferences: store.pickerPreferences,
+                targetCount: store.targets.count,
+                includesRememberFooter: store.canRememberSelection
+            )
         }
 
         private var selectionReceipt: String {
@@ -720,24 +746,32 @@
         private var contentSize: NSSize {
             switch configuration.surface {
             case .settings:
-                NSSize(
+                return NSSize(
                     width: 620,
                     height: 640
                 )
             case .onboarding:
-                NSSize(
+                return NSSize(
                     width: 520,
                     height: 440
                 )
             case .picker:
-                NSSize(
-                    width: 360,
-                    height: DevelopmentUIFixtures.pickerHeight(
-                        for: configuration.state
-                    )
+                let store = DevelopmentUIFixtures.pickerStore(
+                    for: configuration.state,
+                    pickerShortcuts: dependencies.preferencesStore.pickerShortcuts,
+                    pickerPreferences: dependencies.preferencesStore.pickerPreferences
+                )
+                let layout = BrowserPickerLayout(
+                    preferences: store.pickerPreferences,
+                    targetCount: store.targets.count,
+                    includesRememberFooter: store.canRememberSelection
+                )
+                return NSSize(
+                    width: layout.width,
+                    height: layout.height + 40
                 )
             case .menu:
-                NSSize(
+                return NSSize(
                     width: 300,
                     height: 320
                 )

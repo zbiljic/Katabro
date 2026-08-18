@@ -35,8 +35,11 @@ final class BrowserPickerCoordinator: NSObject {
 
             return BrowserPickerPanel(
                 rootView: view,
-                browserCount: store.targets.count,
-                includesRememberFooter: store.canRememberSelection
+                layout: BrowserPickerLayout(
+                    preferences: store.pickerPreferences,
+                    targetCount: store.targets.count,
+                    includesRememberFooter: store.canRememberSelection
+                )
             )
         }
     ) {
@@ -205,7 +208,8 @@ final class BrowserPickerCoordinator: NSObject {
         let store = BrowserPickerStore(
             destination: request.destination,
             targets: targets,
-            pickerShortcuts: dependencies.preferencesStore.pickerShortcuts
+            pickerShortcuts: dependencies.preferencesStore.pickerShortcuts,
+            pickerPreferences: dependencies.preferencesStore.pickerPreferences
         )
         presentedStore = store
 

@@ -8,11 +8,14 @@ final class BrowserPickerStore {
     let destination: IncomingURL
     let targets: [BrowserLaunchTarget]
     let pickerShortcuts: [String: PickerShortcut]
+    let pickerPreferences: BrowserPickerPreferences
     private(set) var selectedIndex: Int?
     private(set) var isRememberingSelection = false
 
     var canRememberSelection: Bool {
-        destination.scheme == .http || destination.scheme == .https
+        !targets.isEmpty
+            && pickerPreferences.showsRememberChoice
+            && (destination.scheme == .http || destination.scheme == .https)
     }
 
     var browsers: [BrowserApplication] {
@@ -34,18 +37,21 @@ final class BrowserPickerStore {
     init(
         destination: IncomingURL,
         targets: [BrowserLaunchTarget],
-        pickerShortcuts: [String: PickerShortcut] = [:]
+        pickerShortcuts: [String: PickerShortcut] = [:],
+        pickerPreferences: BrowserPickerPreferences = BrowserPickerPreferences()
     ) {
         self.destination = destination
         self.targets = targets
         self.pickerShortcuts = pickerShortcuts
+        self.pickerPreferences = pickerPreferences
         selectedIndex = targets.isEmpty ? nil : 0
     }
 
     convenience init(
         destination: IncomingURL,
         browsers: [BrowserApplication],
-        pickerShortcuts: [String: PickerShortcut] = [:]
+        pickerShortcuts: [String: PickerShortcut] = [:],
+        pickerPreferences: BrowserPickerPreferences = BrowserPickerPreferences()
     ) {
         self.init(
             destination: destination,
@@ -55,7 +61,8 @@ final class BrowserPickerStore {
                     kind: .standard
                 )
             },
-            pickerShortcuts: pickerShortcuts
+            pickerShortcuts: pickerShortcuts,
+            pickerPreferences: pickerPreferences
         )
     }
 

@@ -11,12 +11,47 @@ struct BrowserPickerStoreTests {
     func togglesRememberSelection() throws {
         let store = try BrowserPickerStore(
             destination: IncomingURL("https://example.com"),
-            browsers: []
+            browsers: [makeBrowser(identifier: "com.example.browser", name: "Browser")]
         )
 
         #expect(!store.isRememberingSelection)
         store.setRememberingSelection(true)
         #expect(store.isRememberingSelection)
+    }
+
+    @Test("remember eligibility requires targets and the visual preference")
+    func rememberEligibilityUsesPreference() throws {
+        let browser = makeBrowser(identifier: "com.example.browser", name: "Browser")
+        let empty = try BrowserPickerStore(destination: IncomingURL("https://example.com"), browsers: [])
+        let hidden = try BrowserPickerStore(
+            destination: IncomingURL("https://example.com"),
+            browsers: [browser],
+            pickerPreferences: BrowserPickerPreferences(showsRememberChoice: false)
+        )
+
+        #expect(!empty.canRememberSelection)
+        #expect(!hidden.canRememberSelection)
+        hidden.setRememberingSelection(true)
+        #expect(!hidden.effectiveRememberingSelection)
+    }
+
+    @Test("retains its presentation preference snapshot")
+    func retainsPreferenceSnapshot() throws {
+        let preferences = BrowserPickerPreferences(
+            orientation: .horizontal,
+            verticalWidth: .compact,
+            visibleChoiceCount: 8,
+            destinationDisplay: .hidden,
+            shortcutHintMode: .numbersOnly,
+            horizontalLabelMode: .all,
+            showsRememberChoice: false
+        )
+        let store = try BrowserPickerStore(
+            destination: IncomingURL("https://example.com"),
+            browsers: [makeBrowser(identifier: "com.example.browser", name: "Browser")],
+            pickerPreferences: preferences
+        )
+        #expect(store.pickerPreferences == preferences)
     }
 
     @Test("file destinations cannot remember a selection")

@@ -134,10 +134,24 @@
                 Double(DevelopmentUIFixtures.pickerHeight(for: .normal)).bitPattern
                     == Double(
                         DevelopmentUIFixtures.pickerHeight(for: .fileURL)
+                            + BrowserPickerLayout.sectionSpacing
                             + BrowserPickerLayout.rememberFooterHeight
                     ).bitPattern
             )
             #expect(fileStore.targets.count == webStore.targets.count)
+        }
+
+        @MainActor
+        @Test("picker fixtures use compact production layout and a reserved long destination")
+        func pickerFixturesUseProductionLayout() {
+            let normal = DevelopmentUIFixtures.pickerStore(for: .normal)
+            let many = DevelopmentUIFixtures.pickerStore(for: .manyBrowsers)
+            #expect(DevelopmentUIFixtures.pickerHeight(for: .normal) == 257)
+            #expect(DevelopmentUIFixtures.pickerHeight(for: .manyBrowsers) == 301)
+            #expect(DevelopmentUIFixtures.pickerHeight(for: .normal) <= 280)
+            #expect(DevelopmentUIFixtures.pickerHeight(for: .manyBrowsers) <= 320)
+            #expect(normal.destination.url.absoluteString == "https://example.com")
+            #expect(many.destination.url.absoluteString.contains("documentation.preview.long-subdomain.example.com"))
         }
 
         @Test("settings fixtures use an in-memory Folder transport and chooser")

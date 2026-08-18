@@ -54,7 +54,9 @@ enum AccessibilityIdentifier {
     static let onboardingDone = "onboarding.done"
 
     static let pickerDestination = "picker.destination"
+    static let pickerContent = "picker.content"
     static let pickerEmptyState = "picker.empty-state"
+    static let pickerScrollArea = "picker.scroll-area"
     static let pickerRememberHost = "picker.remember-host"
     static let pickerSelectionReceipt = "picker.selection-receipt"
     static let pickerCancellationReceipt = "picker.cancellation-receipt"
@@ -105,6 +107,14 @@ enum AccessibilityIdentifier {
         identifier: String
     ) -> String {
         "picker.target.\(identifier)"
+    }
+
+    static func pickerShortcutLetter(targetIdentifier: String) -> String {
+        "picker.shortcut-letter.\(targetIdentifier)"
+    }
+
+    static func pickerShortcutNumber(targetIdentifier: String) -> String {
+        "picker.shortcut-number.\(targetIdentifier)"
     }
 
     static func settingsProfileBrowser(
