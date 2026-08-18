@@ -26,15 +26,15 @@ struct GeneralSettingsView: View {
                         )
                 }
 
-                Button("Use Katabro as Default Browser…") {
-                    Task {
-                        await defaultBrowserClient.requestDefaultBrowser()
+                if defaultBrowserClient.status != .current {
+                    Button("Use Katabro as Default Browser…") {
+                        Task {
+                            await defaultBrowserClient.requestDefaultBrowser()
+                        }
                     }
+                    .disabled(defaultBrowserClient.isRequesting)
+                    .accessibilityIdentifier(AccessibilityIdentifier.settingsDefaultBrowserAction)
                 }
-                .disabled(defaultBrowserClient.isRequesting)
-                .accessibilityIdentifier(
-                    AccessibilityIdentifier.settingsDefaultBrowserAction
-                )
 
                 if let lastError = defaultBrowserClient.lastError {
                     Label(lastError, systemImage: "exclamationmark.triangle.fill")

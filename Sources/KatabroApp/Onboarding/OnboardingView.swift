@@ -56,20 +56,22 @@ struct OnboardingView: View {
             }
 
             HStack {
-                Button("Use Katabro as Default Browser…") {
-                    Task {
-                        await defaultBrowserClient.requestDefaultBrowser()
+                if defaultBrowserClient.status != .current {
+                    Button("Use Katabro as Default Browser…") {
+                        Task {
+                            await defaultBrowserClient.requestDefaultBrowser()
+                        }
                     }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(defaultBrowserClient.isRequesting)
-                .accessibilityIdentifier(
-                    AccessibilityIdentifier.onboardingDefaultBrowserAction
-                )
+                    .buttonStyle(.borderedProminent)
+                    .disabled(defaultBrowserClient.isRequesting)
+                    .accessibilityIdentifier(
+                        AccessibilityIdentifier.onboardingDefaultBrowserAction
+                    )
 
-                if defaultBrowserClient.isRequesting {
-                    ProgressView()
-                        .controlSize(.small)
+                    if defaultBrowserClient.isRequesting {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
                 }
 
                 Spacer()

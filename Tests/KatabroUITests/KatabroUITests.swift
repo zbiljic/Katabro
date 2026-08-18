@@ -32,6 +32,9 @@ final class KatabroUITests: XCTestCase {
         assertExists(
             application.staticTexts["settings.default-browser.status"]
         )
+        assertDoesNotExist(
+            application.buttons["settings.default-browser.action"]
+        )
         assertExists(
             application.switches["settings.login-item.toggle"]
         )
@@ -117,6 +120,9 @@ final class KatabroUITests: XCTestCase {
             )
         )
         assertExists(
+            application.buttons["settings.default-browser.action"]
+        )
+        assertExists(
             application.staticTexts["settings.default-browser.error"]
         )
         let status = application.staticTexts["settings.icloud.status"]
@@ -125,6 +131,10 @@ final class KatabroUITests: XCTestCase {
         XCTAssertTrue(
             status.label == expectedStatus
                 || status.value as? String == expectedStatus
+        )
+        attachScreenshot(
+            named: "Settings-service-errors",
+            from: application
         )
     }
 
@@ -433,6 +443,31 @@ final class KatabroUITests: XCTestCase {
         }
 
         previousApplication?.terminate()
+    }
+
+    @MainActor
+    func testOnboardingNormalReviewSurface() {
+        let application = launch(
+            surface: "onboarding",
+            state: "normal"
+        )
+        defer {
+            application.terminate()
+        }
+
+        assertExists(
+            application.staticTexts["onboarding.default-browser.status"]
+        )
+        assertDoesNotExist(
+            application.buttons["onboarding.default-browser.action"]
+        )
+        assertExists(
+            application.buttons["onboarding.done"]
+        )
+        attachScreenshot(
+            named: "Onboarding-normal",
+            from: application
+        )
     }
 
     @MainActor
@@ -1588,6 +1623,20 @@ private extension KatabroUITests {
         XCTAssertEqual(
             XCTWaiter.wait(for: [expectation], timeout: 5),
             .completed,
+            message
+        )
+    }
+
+    @MainActor
+    func assertDoesNotExist(
+        _ element: XCUIElement,
+        message: String = "Expected UI element not to appear"
+    ) {
+        let exists = element.waitForExistence(
+            timeout: 1
+        )
+        XCTAssertFalse(
+            exists,
             message
         )
     }
