@@ -32,6 +32,7 @@ enum AccessibilityIdentifier {
     static let settingsAboutLicenseLink = "settings.about.link.license"
     static let settingsDefaultBrowserStatus = "settings.default-browser.status"
     static let settingsDefaultBrowserAction = "settings.default-browser.action"
+    static let settingsDefaultBrowserActive = "settings.default-browser.active"
     static let settingsDefaultBrowserError = "settings.default-browser.error"
     static let settingsLoginItemToggle = "settings.login-item.toggle"
     static let settingsLoginItemStatus = "settings.login-item.status"

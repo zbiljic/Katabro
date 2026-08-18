@@ -33,6 +33,9 @@ final class KatabroUITests: XCTestCase {
             application.staticTexts["settings.default-browser.status"]
         )
         assertDoesNotExist(
+        assertExists(
+            application.staticTexts["settings.default-browser.active"]
+        )
             application.buttons["settings.default-browser.action"]
         )
         assertExists(

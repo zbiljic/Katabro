@@ -18,23 +18,9 @@ struct GeneralSettingsView: View {
     var body: some View {
         Form {
             Section("Default Browser") {
-                LabeledContent("Status") {
-                    Text(defaultBrowserClient.statusDescription)
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier(
-                            AccessibilityIdentifier.settingsDefaultBrowserStatus
-                        )
-                }
-
-                if defaultBrowserClient.status != .current {
-                    Button("Use Katabro as Default Browser…") {
-                        Task {
-                            await defaultBrowserClient.requestDefaultBrowser()
-                        }
-                    }
-                    .disabled(defaultBrowserClient.isRequesting)
-                    .accessibilityIdentifier(AccessibilityIdentifier.settingsDefaultBrowserAction)
-                }
+                DefaultBrowserSettingsRow(
+                    client: defaultBrowserClient
+                )
 
                 if let lastError = defaultBrowserClient.lastError {
                     Label(lastError, systemImage: "exclamationmark.triangle.fill")
@@ -315,6 +301,98 @@ struct GeneralSettingsView: View {
             selectionError = "Folder access is unavailable. Choose the folder again to recover."
             return
         }
+    }
+}
+
+private struct DefaultBrowserSettingsRow: View {
+    let client: DefaultBrowserClient
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: iconName)
+                .foregroundStyle(iconStyle)
+                .font(.title3)
+                .frame(width: 20)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .fontWeight(.semibold)
+                    .accessibilityIdentifier(
+                        AccessibilityIdentifier.settingsDefaultBrowserStatus
+                    )
+
+                Text(detail)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 12)
+
+            if client.status == .current {
+                Label("Active", systemImage: "checkmark")
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier(
+                        AccessibilityIdentifier.settingsDefaultBrowserActive
+                    )
+            } else {
+                Button {
+                    Task {
+                        await client.requestDefaultBrowser()
+                    }
+                } label: {
+                    if client.isRequesting {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Making Default…")
+                        }
+                    } else {
+                        Text("Make Default")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(client.isRequesting)
+                .accessibilityIdentifier(
+                    AccessibilityIdentifier.settingsDefaultBrowserAction
+                )
+            }
+        }
+    }
+
+    private var title: String {
+        switch client.status {
+        case .current:
+            "Katabro is the default browser"
+        case .notCurrent:
+            "Katabro is not the default browser"
+        case .unavailable:
+            "Default browser status unavailable"
+        }
+    }
+
+    private var detail: String {
+        switch client.status {
+        case .current:
+            "Web links are routed through Katabro."
+        case .notCurrent:
+            "Make Katabro the default to route web links."
+        case .unavailable:
+            "Try again by making Katabro the default browser."
+        }
+    }
+
+    private var iconName: String {
+        client.status == .current
+            ? "checkmark.circle.fill"
+            : "exclamationmark.triangle.fill"
+    }
+
+    private var iconStyle: Color {
+        client.status == .current
+            ? .green
+            : .orange
     }
 }
 
