@@ -32,10 +32,10 @@ final class KatabroUITests: XCTestCase {
         assertExists(
             application.staticTexts["settings.default-browser.status"]
         )
-        assertDoesNotExist(
         assertExists(
             application.staticTexts["settings.default-browser.active"]
         )
+        assertDoesNotExist(
             application.buttons["settings.default-browser.action"]
         )
         assertExists(
@@ -65,6 +65,76 @@ final class KatabroUITests: XCTestCase {
         )
         attachScreenshot(
             named: "Settings-normal-browsers-system",
+            from: application
+        )
+    }
+
+    @MainActor
+    func testMenuReadyState() {
+        let application = launch(
+            surface: "menu",
+            state: "normal"
+        )
+        defer {
+            application.terminate()
+        }
+
+        assertExists(
+            application.buttons["menu.open-url-from-clipboard"]
+        )
+        assertDoesNotExist(
+            application.buttons["menu.setup-required"]
+        )
+        assertExists(
+            application.buttons["menu.settings"]
+        )
+        assertExists(
+            application.descendants(matching: .any)["menu.more"]
+        )
+        assertDoesNotExist(
+            application.descendants(matching: .any)["menu.default-browser-status"]
+        )
+        attachScreenshot(
+            named: "Menu-ready",
+            from: application
+        )
+        application.descendants(matching: .any)["menu.more"].click()
+        assertExists(
+            application.descendants(matching: .any)["menu.setup-guide"]
+        )
+        assertExists(
+            application.descendants(matching: .any)["menu.rules"]
+        )
+        assertExists(
+            application.descendants(matching: .any)["menu.about"]
+        )
+        application.descendants(matching: .any)["menu.rules"].click()
+        assertExists(
+            application.scrollViews["settings.rules.form"]
+        )
+    }
+
+    @MainActor
+    func testMenuSetupRequiredState() {
+        let application = launch(
+            surface: "menu",
+            state: "service-errors"
+        )
+        defer {
+            application.terminate()
+        }
+
+        assertExists(
+            application.buttons["menu.setup-required"]
+        )
+        assertDoesNotExist(
+            application.buttons["menu.open-url-from-clipboard"]
+        )
+        assertExists(
+            application.buttons["menu.settings"]
+        )
+        attachScreenshot(
+            named: "Menu-setup-required",
             from: application
         )
     }

@@ -6,12 +6,11 @@ struct SettingsView: View {
     let defaultBrowserClient: DefaultBrowserClient
     let loginItemClient: LoginItemClient
     let preferencesStore: PreferencesStore
+    let navigationStore: SettingsNavigationStore
     let configurationFolderClient: ConfigurationFolderClient
     let userScriptBridge: UserScriptBridge
     let allowsSystemProfileConfiguration: Bool
     let onPreviewPicker: () -> Void
-
-    @State private var selectedPane: SettingsPane
 
     init(
         browserDiscovery: any BrowserDiscovering,
@@ -19,26 +18,28 @@ struct SettingsView: View {
         defaultBrowserClient: DefaultBrowserClient,
         loginItemClient: LoginItemClient,
         preferencesStore: PreferencesStore,
+        navigationStore: SettingsNavigationStore = SettingsNavigationStore(),
         configurationFolderClient: ConfigurationFolderClient = .live,
         userScriptBridge: UserScriptBridge,
         allowsSystemProfileConfiguration: Bool = true,
-        onPreviewPicker: @escaping () -> Void,
-        initialPane: SettingsPane = .general
+        onPreviewPicker: @escaping () -> Void
     ) {
         self.browserDiscovery = browserDiscovery
         self.browserProfileStore = browserProfileStore
         self.defaultBrowserClient = defaultBrowserClient
         self.loginItemClient = loginItemClient
         self.preferencesStore = preferencesStore
+        self.navigationStore = navigationStore
         self.configurationFolderClient = configurationFolderClient
         self.userScriptBridge = userScriptBridge
         self.allowsSystemProfileConfiguration = allowsSystemProfileConfiguration
         self.onPreviewPicker = onPreviewPicker
-        _selectedPane = State(initialValue: initialPane)
     }
 
     var body: some View {
-        TabView(selection: $selectedPane) {
+        @Bindable var navigationStore = navigationStore
+
+        TabView(selection: $navigationStore.selectedPane) {
             GeneralSettingsView(
                 defaultBrowserClient: defaultBrowserClient,
                 loginItemClient: loginItemClient,

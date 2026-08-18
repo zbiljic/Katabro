@@ -9,10 +9,12 @@ struct KatabroApp: App {
     var body: some Scene {
         MenuBarExtra {
             MenuBarView(
+                clipboardURLClient: appDelegate.dependencies.clipboardURLClient,
                 defaultBrowserClient: appDelegate.dependencies.defaultBrowserClient,
                 onboardingCoordinator: appDelegate.onboardingCoordinator,
                 pickerCoordinator: appDelegate.pickerCoordinator,
-                preferencesStore: appDelegate.dependencies.preferencesStore
+                preferencesStore: appDelegate.dependencies.preferencesStore,
+                settingsNavigationStore: appDelegate.dependencies.settingsNavigationStore
             )
         } label: {
             Image("MenuBarIcon")
@@ -27,6 +29,7 @@ struct KatabroApp: App {
                 defaultBrowserClient: appDelegate.dependencies.defaultBrowserClient,
                 loginItemClient: appDelegate.dependencies.loginItemClient,
                 preferencesStore: appDelegate.dependencies.preferencesStore,
+                navigationStore: appDelegate.dependencies.settingsNavigationStore,
                 configurationFolderClient: appDelegate.dependencies.configurationFolderClient,
                 userScriptBridge: appDelegate.dependencies.userScriptBridge,
                 allowsSystemProfileConfiguration: appDelegate.dependencies.allowsSystemProfileConfiguration,

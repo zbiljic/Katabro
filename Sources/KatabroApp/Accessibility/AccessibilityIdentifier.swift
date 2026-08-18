@@ -1,8 +1,11 @@
 enum AccessibilityIdentifier {
-    static let menuOpenTestPicker = "menu.open-test-picker"
+    static let menuOpenClipboard = "menu.open-url-from-clipboard"
+    static let menuSetupRequired = "menu.setup-required"
     static let menuSetupGuide = "menu.setup-guide"
     static let menuSettings = "menu.settings"
-    static let menuDefaultBrowserStatus = "menu.default-browser-status"
+    static let menuMore = "menu.more"
+    static let menuRules = "menu.rules"
+    static let menuAbout = "menu.about"
     static let menuQuit = "menu.quit"
 
     static let settingsGeneralPane = "settings.pane.general"

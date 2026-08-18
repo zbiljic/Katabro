@@ -319,6 +319,12 @@
                 routingDecisionClient: .exactHostRules,
                 browserProfileStore: profileStore,
                 preferencesStore: preferencesStore,
+                clipboardURLClient: .development(
+                    url: URL(string: "https://example.com")
+                ),
+                settingsNavigationStore: SettingsNavigationStore(
+                    selectedPane: state.settingsInitialPane
+                ),
                 configurationFolderClient: configurationFolderClient,
                 userScriptBridge: userScriptBridge,
                 allowsSystemProfileConfiguration: state == .scriptSetup || state == .scriptReplace
@@ -567,11 +573,11 @@
                         defaultBrowserClient: dependencies.defaultBrowserClient,
                         loginItemClient: dependencies.loginItemClient,
                         preferencesStore: dependencies.preferencesStore,
+                        navigationStore: dependencies.settingsNavigationStore,
                         configurationFolderClient: dependencies.configurationFolderClient,
                         userScriptBridge: dependencies.userScriptBridge,
                         allowsSystemProfileConfiguration: dependencies.allowsSystemProfileConfiguration,
-                        onPreviewPicker: pickerCoordinator.preview,
-                        initialPane: configuration.state.settingsInitialPane
+                        onPreviewPicker: pickerCoordinator.preview
                     )
                 case .onboarding:
                     OnboardingView(
@@ -585,10 +591,12 @@
                     )
                 case .menu:
                     MenuBarView(
+                        clipboardURLClient: dependencies.clipboardURLClient,
                         defaultBrowserClient: dependencies.defaultBrowserClient,
                         onboardingCoordinator: onboardingCoordinator,
                         pickerCoordinator: pickerCoordinator,
-                        preferencesStore: dependencies.preferencesStore
+                        preferencesStore: dependencies.preferencesStore,
+                        settingsNavigationStore: dependencies.settingsNavigationStore
                     )
                     .padding(12)
                     .frame(width: 280)

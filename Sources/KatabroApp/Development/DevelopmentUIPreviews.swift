@@ -123,6 +123,7 @@
         let pickerCoordinator = BrowserPickerCoordinator(
             dependencies: dependencies
         )
+        dependencies.settingsNavigationStore.select(pane)
 
         return SettingsView(
             browserDiscovery: dependencies.browserDiscovery,
@@ -130,10 +131,10 @@
             defaultBrowserClient: dependencies.defaultBrowserClient,
             loginItemClient: dependencies.loginItemClient,
             preferencesStore: dependencies.preferencesStore,
+            navigationStore: dependencies.settingsNavigationStore,
             userScriptBridge: dependencies.userScriptBridge,
             allowsSystemProfileConfiguration: dependencies.allowsSystemProfileConfiguration,
-            onPreviewPicker: pickerCoordinator.preview,
-            initialPane: pane
+            onPreviewPicker: pickerCoordinator.preview
         )
     }
 #endif
