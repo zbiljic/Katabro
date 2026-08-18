@@ -570,6 +570,7 @@
                         configurationFolderClient: dependencies.configurationFolderClient,
                         userScriptBridge: dependencies.userScriptBridge,
                         allowsSystemProfileConfiguration: dependencies.allowsSystemProfileConfiguration,
+                        onPreviewPicker: pickerCoordinator.preview,
                         initialPane: configuration.state.settingsInitialPane
                     )
                 case .onboarding:

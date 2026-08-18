@@ -2,7 +2,7 @@ import AppKit
 import KatabroCore
 
 @MainActor
-final class BrowserPickerCoordinator: NSObject {
+final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_body_length
     typealias PanelBuilder = @MainActor (
         _ store: BrowserPickerStore,
         _ onSelect: @escaping (BrowserLaunchTarget, Bool) -> Void,
@@ -13,6 +13,7 @@ final class BrowserPickerCoordinator: NSObject {
     private let panelBuilder: PanelBuilder
     private var launchTask: Task<Void, Never>?
     private var panel: (any BrowserPickerPresenting)?
+    private var presentsPreview = false
     private var request: RoutingRequest?
     private var requestQueue = RoutingRequestQueue()
     private var routingTask: Task<Void, Never>?
@@ -92,6 +93,22 @@ final class BrowserPickerCoordinator: NSObject {
         finishCurrentRequest()
     }
 
+    func preview() {
+        guard request == nil else {
+            return
+        }
+
+        do {
+            let request = try RoutingRequest(
+                destination: IncomingURL("https://example.com"),
+                source: .system
+            )
+            startPreview(request)
+        } catch {
+            record(error)
+        }
+    }
+
     func waitForPendingOperations() async {
         while routingTask != nil || launchTask != nil {
             let pendingRoutingTask = routingTask
@@ -117,11 +134,8 @@ final class BrowserPickerCoordinator: NSObject {
             }
 
             do {
-                let discoveredBrowsers = try await dependencies.browserDiscovery.browsers(
+                let orderedBrowsers = try await orderedBrowsers(
                     for: request.destination
-                )
-                let orderedBrowsers = dependencies.preferencesStore.orderedBrowsers(
-                    discoveredBrowsers
                 )
                 guard
                     !Task.isCancelled,
@@ -142,12 +156,7 @@ final class BrowserPickerCoordinator: NSObject {
                     return
                 }
 
-                dependencies.userScriptBridge.refresh()
-                for browser in orderedBrowsers {
-                    dependencies.browserProfileStore.refresh(
-                        for: browser
-                    )
-                }
+                refreshTargetSources(for: orderedBrowsers)
                 let allTargets = dependencies.browserProfileStore.targets(
                     for: orderedBrowsers,
                     includesArgumentTargets: dependencies.userScriptBridge.isInstalled
@@ -176,13 +185,7 @@ final class BrowserPickerCoordinator: NSObject {
                     return
                 }
 
-                let visibleBrowsers = dependencies.preferencesStore.effectiveVisibleBrowsers(
-                    orderedBrowsers
-                )
-                let visibleTargets = dependencies.browserProfileStore.targets(
-                    for: visibleBrowsers,
-                    includesArgumentTargets: dependencies.userScriptBridge.isInstalled
-                )
+                let visibleTargets = visibleTargets(for: orderedBrowsers)
                 present(request: request, targets: visibleTargets)
             } catch {
                 guard
@@ -199,6 +202,89 @@ final class BrowserPickerCoordinator: NSObject {
                 )
             }
         }
+    }
+
+    private func startPreview(
+        _ request: RoutingRequest
+    ) {
+        self.request = request
+        presentsPreview = true
+        lastError = nil
+
+        routingTask = Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let orderedBrowsers = try await orderedBrowsers(
+                    for: request.destination
+                )
+                guard
+                    !Task.isCancelled,
+                    self.request?.id == request.id,
+                    presentsPreview
+                else {
+                    return
+                }
+
+                refreshTargetSources(for: orderedBrowsers)
+                let targets = visibleTargets(for: orderedBrowsers)
+
+                guard
+                    !Task.isCancelled,
+                    self.request?.id == request.id,
+                    presentsPreview
+                else {
+                    return
+                }
+
+                routingTask = nil
+                present(request: request, targets: targets)
+            } catch {
+                guard
+                    !Task.isCancelled,
+                    self.request?.id == request.id,
+                    presentsPreview
+                else {
+                    return
+                }
+
+                record(error)
+                routingTask = nil
+                finishCurrentRequest(id: request.id)
+            }
+        }
+    }
+
+    private func orderedBrowsers(
+        for destination: IncomingURL
+    ) async throws -> [BrowserApplication] {
+        let discoveredBrowsers = try await dependencies.browserDiscovery.browsers(
+            for: destination
+        )
+        return dependencies.preferencesStore.orderedBrowsers(discoveredBrowsers)
+    }
+
+    private func refreshTargetSources(
+        for orderedBrowsers: [BrowserApplication]
+    ) {
+        dependencies.userScriptBridge.refresh()
+        for browser in orderedBrowsers {
+            dependencies.browserProfileStore.refresh(for: browser)
+        }
+    }
+
+    private func visibleTargets(
+        for orderedBrowsers: [BrowserApplication]
+    ) -> [BrowserLaunchTarget] {
+        let visibleBrowsers = dependencies.preferencesStore.effectiveVisibleBrowsers(
+            orderedBrowsers
+        )
+        return dependencies.browserProfileStore.targets(
+            for: visibleBrowsers,
+            includesArgumentTargets: dependencies.userScriptBridge.isInstalled
+        )
     }
 
     private func present(
@@ -235,6 +321,11 @@ final class BrowserPickerCoordinator: NSObject {
         _ target: BrowserLaunchTarget,
         remembersSelection: Bool
     ) {
+        guard !presentsPreview else {
+            finishCurrentRequest()
+            return
+        }
+
         guard launchTask == nil else {
             return
         }
@@ -319,6 +410,7 @@ final class BrowserPickerCoordinator: NSObject {
         routingTask?.cancel()
         routingTask = nil
         request = nil
+        presentsPreview = false
 
         if closePanel {
             hidePanel()

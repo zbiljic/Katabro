@@ -9,6 +9,7 @@ struct SettingsView: View {
     let configurationFolderClient: ConfigurationFolderClient
     let userScriptBridge: UserScriptBridge
     let allowsSystemProfileConfiguration: Bool
+    let onPreviewPicker: () -> Void
 
     @State private var selectedPane: SettingsPane
 
@@ -21,6 +22,7 @@ struct SettingsView: View {
         configurationFolderClient: ConfigurationFolderClient = .live,
         userScriptBridge: UserScriptBridge,
         allowsSystemProfileConfiguration: Bool = true,
+        onPreviewPicker: @escaping () -> Void,
         initialPane: SettingsPane = .general
     ) {
         self.browserDiscovery = browserDiscovery
@@ -31,6 +33,7 @@ struct SettingsView: View {
         self.configurationFolderClient = configurationFolderClient
         self.userScriptBridge = userScriptBridge
         self.allowsSystemProfileConfiguration = allowsSystemProfileConfiguration
+        self.onPreviewPicker = onPreviewPicker
         _selectedPane = State(initialValue: initialPane)
     }
 
@@ -72,7 +75,8 @@ struct SettingsView: View {
             .tag(SettingsPane.browsers)
 
             PickerSettingsView(
-                preferencesStore: preferencesStore
+                preferencesStore: preferencesStore,
+                onPreviewPicker: onPreviewPicker
             )
             .tabItem {
                 Label(

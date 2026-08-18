@@ -8,9 +8,142 @@ import Testing
 
 @MainActor
 @Suite("Browser picker routing")
-struct BrowserPickerCoordinatorTests {
+struct BrowserPickerCoordinatorTests { // swiftlint:disable:this type_body_length
     enum TestError: Error {
         case expected
+    }
+
+    @Test("new presentations capture the latest picker preference snapshot")
+    func capturesLatestPickerPreferences() async throws {
+        let browser = makeBrowser()
+        let preferencesStore = PreferencesStore()
+        let firstPreferences = BrowserPickerPreferences(orientation: .horizontal, visibleChoiceCount: 3)
+        preferencesStore.setPickerPreferences(firstPreferences)
+        let coordinator = makeCoordinator(
+            discovery: BrowserDiscoveryFake(browsers: [browser]),
+            launcher: BrowserLauncherFake(),
+            preferencesStore: preferencesStore
+        )
+
+        try coordinator.route(RoutingRequest(
+            destination: IncomingURL("https://example.com"),
+            source: .system
+        ))
+        await coordinator.waitForPendingOperations()
+        #expect(coordinator.presentedStore?.pickerPreferences == firstPreferences)
+
+        preferencesStore.setPickerPreferences(BrowserPickerPreferences(orientation: .vertical, visibleChoiceCount: 8))
+        #expect(coordinator.presentedStore?.pickerPreferences == firstPreferences)
+    }
+
+    @Test("preview presents current visible targets and never launches or remembers")
+    func previewsCurrentSettingsWithoutSystemActions() async throws { // swiftlint:disable:this function_body_length
+        let first = makeBrowser(
+            identifier: "com.example.first",
+            name: "First"
+        )
+        let second = makeBrowser(
+            identifier: "com.example.second",
+            name: "Second"
+        )
+        let hidden = makeBrowser(
+            identifier: "com.example.hidden",
+            name: "Hidden"
+        )
+        let pickerPreferences = BrowserPickerPreferences(
+            orientation: .horizontal,
+            verticalWidth: .compact,
+            visibleChoiceCount: 3,
+            destinationDisplay: .fullURL,
+            shortcutHintMode: .hidden,
+            horizontalLabelMode: .all,
+            showsRememberChoice: true
+        )
+        let existingRule = try #require(
+            ExactHostRoutingRule(
+                host: "existing.example",
+                targetIdentifier: makeTarget(first).id
+            )
+        )
+        var preferenceWriteCount = 0
+        let preferencesStore = PreferencesStore(
+            initialPreferences: AppPreferences(
+                browserOrder: [
+                    second.browser.bundleIdentifier,
+                    hidden.browser.bundleIdentifier,
+                    first.browser.bundleIdentifier,
+                ],
+                hiddenBrowserIdentifiers: [hidden.browser.bundleIdentifier],
+                exactHostRoutingRules: [existingRule],
+                pickerPreferences: pickerPreferences
+            )
+        ) { _ in
+            preferenceWriteCount += 1
+        }
+        let discovery = BrowserDiscoveryFake(
+            browsers: [first, second, hidden]
+        )
+        let launcher = BrowserLauncherFake()
+        var routingDecisionCount = 0
+        var selectionHandler: ((BrowserLaunchTarget, Bool) -> Void)?
+        let presentation = BrowserPickerPresentationFake()
+        let coordinator = makeCoordinator(
+            discovery: discovery,
+            launcher: launcher,
+            preferencesStore: preferencesStore,
+            routingDecisionClient: RoutingDecisionClient { _, _ in
+                routingDecisionCount += 1
+                return .open(targetIdentifier: makeTarget(first).id)
+            }
+        ) { _, onSelect, _ in
+            selectionHandler = onSelect
+            return presentation
+        }
+
+        coordinator.preview()
+        await coordinator.waitForPendingOperations()
+
+        let previewDestination = try IncomingURL("https://example.com")
+        #expect(discovery.destinations == [previewDestination])
+        #expect(coordinator.presentedStore?.destination == previewDestination)
+        #expect(coordinator.presentedStore?.pickerPreferences == pickerPreferences)
+        #expect(coordinator.presentedStore?.targets == [makeTarget(second), makeTarget(first)])
+        #expect(routingDecisionCount == 0)
+        #expect(presentation.isPresented)
+
+        coordinator.presentedStore?.setRememberingSelection(true)
+        let select = try #require(selectionHandler)
+        select(makeTarget(second), true)
+        await coordinator.waitForPendingOperations()
+
+        #expect(launcher.openedRequests.isEmpty)
+        #expect(preferenceWriteCount == 0)
+        #expect(preferencesStore.exactHostRoutingRules == [existingRule])
+        #expect(presentation.isClosed)
+        #expect(coordinator.presentedStore == nil)
+    }
+
+    @Test("preview cancellation dismisses without system actions")
+    func cancelsPreview() async throws {
+        let launcher = BrowserLauncherFake()
+        var cancellationHandler: (() -> Void)?
+        let presentation = BrowserPickerPresentationFake()
+        let coordinator = makeCoordinator(
+            discovery: BrowserDiscoveryFake(browsers: [makeBrowser()]),
+            launcher: launcher
+        ) { _, _, onCancel in
+            cancellationHandler = onCancel
+            return presentation
+        }
+
+        coordinator.preview()
+        await coordinator.waitForPendingOperations()
+        let cancel = try #require(cancellationHandler)
+        cancel()
+
+        #expect(presentation.isClosed)
+        #expect(coordinator.presentedStore == nil)
+        #expect(launcher.openedRequests.isEmpty)
     }
 
     @Test("discovers browsers and launches the selected browser")

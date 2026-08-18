@@ -21,6 +21,7 @@ enum AccessibilityIdentifier {
     static let settingsPickerShortcutHintsHiddenNote = "settings.picker.shortcut-hints-hidden-note"
     static let settingsPickerHorizontalLabels = "settings.picker.horizontal-labels"
     static let settingsPickerShowRemember = "settings.picker.show-remember"
+    static let settingsPickerPreview = "settings.picker.preview"
     static let settingsRulesForm = "settings.rules.form"
     static let settingsRulesEmpty = "settings.rules.empty"
     static let settingsRulesRemoveAll = "settings.rules.remove-all"

@@ -120,6 +120,9 @@
         let dependencies = DevelopmentUIFixtures.dependencies(
             for: state
         )
+        let pickerCoordinator = BrowserPickerCoordinator(
+            dependencies: dependencies
+        )
 
         return SettingsView(
             browserDiscovery: dependencies.browserDiscovery,
@@ -129,6 +132,7 @@
             preferencesStore: dependencies.preferencesStore,
             userScriptBridge: dependencies.userScriptBridge,
             allowsSystemProfileConfiguration: dependencies.allowsSystemProfileConfiguration,
+            onPreviewPicker: pickerCoordinator.preview,
             initialPane: pane
         )
     }

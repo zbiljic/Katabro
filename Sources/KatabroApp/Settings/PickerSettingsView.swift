@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PickerSettingsView: View {
     let preferencesStore: PreferencesStore
+    let onPreviewPicker: () -> Void
 
     var body: some View {
         @Bindable var preferencesStore = preferencesStore
@@ -78,6 +79,13 @@ struct PickerSettingsView: View {
                 Text("Information")
             }
 
+            Section {} footer: {
+                Button("Preview Picker", action: onPreviewPicker)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier(AccessibilityIdentifier.settingsPickerPreview)
+            }
         }
         .formStyle(.grouped)
         .accessibilityIdentifier(AccessibilityIdentifier.settingsPickerForm)

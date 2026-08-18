@@ -29,7 +29,8 @@ struct KatabroApp: App {
                 preferencesStore: appDelegate.dependencies.preferencesStore,
                 configurationFolderClient: appDelegate.dependencies.configurationFolderClient,
                 userScriptBridge: appDelegate.dependencies.userScriptBridge,
-                allowsSystemProfileConfiguration: appDelegate.dependencies.allowsSystemProfileConfiguration
+                allowsSystemProfileConfiguration: appDelegate.dependencies.allowsSystemProfileConfiguration,
+                onPreviewPicker: appDelegate.pickerCoordinator.preview
             )
         }
     }

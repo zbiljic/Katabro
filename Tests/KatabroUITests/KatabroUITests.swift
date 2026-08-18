@@ -1155,6 +1155,96 @@ extension KatabroUITests {
         )
     }
 
+    @MainActor
+    func testPickerSettingsPreview() { // swiftlint:disable:this function_body_length
+        let application = launch(
+            surface: "settings",
+            state: "normal",
+            preferencesSuite: "picker-preview-\(UUID().uuidString)",
+            resetsPreferences: true
+        )
+        defer { application.terminate() }
+
+        openPickerSettings(in: application)
+        let hiddenNote = application.staticTexts[
+            "settings.picker.shortcut-hints-hidden-note"
+        ]
+        let previewButton = application.buttons["settings.picker.preview"]
+        XCTAssertFalse(hiddenNote.exists)
+        assertExists(previewButton)
+
+        let verticalWidth = application.popUpButtons["settings.picker.vertical-width"]
+        assertExists(verticalWidth)
+        XCTAssertTrue(verticalWidth.isEnabled)
+        XCTAssertEqual(verticalWidth.value as? String, "Standard (320 pt)")
+
+        previewButton.click()
+        var picker = application.descendants(matching: .any)["picker.content"]
+        assertExists(picker)
+        XCTAssertEqual(picker.frame.width, 320, accuracy: 1)
+        application.typeKey(.escape, modifierFlags: [])
+        XCTAssertFalse(picker.exists)
+
+        selectPickerMenu(
+            "Compact (280 pt)",
+            identifier: "settings.picker.vertical-width",
+            in: application
+        )
+        previewButton.click()
+        picker = application.descendants(matching: .any)["picker.content"]
+        assertExists(picker)
+        XCTAssertEqual(picker.frame.width, 280, accuracy: 1)
+        application.typeKey(.escape, modifierFlags: [])
+        XCTAssertFalse(picker.exists)
+
+        application.radioButtons["Horizontal"].click()
+        XCTAssertFalse(verticalWidth.isEnabled)
+        XCTAssertEqual(verticalWidth.value as? String, "Compact (280 pt)")
+        setVisibleChoices(3, in: application)
+        selectPickerMenu(
+            "Full URL",
+            identifier: "settings.picker.destination",
+            in: application
+        )
+        selectPickerMenu(
+            "Hidden",
+            identifier: "settings.picker.shortcut-hints",
+            in: application
+        )
+        assertExists(hiddenNote)
+        XCTAssertEqual(
+            hiddenNote.value as? String,
+            "Keyboard shortcuts remain active."
+        )
+
+        previewButton.click()
+        picker = application.descendants(matching: .any)["picker.content"]
+        let destination = application.descendants(matching: .any)["picker.destination"]
+        assertExists(picker)
+        XCTAssertEqual(picker.value as? String, "Horizontal, 3 visible choices")
+        XCTAssertEqual(picker.frame.width, 196, accuracy: 1)
+        XCTAssertEqual(destination.value as? String, "https://example.com")
+
+        application.typeKey(.escape, modifierFlags: [])
+        XCTAssertFalse(picker.exists)
+        assertExists(previewButton)
+
+        selectPickerMenu(
+            "All",
+            identifier: "settings.picker.shortcut-hints",
+            in: application
+        )
+        XCTAssertFalse(hiddenNote.exists)
+
+        previewButton.click()
+        let safari = application.descendants(matching: .any)[
+            "picker.browser.com.apple.Safari"
+        ]
+        assertExists(safari)
+        safari.click()
+        XCTAssertFalse(application.descendants(matching: .any)["picker.content"].exists)
+        assertExists(previewButton)
+    }
 
     @MainActor
     func testPickerVerticalWidthPersistsAndAffectsPresentation() {
