@@ -5,6 +5,17 @@ import Testing
 @MainActor
 @Suite("Default browser client")
 struct DefaultBrowserClientTests {
+    @Test("falls back to the scheme handler when the resolved app bundle is unreadable")
+    func resolvesUnreadableApplicationBundle() {
+        let identifier = DefaultBrowserClient.bundleIdentifier(
+            for: URL(fileURLWithPath: "/not-an-readable-application.bundle")
+        ) {
+            "com.example.Katabro"
+        }
+
+        #expect(identifier == "com.example.Katabro")
+    }
+
     @Test("reports current only when both web schemes belong to Katabro")
     func refreshesStatus() {
         let state = DefaultBrowserState()
@@ -26,7 +37,7 @@ struct DefaultBrowserClientTests {
         #expect(client.status == .current)
     }
 
-    @Test("requests both schemes and verifies the resulting handlers")
+    @Test("requests the linked browser association through HTTP and verifies both schemes")
     func requestsDefaultBrowser() async {
         let state = DefaultBrowserState()
         state.handlers["http"] = "com.example.other"
@@ -38,13 +49,14 @@ struct DefaultBrowserClientTests {
             },
             requestHandler: { scheme in
                 state.requestedSchemes.append(scheme)
-                state.handlers[scheme] = "com.example.Katabro"
+                state.handlers["http"] = "com.example.Katabro"
+                state.handlers["https"] = "com.example.Katabro"
             }
         )
 
         await client.requestDefaultBrowser()
 
-        #expect(state.requestedSchemes == ["http", "https"])
+        #expect(state.requestedSchemes == ["http"])
         #expect(client.status == .current)
         #expect(client.lastError == nil)
     }
@@ -65,6 +77,29 @@ struct DefaultBrowserClientTests {
 
         #expect(client.status == .notCurrent)
         #expect(client.lastError == "expected")
+    }
+
+    @Test("trusts verified system status over a registration callback error")
+    func clearsRegistrationErrorAfterVerifiedSuccess() async {
+        let state = DefaultBrowserState()
+        state.handlers["http"] = "com.example.other"
+        state.handlers["https"] = "com.example.other"
+        let client = DefaultBrowserClient(
+            appBundleIdentifier: "com.example.Katabro",
+            currentHandler: { scheme in
+                state.handlers[scheme]
+            },
+            requestHandler: { _ in
+                state.handlers["http"] = "com.example.Katabro"
+                state.handlers["https"] = "com.example.Katabro"
+                throw ClientTestError.expected
+            }
+        )
+
+        await client.requestDefaultBrowser()
+
+        #expect(client.status == .current)
+        #expect(client.lastError == nil)
     }
 
     @Test("clears a request error after an external change succeeds")

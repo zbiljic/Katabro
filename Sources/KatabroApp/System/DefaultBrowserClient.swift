@@ -1,4 +1,5 @@
 import AppKit
+import CoreServices
 import Observation
 
 #if DEBUG
@@ -75,9 +76,13 @@ final class DefaultBrowserClient {
                     return nil
                 }
 
-                return Bundle(
-                    url: applicationURL
-                )?.bundleIdentifier
+                return Self.bundleIdentifier(
+                    for: applicationURL
+                ) {
+                    LSCopyDefaultHandlerForURLScheme(
+                        scheme as CFString
+                    )?.takeRetainedValue() as String?
+                }
             },
             requestHandler: { scheme in
                 try await withCheckedThrowingContinuation { continuation in
@@ -96,6 +101,14 @@ final class DefaultBrowserClient {
                 }
             }
         )
+    }
+
+    static func bundleIdentifier(
+        for applicationURL: URL,
+        fallbackHandler: () -> String?
+    ) -> String? {
+        Bundle(url: applicationURL)?.bundleIdentifier
+            ?? fallbackHandler()
     }
 
     #if DEBUG
@@ -176,12 +189,14 @@ final class DefaultBrowserClient {
             refresh(
                 clearsResolvedError: false
             )
+
+            if status == .current {
+                lastError = nil
+            }
         }
 
         do {
-            for scheme in ["http", "https"] {
-                try await requestHandler(scheme)
-            }
+            try await requestHandler("http")
         } catch {
             lastError = error.localizedDescription
         }
