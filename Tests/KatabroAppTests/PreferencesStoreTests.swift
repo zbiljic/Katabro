@@ -8,6 +8,208 @@ import Testing
 @MainActor
 @Suite("App preferences")
 struct PreferencesStoreTests {
+    @Test("legacy payloads receive picker presentation defaults")
+    func pickerPresentationLegacyDefaults() throws {
+        let decoded = try JSONDecoder().decode(
+            AppPreferences.self,
+            from: Data(#"{"browserOrder":["preserved.browser"]}"#.utf8)
+        )
+
+        #expect(decoded.browserOrder == ["preserved.browser"])
+        #expect(decoded.pickerPreferences == BrowserPickerPreferences())
+    }
+
+    @Test("picker presentation round trips and clamps visible choices")
+    func pickerPresentationRoundTrip() throws {
+        let preferences = AppPreferences(
+            hiddenBrowserIdentifiers: ["hidden.browser"],
+            pickerPreferences: BrowserPickerPreferences(
+                orientation: .horizontal,
+                verticalWidth: .compact,
+                visibleChoiceCount: 99,
+                destinationDisplay: .fullURL,
+                shortcutHintMode: .lettersOnly,
+                horizontalLabelMode: .all,
+                showsRememberChoice: false
+            )
+        )
+        let decoded = try JSONDecoder().decode(
+            AppPreferences.self,
+            from: JSONEncoder().encode(preferences)
+        )
+
+        #expect(decoded == preferences)
+        #expect(decoded.pickerPreferences.visibleChoiceCount == 8)
+        #expect(decoded.hiddenBrowserIdentifiers == ["hidden.browser"])
+    }
+
+    @Test(
+        "vertical width defaults independently for missing, malformed, and unknown values",
+        arguments: [
+            "",
+            ",\"verticalWidth\":280",
+            ",\"verticalWidth\":\"wide\"",
+        ]
+    )
+    func verticalWidthLossTolerance(verticalWidthField: String) throws {
+        let json = """
+        {
+          "browserOrder": ["preserved.browser"],
+          "pickerPreferences": {
+            "orientation": "horizontal",
+            "visibleChoiceCount": 7,
+            "destinationDisplay": "fullURL",
+            "shortcutHintMode": "numbersOnly",
+            "horizontalLabelMode": "all",
+            "showsRememberChoice": false\(verticalWidthField)
+          }
+        }
+        """
+        let decoded = try JSONDecoder().decode(AppPreferences.self, from: Data(json.utf8))
+
+        #expect(decoded.browserOrder == ["preserved.browser"])
+        #expect(decoded.pickerPreferences.verticalWidth == .standard)
+        #expect(decoded.pickerPreferences.orientation == .horizontal)
+        #expect(decoded.pickerPreferences.visibleChoiceCount == 7)
+        #expect(decoded.pickerPreferences.destinationDisplay == .fullURL)
+        #expect(decoded.pickerPreferences.shortcutHintMode == .numbersOnly)
+        #expect(decoded.pickerPreferences.horizontalLabelMode == .all)
+        #expect(!decoded.pickerPreferences.showsRememberChoice)
+    }
+
+    @Test(
+        "malformed picker presentation fields fall back independently",
+        arguments: [
+            "orientation",
+            "verticalWidth",
+            "visibleChoiceCount",
+            "destinationDisplay",
+            "shortcutHintMode",
+            "horizontalLabelMode",
+            "showsRememberChoice",
+        ]
+    )
+    func malformedPickerPresentationField(field: String) throws {
+        let malformedValue = switch field {
+        case "visibleChoiceCount": #""many""#
+        case "showsRememberChoice": #""yes""#
+        default: #""unknown""#
+        }
+        let validFields = [
+            "orientation": #""horizontal""#,
+            "verticalWidth": #""compact""#,
+            "visibleChoiceCount": "7",
+            "destinationDisplay": #""fullURL""#,
+            "shortcutHintMode": #""numbersOnly""#,
+            "horizontalLabelMode": #""all""#,
+            "showsRememberChoice": "false",
+        ]
+        let pickerJSON = BrowserPickerPreferenceField.allCases
+            .map { candidate in
+                let value = candidate.rawValue == field
+                    ? malformedValue
+                    : validFields[candidate.rawValue, default: "null"]
+                return "\"\(candidate.rawValue)\":\(value)"
+            }
+            .joined(separator: ",")
+        let data = Data(
+            "{\"browserOrder\":[\"preserved.browser\"],\"hiddenBrowserIdentifiers\":[\"hidden.browser\"],\"hasCompletedOnboarding\":true,\"pickerPreferences\":{\(pickerJSON)}}"
+                .utf8
+        )
+        let decoded = try JSONDecoder().decode(AppPreferences.self, from: data)
+        let picker = decoded.pickerPreferences
+
+        #expect(picker.orientation == (field == "orientation" ? .vertical : .horizontal))
+        #expect(picker.verticalWidth == (field == "verticalWidth" ? .standard : .compact))
+        #expect(picker.visibleChoiceCount == (field == "visibleChoiceCount" ? 5 : 7))
+        #expect(picker.destinationDisplay == (field == "destinationDisplay" ? .domain : .fullURL))
+        #expect(picker.shortcutHintMode == (field == "shortcutHintMode" ? .all : .numbersOnly))
+        #expect(picker.horizontalLabelMode == (field == "horizontalLabelMode" ? .selectedOnly : .all))
+        #expect(picker.showsRememberChoice == (field == "showsRememberChoice"))
+        #expect(decoded.browserOrder == ["preserved.browser"])
+        #expect(decoded.hiddenBrowserIdentifiers == ["hidden.browser"])
+        #expect(decoded.hasCompletedOnboarding)
+    }
+
+    @Test(
+        "decoded visible choice boundaries clamp",
+        arguments: [
+            (2, 3),
+            (9, 8),
+        ]
+    )
+    func decodedVisibleChoiceBoundary(input: Int, expected: Int) throws {
+        let data = Data("{\"pickerPreferences\":{\"visibleChoiceCount\":\(input)}}".utf8)
+        let decoded = try JSONDecoder().decode(AppPreferences.self, from: data)
+        #expect(decoded.pickerPreferences.visibleChoiceCount == expected)
+    }
+
+    @Test("picker presentation mutations save locally once and never enter the sync snapshot")
+    func pickerPresentationMutationIsLocalOnly() {
+        var saves: [AppPreferences] = []
+        let store = PreferencesStore(initialPreferences: AppPreferences()) { saves.append($0) }
+        let updated = BrowserPickerPreferences(
+            orientation: .horizontal,
+            verticalWidth: .compact,
+            visibleChoiceCount: 3,
+            destinationDisplay: .hidden,
+            shortcutHintMode: .hidden,
+            horizontalLabelMode: .all,
+            showsRememberChoice: false
+        )
+
+        #expect(store.setPickerPreferences(updated))
+        #expect(!store.setPickerPreferences(updated))
+        #expect(saves.count == 1)
+        #expect(store.pickerPreferences == updated)
+        #expect(store.browserSettingsSnapshot() == BrowserSettingsSnapshot(
+            browserOrder: [],
+            pickerShortcuts: [:],
+            exactHostRoutingRules: []
+        ))
+    }
+
+    @Test("picker presentation mutations write neither iCloud nor Folder transports")
+    func pickerPresentationMutationSkipsTransports() {
+        let cloudStore = PreferencesCloudStoreSpy()
+        let cloudClient = ICloudPreferencesClient(
+            store: cloudStore,
+            notificationCenter: NotificationCenter()
+        )
+        let cloudPreferences = PreferencesStore(
+            initialSyncStatus: .available,
+            iCloudClient: cloudClient
+        )
+        #expect(cloudPreferences.setPickerPreferences(BrowserPickerPreferences(
+            orientation: .horizontal,
+            verticalWidth: .compact
+        )))
+        #expect(cloudStore.writes.isEmpty)
+
+        let sharedSnapshot = BrowserSettingsSnapshot(
+            browserOrder: [],
+            pickerShortcuts: [:],
+            exactHostRoutingRules: []
+        )
+        var folderWrites = 0
+        let folderClient = FilePreferencesClient(
+            injectedRead: { .snapshot(sharedSnapshot, bytes: Data("snapshot".utf8)) },
+            injectedWrite: { _ in
+                folderWrites += 1
+                return true
+            },
+            displayName: "Provider"
+        )
+        let folderPreferences = PreferencesStore(syncMethod: .folder)
+        #expect(folderPreferences.configureFolderSync(client: folderClient, displayName: "Provider"))
+        folderWrites = 0
+        #expect(folderPreferences.setPickerPreferences(BrowserPickerPreferences(
+            verticalWidth: .compact,
+            destinationDisplay: .hidden
+        )))
+        #expect(folderWrites == 0)
+    }
+
     @Test(
         "validates and normalizes picker shortcut letters",
         arguments: [
@@ -728,6 +930,16 @@ struct ShortcutEditCase: Sendable {
     let currentValue: String
     let editedValue: String
     let expected: String?
+}
+
+private enum BrowserPickerPreferenceField: String, CaseIterable {
+    case orientation
+    case verticalWidth
+    case visibleChoiceCount
+    case destinationDisplay
+    case shortcutHintMode
+    case horizontalLabelMode
+    case showsRememberChoice
 }
 
 @MainActor

@@ -6,6 +6,7 @@ struct AppPreferences: Codable, Equatable, Sendable {
     var pickerShortcuts: [String: PickerShortcut] = [:]
     var hasCompletedOnboarding = false
     var exactHostRoutingRules: [ExactHostRoutingRule] = []
+    var pickerPreferences = BrowserPickerPreferences()
 
     private enum CodingKeys: String, CodingKey {
         case browserOrder
@@ -13,6 +14,7 @@ struct AppPreferences: Codable, Equatable, Sendable {
         case pickerShortcuts
         case hasCompletedOnboarding
         case exactHostRoutingRules
+        case pickerPreferences
     }
 
     init(
@@ -20,13 +22,15 @@ struct AppPreferences: Codable, Equatable, Sendable {
         hiddenBrowserIdentifiers: [String] = [],
         pickerShortcuts: [String: PickerShortcut] = [:],
         hasCompletedOnboarding: Bool = false,
-        exactHostRoutingRules: [ExactHostRoutingRule] = []
+        exactHostRoutingRules: [ExactHostRoutingRule] = [],
+        pickerPreferences: BrowserPickerPreferences = BrowserPickerPreferences()
     ) {
         self.browserOrder = browserOrder
         self.hiddenBrowserIdentifiers = hiddenBrowserIdentifiers
         self.pickerShortcuts = pickerShortcuts
         self.hasCompletedOnboarding = hasCompletedOnboarding
         self.exactHostRoutingRules = exactHostRoutingRules
+        self.pickerPreferences = pickerPreferences
     }
 
     init(
@@ -60,6 +64,10 @@ struct AppPreferences: Codable, Equatable, Sendable {
             ExactHostRoutingRule.self,
             forKey: .exactHostRoutingRules
         )
+        pickerPreferences = (try? container.decode(
+            BrowserPickerPreferences.self,
+            forKey: .pickerPreferences
+        )) ?? BrowserPickerPreferences()
     }
 }
 

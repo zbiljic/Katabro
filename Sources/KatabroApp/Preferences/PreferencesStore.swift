@@ -99,6 +99,10 @@ final class PreferencesStore {
         preferences.exactHostRoutingRules
     }
 
+    var pickerPreferences: BrowserPickerPreferences {
+        preferences.pickerPreferences
+    }
+
     private init(
         initialPreferences: AppPreferences = AppPreferences(),
         initialSyncStatus: ICloudSyncStatus = .localOnly,
@@ -604,6 +608,25 @@ final class PreferencesStore {
             preferences,
             origin: syncMethod == .folder ? .folderPickerShortcuts : .pickerShortcuts
         )
+        return changed
+    }
+
+    @discardableResult
+    func setPickerPreferences(
+        _ pickerPreferences: BrowserPickerPreferences
+    ) -> Bool {
+        var updated = preferences
+        updated.pickerPreferences = BrowserPickerPreferences(
+            orientation: pickerPreferences.orientation,
+            verticalWidth: pickerPreferences.verticalWidth,
+            visibleChoiceCount: pickerPreferences.visibleChoiceCount,
+            destinationDisplay: pickerPreferences.destinationDisplay,
+            shortcutHintMode: pickerPreferences.shortcutHintMode,
+            horizontalLabelMode: pickerPreferences.horizontalLabelMode,
+            showsRememberChoice: pickerPreferences.showsRememberChoice
+        )
+        let changed = updated != preferences
+        update(updated, origin: .local)
         return changed
     }
 
