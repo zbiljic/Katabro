@@ -15,12 +15,14 @@ final class KatabroUITests: XCTestCase {
 
         let generalTab = application.radioButtons["settings.pane.general"]
         let browsersTab = application.radioButtons["settings.pane.browsers"]
+        let pickerTab = application.radioButtons["settings.pane.picker"]
         let rulesTab = application.radioButtons["settings.pane.rules"]
         let aboutTab = application.radioButtons["settings.pane.about"]
 
         assertExists(application.scrollViews["settings.general.form"])
         assertExists(generalTab)
         assertExists(browsersTab)
+        assertExists(pickerTab)
         assertExists(rulesTab)
         assertExists(aboutTab)
         XCTAssertTrue(isControlOn(generalTab))
@@ -234,6 +236,7 @@ final class KatabroUITests: XCTestCase {
 
         let generalTab = application.radioButtons["settings.pane.general"]
         let browsersTab = application.radioButtons["settings.pane.browsers"]
+        let pickerTab = application.radioButtons["settings.pane.picker"]
         let rulesTab = application.radioButtons["settings.pane.rules"]
         let aboutTab = application.radioButtons["settings.pane.about"]
 
@@ -245,6 +248,9 @@ final class KatabroUITests: XCTestCase {
                 "settings.browser-row.com.apple.Safari.visibility"
             ]
         )
+        pickerTab.click()
+        assertExists(application.scrollViews["settings.picker.form"])
+        assertExists(application.descendants(matching: .any)["settings.picker.orientation"])
         rulesTab.click()
         assertExists(application.scrollViews["settings.rules.form"])
         assertExists(
@@ -487,8 +493,8 @@ extension KatabroUITests {
 
             assertExists(destination)
             XCTAssertTrue(
-                (destination.value as? String)?.contains("file:///fixture/index.html") == true
-                    || destination.label.contains("file:///fixture/index.html")
+                (destination.value as? String)?.contains("/fixture/index.html") == true
+                    || destination.label.contains("/fixture/index.html")
             )
             XCTAssertFalse(remember.exists)
             assertExists(safari)
@@ -602,6 +608,10 @@ extension KatabroUITests {
                 assertExists(
                     application.descendants(matching: .any)["picker.remember-host"]
                 )
+                let picker = application.descendants(matching: .any)["picker.content"]
+                assertExists(picker)
+                XCTAssertEqual(picker.frame.width, 320, accuracy: 1)
+                XCTAssertLessThanOrEqual(picker.frame.height, state == "normal" ? 280 : 320)
                 attachScreenshot(
                     named: "Picker-\(state)-\(appearance)",
                     from: application
@@ -891,6 +901,379 @@ extension KatabroUITests {
     }
 
     @MainActor
+    func testManyBrowserPickerKeyboardSelectionScrollsToLateRows() {
+        let application = launch(
+            surface: "picker",
+            state: "many-browsers",
+            preferencesSuite: "vertical-many-\(UUID().uuidString)",
+            resetsPreferences: true
+        )
+        defer { application.terminate() }
+        let picker = application.descendants(matching: .any)["picker.content"]
+        let scrollArea = application.descendants(matching: .any)["picker.scroll-area"]
+        let destination = application.descendants(matching: .any)["picker.destination"]
+        let remember = application.descendants(matching: .any)["picker.remember-host"]
+        let lateTarget = application.descendants(matching: .any)[
+            "picker.browser.com.duckduckgo.macos.browser"
+        ]
+        let firstTarget = application.descendants(matching: .any)[
+            "picker.browser.com.apple.Safari"
+        ]
+        let receipt = application.descendants(matching: .any)["picker.selection-receipt"]
+        let fullURL = "https://documentation.preview.long-subdomain.example.com/guides/browser-routing?source=fixture"
+
+        assertExists(picker)
+        assertExists(scrollArea)
+        XCTAssertEqual(application.scrollBars.count, 0)
+        assertExists(destination)
+        assertExists(remember)
+        XCTAssertEqual(picker.frame.width, 320, accuracy: 1)
+        XCTAssertLessThanOrEqual(picker.frame.height, 320)
+        XCTAssertTrue(destination.label.contains("documentation.preview.long-subdomain.example.com"))
+        XCTAssertEqual(destination.value as? String, fullURL)
+        XCTAssertEqual(remember.label, "Remember for documentation.preview.long-subdomain.example.com")
+        XCTAssertTrue(firstTarget.isSelected)
+        XCTAssertTrue(firstTarget.isHittable)
+        XCTAssertLessThanOrEqual(firstTarget.frame.minY, scrollArea.frame.minY + 2)
+        for _ in 0 ..< 10 {
+            application.typeKey(.downArrow, modifierFlags: [])
+        }
+        assertExists(lateTarget)
+        XCTAssertTrue(lateTarget.isSelected)
+        XCTAssertTrue(lateTarget.isHittable)
+        application.typeKey(.return, modifierFlags: [])
+        assertReceipt(receipt, equals: "DuckDuckGo Privacy Browser — Long Name Fixture selected 1 time")
+        application.typeKey(.downArrow, modifierFlags: [])
+        application.typeKey(.downArrow, modifierFlags: [])
+        XCTAssertTrue(firstTarget.isSelected)
+        XCTAssertTrue(firstTarget.isHittable)
+        XCTAssertEqual(receipt.value as? String, "DuckDuckGo Privacy Browser — Long Name Fixture selected 1 time")
+    }
+
+    @MainActor
+    func testHorizontalManyBrowserPickerKeyboardSelectionScrollsToLateTargets() {
+        let suite = "horizontal-many-\(UUID().uuidString)"
+        configureHorizontalPicker(preferencesSuite: suite)
+        let application = launch(surface: "picker", state: "many-browsers", preferencesSuite: suite)
+        defer { application.terminate() }
+        let picker = application.descendants(matching: .any)["picker.content"]
+        let scrollArea = application.descendants(matching: .any)["picker.scroll-area"]
+        let firstTarget = application.descendants(matching: .any)["picker.browser.com.apple.Safari"]
+        let orion = application.descendants(matching: .any)["picker.browser.com.kagi.kagimacOS"]
+        let lateTarget = application.descendants(matching: .any)[
+            "picker.browser.com.duckduckgo.macos.browser"
+        ]
+        let receipt = application.descendants(matching: .any)["picker.selection-receipt"]
+
+        assertExists(picker)
+        assertExists(scrollArea)
+        XCTAssertEqual(application.scrollBars.count, 0)
+        XCTAssertEqual(picker.frame.width, 316, accuracy: 1)
+        XCTAssertLessThanOrEqual(picker.frame.height, 190)
+        XCTAssertTrue(firstTarget.isSelected)
+        XCTAssertLessThanOrEqual(firstTarget.frame.minX, scrollArea.frame.minX + 2)
+        for _ in 0 ..< 10 {
+            application.typeKey(.rightArrow, modifierFlags: [])
+        }
+        assertExists(lateTarget)
+        XCTAssertTrue(lateTarget.isSelected)
+        XCTAssertTrue(lateTarget.isHittable)
+        application.typeKey(.return, modifierFlags: [])
+        assertReceipt(receipt, equals: "DuckDuckGo Privacy Browser — Long Name Fixture selected 1 time")
+
+        application.typeKey(.leftArrow, modifierFlags: [])
+        XCTAssertTrue(orion.isSelected)
+        application.typeKey(.downArrow, modifierFlags: [])
+        XCTAssertTrue(lateTarget.isSelected)
+        application.typeKey(.upArrow, modifierFlags: [])
+        XCTAssertTrue(orion.isSelected)
+        for _ in 0 ..< 3 {
+            application.typeKey(.rightArrow, modifierFlags: [])
+        }
+        XCTAssertTrue(firstTarget.isSelected)
+        XCTAssertTrue(firstTarget.isHittable)
+        XCTAssertEqual(receipt.value as? String, "DuckDuckGo Privacy Browser — Long Name Fixture selected 1 time")
+    }
+
+    @MainActor
+    func testPickerKeyboardSelectionWinsUntilPointerMoves() {
+        let suite = "hover-arbitration-\(UUID().uuidString)"
+        let application = launch(
+            surface: "picker",
+            state: "many-browsers",
+            preferencesSuite: suite,
+            resetsPreferences: true
+        )
+        defer { application.terminate() }
+        let firstTarget = application.descendants(matching: .any)["picker.browser.com.apple.Safari"]
+        let lateTarget = application.descendants(matching: .any)[
+            "picker.browser.com.duckduckgo.macos.browser"
+        ]
+        assertExists(firstTarget)
+        firstTarget.hover()
+        XCTAssertTrue(firstTarget.isSelected)
+
+        let navigationTargets = [
+            "picker.browser.com.google.Chrome",
+            "picker.browser.org.mozilla.firefox",
+            "picker.browser.company.thebrowser.Browser",
+            "picker.browser.com.microsoft.edgemac",
+            "picker.browser.com.brave.Browser",
+            "picker.browser.com.operasoftware.Opera",
+            "picker.browser.com.vivaldi.Vivaldi",
+            "picker.browser.org.chromium.Chromium",
+            "picker.browser.com.kagi.kagimacOS",
+            "picker.browser.com.duckduckgo.macos.browser",
+        ]
+        for identifier in navigationTargets {
+            application.typeKey(.downArrow, modifierFlags: [])
+            let target = application.descendants(matching: .any)[identifier]
+            assertSelected(target)
+        }
+
+        assertExists(lateTarget)
+        XCTAssertTrue(lateTarget.isHittable)
+        XCTAssertTrue(lateTarget.isSelected)
+
+        let movedPointerTarget = application.descendants(matching: .any)["picker.browser.com.kagi.kagimacOS"]
+        assertExists(movedPointerTarget)
+        XCTAssertTrue(movedPointerTarget.isHittable)
+        movedPointerTarget.hover()
+        assertSelected(movedPointerTarget)
+        XCTAssertFalse(lateTarget.isSelected)
+    }
+
+    @MainActor
+    func testPickerSettingsPersistAndAffectPresentation() { // swiftlint:disable:this function_body_length
+        let suite = "picker-presentation-\(UUID().uuidString)"
+        var application = launch(
+            surface: "settings",
+            state: "normal",
+            preferencesSuite: suite,
+            resetsPreferences: true
+        )
+        openPickerSettings(in: application)
+        let horizontalLabels = application.popUpButtons["settings.picker.horizontal-labels"]
+        XCTAssertFalse(horizontalLabels.isEnabled)
+        application.radioButtons["Horizontal"].click()
+        XCTAssertTrue(horizontalLabels.isEnabled)
+        setVisibleChoices(3, in: application)
+        selectPickerMenu("Full URL", identifier: "settings.picker.destination", in: application)
+        selectPickerMenu("Hidden", identifier: "settings.picker.shortcut-hints", in: application)
+        selectPickerMenu("All", identifier: "settings.picker.horizontal-labels", in: application)
+        let rememberToggle = application.switches["settings.picker.show-remember"]
+        assertExists(rememberToggle)
+        rememberToggle.click()
+        application.terminate()
+
+        application = launch(surface: "settings", state: "normal", preferencesSuite: suite)
+        openPickerSettings(in: application)
+        XCTAssertTrue(isControlOn(application.radioButtons["Horizontal"]))
+        XCTAssertEqual(integerValue(application.steppers["settings.picker.visible-choices"]), 3)
+        XCTAssertEqual(application.popUpButtons["settings.picker.destination"].value as? String, "Full URL")
+        XCTAssertEqual(application.popUpButtons["settings.picker.shortcut-hints"].value as? String, "Hidden")
+        XCTAssertEqual(application.popUpButtons["settings.picker.horizontal-labels"].value as? String, "All")
+        XCTAssertFalse(isControlOn(application.switches["settings.picker.show-remember"]))
+        application.terminate()
+
+        application = launch(surface: "picker", state: "many-browsers", preferencesSuite: suite)
+        let safari = application.descendants(matching: .any)["picker.browser.com.apple.Safari"]
+        let chrome = application.descendants(matching: .any)["picker.browser.com.google.Chrome"]
+        let picker = application.descendants(matching: .any)["picker.content"]
+        let destination = application.descendants(matching: .any)["picker.destination"]
+        let receipt = application.descendants(matching: .any)["picker.selection-receipt"]
+        assertExists(safari)
+        assertExists(chrome)
+        assertExists(picker)
+        XCTAssertLessThan(abs(safari.frame.midY - chrome.frame.midY), 5)
+        XCTAssertEqual(picker.frame.width, 196, accuracy: 1)
+        XCTAssertEqual(picker.value as? String, "Horizontal, 3 visible choices")
+        XCTAssertEqual(safari.value as? String, "Shortcut hints: Hidden, Horizontal labels: All")
+        XCTAssertEqual(
+            destination.label,
+            "Destination https://documentation.preview.long-subdomain.example.com/guides/browser-routing?source=fixture"
+        )
+        let allLabelsCellWidth = safari.frame.width
+        XCTAssertFalse(application.descendants(matching: .any)["picker.remember-host"].exists)
+        application.typeKey("r", modifierFlags: [.command, .shift])
+        XCTAssertEqual(receipt.value as? String, "No browser selected")
+        application.typeKey("s", modifierFlags: [])
+        assertReceipt(receipt, equals: "Safari selected 1 time")
+        application.typeKey("2", modifierFlags: [])
+        assertReceipt(receipt, equals: "Google Chrome selected 2 times")
+        application.terminate()
+
+        application = launch(surface: "settings", state: "normal", preferencesSuite: suite)
+        openPickerSettings(in: application)
+        selectPickerMenu("Hidden", identifier: "settings.picker.destination", in: application)
+        selectPickerMenu("Letters", identifier: "settings.picker.shortcut-hints", in: application)
+        selectPickerMenu("Selected Only", identifier: "settings.picker.horizontal-labels", in: application)
+        application.switches["settings.picker.show-remember"].click()
+        application.terminate()
+
+        application = launch(surface: "picker", state: "many-browsers", preferencesSuite: suite)
+        let selectedOnlySafari = application.descendants(matching: .any)["picker.browser.com.apple.Safari"]
+        XCTAssertFalse(application.descendants(matching: .any)["picker.destination"].exists)
+        assertExists(application.descendants(matching: .any)["picker.remember-host"])
+        XCTAssertEqual(selectedOnlySafari.value as? String, "Shortcut hints: Letters, Horizontal labels: Selected Only")
+        XCTAssertEqual(selectedOnlySafari.frame.width, allLabelsCellWidth, accuracy: 1)
+        application.terminate()
+
+        application = launch(surface: "settings", state: "normal", preferencesSuite: suite)
+        openPickerSettings(in: application)
+        selectPickerMenu("Domain", identifier: "settings.picker.destination", in: application)
+        selectPickerMenu("Numbers", identifier: "settings.picker.shortcut-hints", in: application)
+        application.terminate()
+
+        application = launch(surface: "picker", state: "many-browsers", preferencesSuite: suite)
+        let numbersSafari = application.descendants(matching: .any)["picker.browser.com.apple.Safari"]
+        let domain = application.descendants(matching: .any)["picker.destination"]
+        let numbersReceipt = application.descendants(matching: .any)["picker.selection-receipt"]
+        XCTAssertTrue(domain.label.contains("documentation.preview.long-subdomain.example.com"))
+        XCTAssertEqual(
+            domain.value as? String,
+            "https://documentation.preview.long-subdomain.example.com/guides/browser-routing?source=fixture"
+        )
+        XCTAssertEqual(numbersSafari.value as? String, "Shortcut hints: Numbers, Horizontal labels: Selected Only")
+        application.typeKey("s", modifierFlags: [])
+        assertReceipt(numbersReceipt, equals: "Safari selected 1 time")
+        application.terminate()
+
+        application = launch(surface: "settings", state: "normal", preferencesSuite: suite)
+        openPickerSettings(in: application)
+        selectPickerMenu("All", identifier: "settings.picker.shortcut-hints", in: application)
+        application.terminate()
+
+        application = launch(surface: "picker", state: "normal", preferencesSuite: suite)
+        defer { application.terminate() }
+        let allSafari = application.descendants(matching: .any)["picker.browser.com.apple.Safari"]
+        XCTAssertEqual(allSafari.value as? String, "Shortcut hints: All, Horizontal labels: Selected Only")
+        application.typeKey("2", modifierFlags: [])
+        assertReceipt(
+            application.descendants(matching: .any)["picker.selection-receipt"],
+            equals: "Google Chrome selected 1 time"
+        )
+    }
+
+
+    @MainActor
+    func testPickerVerticalWidthPersistsAndAffectsPresentation() {
+        let suite = "picker-vertical-width-\(UUID().uuidString)"
+        var application = launch(
+            surface: "settings",
+            state: "normal",
+            preferencesSuite: suite,
+            resetsPreferences: true
+        )
+        openPickerSettings(in: application)
+        let width = application.popUpButtons["settings.picker.vertical-width"]
+        assertExists(width)
+        XCTAssertTrue(width.isEnabled)
+        XCTAssertEqual(width.value as? String, "Standard (320 pt)")
+        selectPickerMenu(
+            "Compact (280 pt)",
+            identifier: "settings.picker.vertical-width",
+            in: application
+        )
+        application.radioButtons["Horizontal"].click()
+        XCTAssertFalse(width.isEnabled)
+        XCTAssertEqual(width.value as? String, "Compact (280 pt)")
+        application.terminate()
+
+        application = launch(surface: "settings", state: "normal", preferencesSuite: suite)
+        openPickerSettings(in: application)
+        let persistedWidth = application.popUpButtons["settings.picker.vertical-width"]
+        XCTAssertFalse(persistedWidth.isEnabled)
+        XCTAssertEqual(persistedWidth.value as? String, "Compact (280 pt)")
+        application.radioButtons["Vertical"].click()
+        XCTAssertTrue(persistedWidth.isEnabled)
+        XCTAssertEqual(persistedWidth.value as? String, "Compact (280 pt)")
+        application.terminate()
+
+        application = launch(surface: "picker", state: "normal", preferencesSuite: suite)
+        var picker = application.descendants(matching: .any)["picker.content"]
+        assertExists(picker)
+        XCTAssertEqual(picker.frame.width, 280, accuracy: 1)
+        application.terminate()
+
+        application = launch(surface: "settings", state: "normal", preferencesSuite: suite)
+        openPickerSettings(in: application)
+        selectPickerMenu(
+            "Standard (320 pt)",
+            identifier: "settings.picker.vertical-width",
+            in: application
+        )
+        application.terminate()
+
+        application = launch(surface: "picker", state: "normal", preferencesSuite: suite)
+        defer { application.terminate() }
+        picker = application.descendants(matching: .any)["picker.content"]
+        assertExists(picker)
+        XCTAssertEqual(picker.frame.width, 320, accuracy: 1)
+    }
+
+    @MainActor
+    func testHorizontalPickerLightAndDarkScreenshots() {
+        for appearance in ["light", "dark"] {
+            let suite = "horizontal-screenshot-\(appearance)-\(UUID().uuidString)"
+            configureHorizontalPicker(preferencesSuite: suite)
+            for state in ["normal", "many-browsers"] {
+                let application = launch(
+                    surface: "picker",
+                    state: state,
+                    appearance: appearance,
+                    preferencesSuite: suite
+                )
+                assertExists(application.descendants(matching: .any)["picker.scroll-area"])
+                let picker = application.descendants(matching: .any)["picker.content"]
+                assertExists(picker)
+                XCTAssertEqual(picker.frame.width, state == "normal" ? 256 : 316, accuracy: 1)
+                XCTAssertLessThanOrEqual(picker.frame.height, 190)
+                attachScreenshot(named: "Picker-horizontal-\(state)-\(appearance)", from: application)
+                application.terminate()
+            }
+        }
+    }
+
+    @MainActor
+    func testPickerEmptyStateOmitsActionChrome() {
+        let application = launch(surface: "picker", state: "no-browsers")
+        defer { application.terminate() }
+        assertExists(application.descendants(matching: .any)["picker.destination"])
+        assertExists(application.descendants(matching: .any)["picker.empty-state"])
+        XCTAssertFalse(application.descendants(matching: .any)["picker.scroll-area"].exists)
+        XCTAssertFalse(application.descendants(matching: .any)["picker.remember-host"].exists)
+        XCTAssertEqual(
+            application.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'picker.browser.'")).count,
+            0
+        )
+        application.typeKey("r", modifierFlags: [.command, .shift])
+        application.typeKey(.return, modifierFlags: [])
+        XCTAssertEqual(
+            application.descendants(matching: .any)["picker.selection-receipt"].value as? String,
+            "No browser selected"
+        )
+    }
+
+    @MainActor
+    func testPickerProfileAndPrivateIdentity() {
+        let application = launch(surface: "picker", state: "browser-profiles")
+        defer { application.terminate() }
+        let privateTarget = application.descendants(matching: .any)[
+            "picker.target.com.google.chrome:private"
+        ]
+        let profileTarget = application.descendants(matching: .any)[
+            "picker.target.com.google.chrome:profile:Default"
+        ]
+        assertExists(privateTarget)
+        assertExists(profileTarget)
+        XCTAssertEqual(privateTarget.label, "Open in Private Window, Google Chrome")
+        XCTAssertEqual(profileTarget.label, "Open in Personal, Google Chrome")
+        XCTAssertFalse(application.images["person.crop.circle.fill"].exists)
+        XCTAssertFalse(application.images["eye.slash.fill"].exists)
+    }
+
+    @MainActor
     func testSettingsAboutPane() {
         let application = launch(
             surface: "settings",
@@ -913,6 +1296,70 @@ extension KatabroUITests {
 }
 
 private extension KatabroUITests {
+    @MainActor
+    func openPickerSettings(in application: XCUIApplication) {
+        let pickerTab = application.radioButtons["settings.pane.picker"]
+        assertExists(pickerTab)
+        pickerTab.click()
+        assertExists(application.scrollViews["settings.picker.form"])
+    }
+
+    @MainActor
+    func setVisibleChoices(_ count: Int, in application: XCUIApplication) {
+        let stepper = application.steppers["settings.picker.visible-choices"]
+        assertExists(stepper)
+        guard let current = integerValue(stepper) else {
+            XCTFail("Visible choices did not expose an integer value")
+            return
+        }
+        let delta = count - current
+        let arrow = delta > 0 ? stepper.incrementArrows.firstMatch : stepper.decrementArrows.firstMatch
+        assertExists(arrow)
+        for _ in 0 ..< abs(delta) {
+            arrow.click()
+        }
+        XCTAssertEqual(integerValue(stepper), count)
+    }
+
+    @MainActor
+    func integerValue(_ element: XCUIElement) -> Int? {
+        if let number = element.value as? NSNumber {
+            return number.intValue
+        }
+        if let string = element.value as? String {
+            return Int(string)
+        }
+        return nil
+    }
+
+    @MainActor
+    func selectPickerMenu(
+        _ value: String,
+        identifier: String,
+        in application: XCUIApplication
+    ) {
+        let picker = application.popUpButtons[identifier]
+        assertExists(picker)
+        picker.click()
+        let item = application.menuItems[value]
+        assertExists(item)
+        item.click()
+        XCTAssertEqual(picker.value as? String, value)
+    }
+
+    @MainActor
+    func configureHorizontalPicker(preferencesSuite: String) {
+        let application = launch(
+            surface: "settings",
+            state: "normal",
+            preferencesSuite: preferencesSuite,
+            resetsPreferences: true
+        )
+        openPickerSettings(in: application)
+        application.radioButtons["Horizontal"].click()
+        application.terminate()
+    }
+
     @MainActor
     func launch(
         surface: String,
@@ -1035,6 +1482,22 @@ private extension KatabroUITests {
         )
         XCTAssertTrue(
             exists,
+            message
+        )
+    }
+
+    @MainActor
+    func assertSelected(
+        _ element: XCUIElement,
+        message: String = "Expected UI element did not become selected"
+    ) {
+        let expectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "selected == true"),
+            object: element
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [expectation], timeout: 5),
+            .completed,
             message
         )
     }

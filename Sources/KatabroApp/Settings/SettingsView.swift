@@ -71,6 +71,18 @@ struct SettingsView: View {
             }
             .tag(SettingsPane.browsers)
 
+            PickerSettingsView(
+                preferencesStore: preferencesStore
+            )
+            .tabItem {
+                Label(
+                    SettingsPane.picker.displayName,
+                    systemImage: SettingsPane.picker.systemImage
+                )
+                .accessibilityIdentifier(AccessibilityIdentifier.settingsPickerPane)
+            }
+            .tag(SettingsPane.picker)
+
             RulesSettingsView(
                 preferencesStore: preferencesStore
             )

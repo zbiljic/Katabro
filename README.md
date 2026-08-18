@@ -17,6 +17,8 @@ release artifacts, notarization, and an installer are not available yet.
 - Discovers compatible browsers without a hard-coded browser list.
 - Supports arrow keys, Return or Space, Escape, numeric picker shortcuts, and
   optional per-browser letter shortcuts.
+- Configures compact vertical or horizontal picker layout, visible choices,
+  destination and shortcut detail, and the Remember option in **Settings > Picker**.
 - Opens private windows and profiles for supported Chromium- and Firefox-family
   browsers while retaining the App Sandbox, after user-authorized setup.
 - Queues simultaneous link requests instead of dropping them.
