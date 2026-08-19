@@ -611,6 +611,7 @@
         @State private var store: BrowserPickerStore
         @State private var selectedBrowserName: String?
         @State private var selectionCount = 0
+        @State private var copyCount = 0
         @State private var cancellationCount = 0
         let preferencesStore: PreferencesStore
 
@@ -629,10 +630,10 @@
             VStack(spacing: 4) {
                 BrowserPickerView(
                     store: store,
-                    onSelect: recordSelection
-                ) {
-                    cancellationCount += 1
-                }
+                    onSelect: recordSelection,
+                    onCopyLink: { copyCount += 1 },
+                    onCancel: { cancellationCount += 1 }
+                )
 
                 Text(selectionReceipt)
                     .font(.caption2)
@@ -647,6 +648,13 @@
                     .accessibilityLabel("Picker cancellation receipt")
                     .accessibilityValue(cancellationReceipt)
                     .accessibilityIdentifier(AccessibilityIdentifier.pickerCancellationReceipt)
+
+                Text(copyReceipt)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Picker copy receipt")
+                    .accessibilityValue(copyReceipt)
+                    .accessibilityIdentifier(AccessibilityIdentifier.pickerCopyReceipt)
             }
             .frame(minHeight: pickerLayout.height, alignment: .top)
         }
@@ -669,6 +677,12 @@
             cancellationCount == 0
                 ? "Picker not cancelled"
                 : "Picker cancelled \(cancellationCount) time\(cancellationCount == 1 ? "" : "s")"
+        }
+
+        private var copyReceipt: String {
+            copyCount == 0
+                ? "Link not copied"
+                : "Link copied \(copyCount) time\(copyCount == 1 ? "" : "s")"
         }
 
         private func recordSelection(
@@ -783,7 +797,7 @@
                 )
                 return NSSize(
                     width: layout.width,
-                    height: layout.height + 40
+                    height: layout.height + 56
                 )
             case .menu:
                 return NSSize(

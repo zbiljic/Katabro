@@ -1039,6 +1039,77 @@ extension KatabroUITests {
     // swiftlint:enable function_body_length
 
     @MainActor
+    func testPickerCopyLink() { // swiftlint:disable:this function_body_length
+        let preferencesSuite = "picker-copy-link-\(UUID().uuidString)"
+        var application = launch(
+            surface: "picker",
+            state: "normal",
+            preferencesSuite: preferencesSuite,
+            resetsPreferences: true
+        )
+        var copyReceipt = application.descendants(matching: .any)["picker.copy-receipt"]
+        var selectionReceipt = application.descendants(matching: .any)["picker.selection-receipt"]
+        var cancellationReceipt = application.descendants(matching: .any)["picker.cancellation-receipt"]
+        let destination = application.descendants(matching: .any)["picker.destination"]
+        assertExists(copyReceipt)
+        assertExists(selectionReceipt)
+        assertExists(cancellationReceipt)
+        assertExists(destination)
+
+        application.typeKey("c", modifierFlags: [.command])
+        assertReceipt(copyReceipt, equals: "Link copied 1 time")
+        XCTAssertEqual(selectionReceipt.value as? String, "No browser selected")
+        XCTAssertEqual(cancellationReceipt.value as? String, "Picker not cancelled")
+
+        application.typeKey("c", modifierFlags: [])
+        assertReceipt(selectionReceipt, equals: "Google Chrome selected 1 time")
+        XCTAssertEqual(copyReceipt.value as? String, "Link copied 1 time")
+        for modifiers in [
+            XCUIElement.KeyModifierFlags.option,
+            XCUIElement.KeyModifierFlags.control,
+        ] {
+            application.typeKey("c", modifierFlags: modifiers)
+        }
+        XCTAssertEqual(selectionReceipt.value as? String, "Google Chrome selected 1 time")
+        XCTAssertEqual(copyReceipt.value as? String, "Link copied 1 time")
+
+        destination.rightClick()
+        let copyLink = application.descendants(matching: .any)["picker.copy-link"]
+        assertExists(copyLink)
+        copyLink.click()
+        assertReceipt(copyReceipt, equals: "Link copied 2 times")
+        XCTAssertEqual(selectionReceipt.value as? String, "Google Chrome selected 1 time")
+        XCTAssertEqual(cancellationReceipt.value as? String, "Picker not cancelled")
+        application.terminate()
+
+        application = launch(
+            surface: "settings",
+            state: "normal",
+            preferencesSuite: preferencesSuite
+        )
+        openPickerSettings(in: application)
+        selectPickerMenu("Hidden", identifier: "settings.picker.destination", in: application)
+        application.terminate()
+
+        application = launch(
+            surface: "picker",
+            state: "normal",
+            preferencesSuite: preferencesSuite
+        )
+        copyReceipt = application.descendants(matching: .any)["picker.copy-receipt"]
+        selectionReceipt = application.descendants(matching: .any)["picker.selection-receipt"]
+        cancellationReceipt = application.descendants(matching: .any)["picker.cancellation-receipt"]
+        assertExists(copyReceipt)
+        XCTAssertFalse(application.descendants(matching: .any)["picker.destination"].exists)
+
+        application.typeKey("c", modifierFlags: [.command])
+        assertReceipt(copyReceipt, equals: "Link copied 1 time")
+        XCTAssertEqual(selectionReceipt.value as? String, "No browser selected")
+        XCTAssertEqual(cancellationReceipt.value as? String, "Picker not cancelled")
+        application.terminate()
+    }
+
+    @MainActor
     func testPickerKeyboardSelection() {
         let application = launch(
             surface: "picker",

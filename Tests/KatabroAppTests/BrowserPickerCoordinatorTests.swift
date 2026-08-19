@@ -72,7 +72,7 @@ struct BrowserPickerCoordinatorTests { // swiftlint:disable:this type_body_lengt
                 return nil
             },
             menuActionScheduler: menuActionScheduler
-        ) { _, _, _ in
+        ) { _, _, _, _ in
             presentation
         }
 
@@ -183,7 +183,7 @@ struct BrowserPickerCoordinatorTests { // swiftlint:disable:this type_body_lengt
                 routingDecisionCount += 1
                 return .open(targetIdentifier: makeTarget(first).id)
             }
-        ) { _, onSelect, _ in
+        ) { _, onSelect, _, _ in
             selectionHandler = onSelect
             return presentation
         }
@@ -219,7 +219,7 @@ struct BrowserPickerCoordinatorTests { // swiftlint:disable:this type_body_lengt
         let coordinator = makeCoordinator(
             discovery: BrowserDiscoveryFake(browsers: [makeBrowser()]),
             launcher: launcher
-        ) { _, _, onCancel in
+        ) { _, _, _, onCancel in
             cancellationHandler = onCancel
             return presentation
         }
@@ -245,7 +245,7 @@ struct BrowserPickerCoordinatorTests { // swiftlint:disable:this type_body_lengt
         let coordinator = makeCoordinator(
             discovery: discovery,
             launcher: launcher
-        ) { _, onSelect, _ in
+        ) { _, onSelect, _, _ in
             selectionHandler = onSelect
             return BrowserPickerPresentationFake()
         }
@@ -421,7 +421,7 @@ struct BrowserPickerCoordinatorTests { // swiftlint:disable:this type_body_lengt
             discovery: discovery,
             launcher: launcher,
             errorPresenter: errorPresenter
-        ) { _, onSelect, _ in
+        ) { _, onSelect, _, _ in
             selectionHandler = onSelect
             return BrowserPickerPresentationFake()
         }
@@ -455,7 +455,7 @@ extension BrowserPickerCoordinatorTests {
                 browsers: [browser]
             ),
             launcher: launcher
-        ) { _, onSelect, _ in
+        ) { _, onSelect, _, _ in
             selectionHandler = onSelect
             return BrowserPickerPresentationFake()
         }
@@ -516,6 +516,166 @@ extension BrowserPickerCoordinatorTests {
             ]
         )
         #expect(coordinator.presentedStore?.destination == secondRequest.destination)
+        #expect(coordinator.pendingRequestCount == 0)
+    }
+
+    @Test("copying preserves the exact URL and completes without launching")
+    func copiesExactURLAndCompletes() async throws {
+        let launcher = BrowserLauncherFake()
+        let presentation = BrowserPickerPresentationFake()
+        var copiedURLs: [URL] = []
+        var copyHandler: (() -> Void)?
+        let coordinator = makeCoordinator(
+            discovery: BrowserDiscoveryFake(browsers: [makeBrowser()]),
+            launcher: launcher,
+            clipboardURLClient: ClipboardURLClient(
+                currentURLHandler: { nil },
+                copyURLHandler: { copiedURLs.append($0) }
+            )
+        ) { _, _, onCopyLink, _ in
+            copyHandler = onCopyLink
+            return presentation
+        }
+        let request = try RoutingRequest(
+            destination: IncomingURL("https://example.com/full/path?query=value#fragment"),
+            source: .system
+        )
+
+        coordinator.route(request)
+        await coordinator.waitForPendingOperations()
+        let copy = try #require(copyHandler)
+        copy()
+
+        #expect(copiedURLs == [request.destination.url])
+        #expect(launcher.openedRequests.isEmpty)
+        #expect(presentation.isClosed)
+        #expect(coordinator.presentedStore == nil)
+        #expect(coordinator.lastError == nil)
+    }
+
+    @Test("successful copy advances the queued request")
+    func successfulCopyAdvancesQueue() async throws {
+        var copiedURLs: [URL] = []
+        var copyHandlers: [() -> Void] = []
+        let coordinator = makeCoordinator(
+            discovery: BrowserDiscoveryFake(browsers: [makeBrowser()]),
+            launcher: BrowserLauncherFake(),
+            clipboardURLClient: ClipboardURLClient(
+                currentURLHandler: { nil },
+                copyURLHandler: { copiedURLs.append($0) }
+            )
+        ) { _, _, onCopyLink, _ in
+            copyHandlers.append(onCopyLink)
+            return BrowserPickerPresentationFake()
+        }
+        let first = try RoutingRequest(
+            destination: IncomingURL("https://first.example/path"),
+            source: .system
+        )
+        let second = try RoutingRequest(
+            destination: IncomingURL("https://second.example/path"),
+            source: .system
+        )
+
+        coordinator.route(first)
+        await coordinator.waitForPendingOperations()
+        coordinator.route(second)
+        #expect(coordinator.pendingRequestCount == 1)
+
+        let copy = try #require(copyHandlers.first)
+        copy()
+        await coordinator.waitForPendingOperations()
+
+        #expect(copiedURLs == [first.destination.url])
+        #expect(coordinator.presentedStore?.destination == second.destination)
+        #expect(coordinator.pendingRequestCount == 0)
+        #expect(copyHandlers.count == 2)
+    }
+
+    @Test("failed copy keeps the picker and queue active")
+    func failedCopyRetainsRequest() async throws {
+        let launcher = BrowserLauncherFake()
+        let errorPresenter = RoutingErrorPresenterFake()
+        let presentation = BrowserPickerPresentationFake()
+        var copyCount = 0
+        var copyHandler: (() -> Void)?
+        let coordinator = makeCoordinator(
+            discovery: BrowserDiscoveryFake(browsers: [makeBrowser()]),
+            launcher: launcher,
+            errorPresenter: errorPresenter,
+            clipboardURLClient: ClipboardURLClient(
+                currentURLHandler: { nil },
+                copyURLHandler: { _ in
+                    copyCount += 1
+                    throw TestError.expected
+                }
+            )
+        ) { _, _, onCopyLink, _ in
+            copyHandler = onCopyLink
+            return presentation
+        }
+        let first = try RoutingRequest(
+            destination: IncomingURL("https://first.example"),
+            source: .system
+        )
+        let second = try RoutingRequest(
+            destination: IncomingURL("https://second.example"),
+            source: .system
+        )
+
+        coordinator.route(first)
+        await coordinator.waitForPendingOperations()
+        let presentedStore = try #require(coordinator.presentedStore)
+        coordinator.route(second)
+        let copy = try #require(copyHandler)
+        copy()
+
+        #expect(copyCount == 1)
+        #expect(errorPresenter.presentedErrors == ["expected"])
+        #expect(launcher.openedRequests.isEmpty)
+        #expect(presentation.isPresented)
+        #expect(!presentation.isClosed)
+        #expect(coordinator.presentedStore === presentedStore)
+        #expect(coordinator.presentedStore?.destination == first.destination)
+        #expect(coordinator.pendingRequestCount == 1)
+    }
+
+    @Test("stale copy callback cannot affect the next request")
+    func staleCopyDoesNotAffectNextRequest() async throws {
+        var copiedURLs: [URL] = []
+        var copyHandlers: [() -> Void] = []
+        let coordinator = makeCoordinator(
+            discovery: BrowserDiscoveryFake(browsers: [makeBrowser()]),
+            launcher: BrowserLauncherFake(),
+            clipboardURLClient: ClipboardURLClient(
+                currentURLHandler: { nil },
+                copyURLHandler: { copiedURLs.append($0) }
+            )
+        ) { _, _, onCopyLink, _ in
+            copyHandlers.append(onCopyLink)
+            return BrowserPickerPresentationFake()
+        }
+        let first = try RoutingRequest(
+            destination: IncomingURL("https://first.example"),
+            source: .system
+        )
+        let second = try RoutingRequest(
+            destination: IncomingURL("https://second.example"),
+            source: .system
+        )
+
+        coordinator.route(first)
+        await coordinator.waitForPendingOperations()
+        coordinator.route(second)
+        let staleCopy = try #require(copyHandlers.first)
+        staleCopy()
+        await coordinator.waitForPendingOperations()
+
+        #expect(coordinator.presentedStore?.destination == second.destination)
+        staleCopy()
+
+        #expect(copiedURLs == [first.destination.url])
+        #expect(coordinator.presentedStore?.destination == second.destination)
         #expect(coordinator.pendingRequestCount == 0)
     }
 
@@ -601,7 +761,7 @@ extension BrowserPickerCoordinatorTests {
                 browsers: [makeBrowser()]
             ),
             launcher: BrowserLauncherFake()
-        ) { _, _, onCancel in
+        ) { _, _, _, onCancel in
             cancellationHandler = onCancel
             return BrowserPickerPresentationFake()
         }
@@ -630,7 +790,7 @@ extension BrowserPickerCoordinatorTests {
             discovery: BrowserDiscoveryFake(browsers: [browser]),
             launcher: launcher,
             preferencesStore: preferencesStore
-        ) { _, onSelect, _ in
+        ) { _, onSelect, _, _ in
             selectionHandler = onSelect
             return BrowserPickerPresentationFake()
         }
@@ -669,7 +829,7 @@ extension BrowserPickerCoordinatorTests {
             discovery: BrowserDiscoveryFake(browsers: [browser]),
             launcher: launcher,
             preferencesStore: preferencesStore
-        ) { _, _, _ in
+        ) { _, _, _, _ in
             panelBuildCount += 1
             return BrowserPickerPresentationFake()
         }
@@ -721,7 +881,7 @@ extension BrowserPickerCoordinatorTests {
             discovery: BrowserDiscoveryFake(browsers: [browser]),
             launcher: BrowserLauncherFake(),
             preferencesStore: preferencesStore
-        ) { _, onSelect, _ in
+        ) { _, onSelect, _, _ in
             selectionHandler = onSelect
             return BrowserPickerPresentationFake()
         }
@@ -760,7 +920,7 @@ extension BrowserPickerCoordinatorTests {
             launcher: BrowserLauncherFake(error: TestError.expected),
             preferencesStore: preferencesStore,
             routingDecisionClient: RoutingDecisionClient { _, _ in .ask }
-        ) { _, onSelect, _ in
+        ) { _, onSelect, _, _ in
             selectionHandler = onSelect
             return BrowserPickerPresentationFake()
         }
@@ -970,7 +1130,7 @@ extension BrowserPickerCoordinatorTests {
         userScriptBridge: UserScriptBridge = UserScriptBridge(
             initialInstallationState: .missing
         ),
-        panelBuilder: @escaping BrowserPickerCoordinator.PanelBuilder = { _, _, _ in
+        panelBuilder: @escaping BrowserPickerCoordinator.PanelBuilder = { _, _, _, _ in
             BrowserPickerPresentationFake()
         }
     ) -> BrowserPickerCoordinator {

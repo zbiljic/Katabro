@@ -63,6 +63,7 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
     typealias PanelBuilder = @MainActor (
         _ store: BrowserPickerStore,
         _ onSelect: @escaping (BrowserLaunchTarget, Bool) -> Void,
+        _ onCopyLink: @escaping () -> Void,
         _ onCancel: @escaping () -> Void
     ) -> any BrowserPickerPresenting
 
@@ -86,10 +87,11 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
     init(
         dependencies: AppDependencies,
         menuActionScheduler: any MenuActionScheduling = MenuTrackingActionScheduler(),
-        panelBuilder: @escaping PanelBuilder = { store, onSelect, onCancel in
+        panelBuilder: @escaping PanelBuilder = { store, onSelect, onCopyLink, onCancel in
             let view = BrowserPickerView(
                 store: store,
                 onSelect: onSelect,
+                onCopyLink: onCopyLink,
                 onCancel: onCancel
             )
 
@@ -385,6 +387,9 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
                 )
             },
             { [weak self] in
+                self?.copy(request: request)
+            },
+            { [weak self] in
                 self?.cancel()
             }
         )
@@ -392,6 +397,21 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
         panel.delegate = self
         self.panel = panel
         panel.presentNearPointer()
+    }
+
+    private func copy(
+        request: RoutingRequest
+    ) {
+        guard self.request?.id == request.id else {
+            return
+        }
+
+        do {
+            try dependencies.clipboardURLClient.copy(request.destination.url)
+            finishCurrentRequest(id: request.id)
+        } catch {
+            record(error)
+        }
     }
 
     private func select(

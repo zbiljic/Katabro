@@ -50,6 +50,7 @@ struct BrowserPickerView: View {
 
     let store: BrowserPickerStore
     let onSelect: (BrowserLaunchTarget, Bool) -> Void
+    let onCopyLink: () -> Void
     let onCancel: () -> Void
 
     private var layout: BrowserPickerLayout {
@@ -140,6 +141,16 @@ struct BrowserPickerView: View {
             store.toggleRememberingSelection()
             return .handled
         }
+        .onKeyPress(
+            characters: CharacterSet(charactersIn: "cC"),
+            phases: .down
+        ) { keyPress in
+            guard keyPress.modifiers == [.command] else {
+                return .ignored
+            }
+            copyLink()
+            return .handled
+        }
         .onKeyPress(characters: .letters, phases: .down) { keyPress in
             guard
                 let target = store.target(
@@ -166,6 +177,12 @@ struct BrowserPickerView: View {
                 .help(store.destination.url.absoluteString)
                 .accessibilityIdentifier(AccessibilityIdentifier.pickerDestination)
                 .frame(height: BrowserPickerLayout.destinationHeight)
+                .contextMenu {
+                    Button(action: copyLink) {
+                        Label("Copy Link", systemImage: "doc.on.doc")
+                    }
+                    .accessibilityIdentifier(AccessibilityIdentifier.pickerCopyLink)
+                }
         }
     }
 
@@ -318,6 +335,10 @@ struct BrowserPickerView: View {
             onSelect(target, store.effectiveRememberingSelection)
         }
         return .handled
+    }
+
+    private func copyLink() {
+        onCopyLink()
     }
 
     private func moveSelectionFromKeyboard(by offset: Int) {

@@ -73,6 +73,8 @@ enum AccessibilityIdentifier {
     static let pickerEmptyState = "picker.empty-state"
     static let pickerScrollArea = "picker.scroll-area"
     static let pickerRememberHost = "picker.remember-host"
+    static let pickerCopyLink = "picker.copy-link"
+    static let pickerCopyReceipt = "picker.copy-receipt"
     static let pickerSelectionReceipt = "picker.selection-receipt"
     static let pickerCancellationReceipt = "picker.cancellation-receipt"
 

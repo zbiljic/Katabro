@@ -9,24 +9,47 @@ enum ClipboardURLReadError: LocalizedError {
     }
 }
 
+enum ClipboardURLWriteError: LocalizedError {
+    case couldNotWrite
+
+    var errorDescription: String? {
+        "Katabro could not copy the link to the clipboard."
+    }
+}
+
 @MainActor
 struct ClipboardURLClient {
     typealias CurrentURLHandler = @MainActor () -> URL?
+    typealias CopyURLHandler = @MainActor (URL) throws -> Void
 
     private let currentURLHandler: CurrentURLHandler
+    private let copyURLHandler: CopyURLHandler
 
     init(
-        currentURLHandler: @escaping CurrentURLHandler
+        currentURLHandler: @escaping CurrentURLHandler,
+        copyURLHandler: @escaping CopyURLHandler = { _ in }
     ) {
         self.currentURLHandler = currentURLHandler
+        self.copyURLHandler = copyURLHandler
     }
 
-    static let live = Self {
-        currentURL(in: NSPasteboard.general)
-    }
+    static let live = Self(
+        currentURLHandler: {
+            currentURL(in: NSPasteboard.general)
+        },
+        copyURLHandler: { url in
+            try copy(url, to: NSPasteboard.general)
+        }
+    )
 
     func currentURL() -> URL? {
         currentURLHandler()
+    }
+
+    func copy(
+        _ url: URL
+    ) throws {
+        try copyURLHandler(url)
     }
 
     static func validatedURL(
@@ -58,13 +81,31 @@ struct ClipboardURLClient {
         return nil
     }
 
+    static func copy(
+        _ url: URL,
+        to pasteboard: NSPasteboard
+    ) throws {
+        pasteboard.prepareForNewContents()
+
+        let item = NSPasteboardItem()
+        let canonicalType: NSPasteboard.PasteboardType = url.isFileURL ? .fileURL : .URL
+        item.setString(url.absoluteString, forType: canonicalType)
+        item.setString(url.absoluteString, forType: .string)
+
+        guard pasteboard.writeObjects([item]) else {
+            throw ClipboardURLWriteError.couldNotWrite
+        }
+    }
+
     #if DEBUG
         static func development(
-            url: URL?
+            url: URL?,
+            copyURLHandler: @escaping CopyURLHandler = { _ in }
         ) -> Self {
-            Self {
-                url
-            }
+            Self(
+                currentURLHandler: { url },
+                copyURLHandler: copyURLHandler
+            )
         }
     #endif
 }

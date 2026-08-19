@@ -88,6 +88,7 @@
                 for: .normal
             ),
             onSelect: { _, _ in },
+            onCopyLink: {},
             onCancel: {}
         )
     }
@@ -98,6 +99,7 @@
                 for: .manyBrowsers
             ),
             onSelect: { _, _ in },
+            onCopyLink: {},
             onCancel: {}
         )
     }
@@ -108,6 +110,7 @@
                 for: .fileURL
             ),
             onSelect: { _, _ in },
+            onCopyLink: {},
             onCancel: {}
         )
     }

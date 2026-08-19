@@ -85,6 +85,38 @@ struct ClipboardURLClientTests {
         }
     }
 
+    @Test("writes web URLs as URL and string representations")
+    func writesWebURLRepresentations() throws {
+        try withPasteboard { pasteboard in
+            let url = try #require(
+                URL(string: "https://example.com/path?query=value#fragment")
+            )
+
+            try ClipboardURLClient.copy(url, to: pasteboard)
+
+            let item = try #require(pasteboard.pasteboardItems?.first)
+            #expect(item.types == [.URL, .string])
+            #expect(item.string(forType: .URL) == url.absoluteString)
+            #expect(item.string(forType: .string) == url.absoluteString)
+            #expect(item.string(forType: .fileURL) == nil)
+        }
+    }
+
+    @Test("writes local URLs as file URL and string representations")
+    func writesFileURLRepresentations() throws {
+        try withPasteboard { pasteboard in
+            let url = URL(fileURLWithPath: "/Users/example/document.html")
+
+            try ClipboardURLClient.copy(url, to: pasteboard)
+
+            let item = try #require(pasteboard.pasteboardItems?.first)
+            #expect(item.types == [.fileURL, .string])
+            #expect(item.string(forType: .fileURL) == url.absoluteString)
+            #expect(item.string(forType: .string) == url.absoluteString)
+            #expect(item.string(forType: .URL) == nil)
+        }
+    }
+
     @Test("accepts supported absolute URLs", arguments: [
         "https://example.com/path",
         " http://example.com \n",
@@ -114,8 +146,8 @@ struct ClipboardURLClientTests {
     }
 
     private func withPasteboard(
-        _ operation: (NSPasteboard) -> Void
-    ) {
+        _ operation: (NSPasteboard) throws -> Void
+    ) rethrows {
         let pasteboard = NSPasteboard.withUniqueName()
         defer {
             pasteboard.clearContents()
@@ -123,6 +155,6 @@ struct ClipboardURLClientTests {
         }
 
         pasteboard.clearContents()
-        operation(pasteboard)
+        try operation(pasteboard)
     }
 }

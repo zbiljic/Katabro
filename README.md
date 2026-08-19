@@ -33,6 +33,8 @@ release artifacts, notarization, and an installer are not available yet.
 - Opens absolute HTTP, HTTPS, and local file URLs from the clipboard only when
   requested, without monitoring clipboard history. Clipboard managers such as
   Maccy require no special integration.
+- Copies the pending web or local-file link with Command-C or the destination's
+  **Copy Link** context-menu action.
 
 ## Build and run from source
 
