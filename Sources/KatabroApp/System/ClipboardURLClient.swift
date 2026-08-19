@@ -1,6 +1,14 @@
 import AppKit
 import KatabroCore
 
+enum ClipboardURLReadError: LocalizedError {
+    case noRoutableURL
+
+    var errorDescription: String? {
+        "The clipboard must contain an absolute HTTP, HTTPS, or local file URL that Katabro can open."
+    }
+}
+
 @MainActor
 struct ClipboardURLClient {
     typealias CurrentURLHandler = @MainActor () -> URL?
@@ -14,11 +22,7 @@ struct ClipboardURLClient {
     }
 
     static let live = Self {
-        let pasteboard = NSPasteboard.general
-        let rawValue = pasteboard.string(forType: .URL)
-            ?? pasteboard.string(forType: .string)
-
-        return validatedURL(from: rawValue)
+        currentURL(in: NSPasteboard.general)
     }
 
     func currentURL() -> URL? {
@@ -36,6 +40,22 @@ struct ClipboardURLClient {
         }
 
         return incomingURL.url
+    }
+
+    static func currentURL(
+        in pasteboard: NSPasteboard
+    ) -> URL? {
+        guard let item = pasteboard.pasteboardItems?.first else {
+            return nil
+        }
+
+        for type in [NSPasteboard.PasteboardType.URL, .fileURL, .string] {
+            if let url = validatedURL(from: item.string(forType: type)) {
+                return url
+            }
+        }
+
+        return nil
     }
 
     #if DEBUG

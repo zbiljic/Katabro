@@ -5,7 +5,6 @@ struct MenuBarView: View {
     @Environment(\.openSettings)
     private var openSettings
 
-    let clipboardURLClient: ClipboardURLClient
     let defaultBrowserClient: DefaultBrowserClient
     let onboardingCoordinator: OnboardingWindowCoordinator
     let pickerCoordinator: BrowserPickerCoordinator
@@ -13,89 +12,80 @@ struct MenuBarView: View {
     let settingsNavigationStore: SettingsNavigationStore
 
     var body: some View {
-        let clipboardURL = clipboardURLClient.currentURL()
-
-        Group {
-            if setupRequired {
-                Button {
-                    onboardingCoordinator.present()
-                } label: {
-                    Label(
-                        preferencesStore.hasCompletedOnboarding
-                            ? "Setup Required…"
-                            : "Finish Setup…",
-                        systemImage: "exclamationmark.triangle.fill"
-                    )
-                }
-                .accessibilityIdentifier(
-                    AccessibilityIdentifier.menuSetupRequired
-                )
-            } else {
-                Button("Open URL from Clipboard") {
-                    guard let clipboardURL else {
-                        return
-                    }
-
-                    pickerCoordinator.handle(clipboardURL)
-                }
-                .disabled(clipboardURL == nil)
-                .accessibilityIdentifier(
-                    AccessibilityIdentifier.menuOpenClipboard
+        if setupRequired {
+            Button {
+                onboardingCoordinator.present()
+            } label: {
+                Label(
+                    preferencesStore.hasCompletedOnboarding
+                        ? "Setup Required…"
+                        : "Finish Setup…",
+                    systemImage: "exclamationmark.triangle.fill"
                 )
             }
-
-            Divider()
-
-            Button("Settings…") {
-                presentSettings()
-            }
-            .keyboardShortcut(",", modifiers: .command)
             .accessibilityIdentifier(
-                AccessibilityIdentifier.menuSettings
+                AccessibilityIdentifier.menuSetupRequired
             )
-
-            Menu("More") {
-                if !setupRequired {
-                    Button("Setup Guide…") {
-                        onboardingCoordinator.present()
-                    }
-                    .accessibilityIdentifier(
-                        AccessibilityIdentifier.menuSetupGuide
-                    )
-                }
-
-                Button("Rules…") {
-                    showSettings(
-                        pane: .rules
-                    )
-                }
-                .accessibilityIdentifier(
-                    AccessibilityIdentifier.menuRules
-                )
-
-                Button("About Katabro") {
-                    showSettings(
-                        pane: .about
-                    )
-                }
-                .accessibilityIdentifier(
-                    AccessibilityIdentifier.menuAbout
-                )
+        } else {
+            Button("Open URL from Clipboard") {
+                pickerCoordinator.openClipboardURL()
             }
             .accessibilityIdentifier(
-                AccessibilityIdentifier.menuMore
-            )
-
-            Divider()
-
-            Button("Quit Katabro") {
-                NSApplication.shared.terminate(nil)
-            }
-            .keyboardShortcut("q", modifiers: .command)
-            .accessibilityIdentifier(
-                AccessibilityIdentifier.menuQuit
+                AccessibilityIdentifier.menuOpenClipboard
             )
         }
+
+        Divider()
+
+        Button("Settings…") {
+            presentSettings()
+        }
+        .keyboardShortcut(",", modifiers: .command)
+        .accessibilityIdentifier(
+            AccessibilityIdentifier.menuSettings
+        )
+
+        Menu("More") {
+            if !setupRequired {
+                Button("Setup Guide…") {
+                    onboardingCoordinator.present()
+                }
+                .accessibilityIdentifier(
+                    AccessibilityIdentifier.menuSetupGuide
+                )
+            }
+
+            Button("Rules…") {
+                showSettings(
+                    pane: .rules
+                )
+            }
+            .accessibilityIdentifier(
+                AccessibilityIdentifier.menuRules
+            )
+
+            Button("About Katabro") {
+                showSettings(
+                    pane: .about
+                )
+            }
+            .accessibilityIdentifier(
+                AccessibilityIdentifier.menuAbout
+            )
+        }
+        .accessibilityIdentifier(
+            AccessibilityIdentifier.menuMore
+        )
+
+        Divider()
+
+        Button("Quit Katabro") {
+            NSApplication.shared.terminate(nil)
+        }
+        .keyboardShortcut("q", modifiers: .command)
+        .accessibilityIdentifier(
+            AccessibilityIdentifier.menuQuit
+        )
     }
 
     private var setupRequired: Bool {

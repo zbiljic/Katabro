@@ -152,6 +152,31 @@ final class KatabroUITests: XCTestCase {
     }
 
     @MainActor
+    func testMenuClipboardAction() {
+        let application = launch(
+            surface: "menu",
+            state: "normal"
+        )
+        defer {
+            application.terminate()
+        }
+
+        let clipboardAction = application.buttons["menu.open-url-from-clipboard"]
+        assertExists(clipboardAction)
+        XCTAssertTrue(clipboardAction.isEnabled)
+        clipboardAction.click()
+
+        let picker = application.descendants(matching: .any)["picker.content"]
+        let destination = application.descendants(matching: .any)["picker.destination"]
+        assertExists(picker)
+        assertExists(destination)
+        XCTAssertEqual(destination.value as? String, "https://example.com")
+
+        application.typeKey(.escape, modifierFlags: [])
+        assertDoesNotExist(picker)
+    }
+
+    @MainActor
     func testMenuSetupRequiredState() {
         let application = launch(
             surface: "menu",

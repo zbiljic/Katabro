@@ -1,8 +1,65 @@
 import AppKit
 import KatabroCore
 
+// Menu scheduling and routing lifecycle intentionally remain together.
+// swiftlint:disable file_length
+
+@MainActor
+protocol MenuActionScheduling {
+    func schedule(
+        _ action: @escaping @MainActor () -> Void
+    )
+}
+
+@MainActor
+final class MenuTrackingActionScheduler: NSObject, MenuActionScheduling {
+    private var pendingCompletion: (@MainActor () -> Void)?
+
+    func schedule(
+        _ action: @escaping @MainActor () -> Void
+    ) {
+        NotificationCenter.default.removeObserver(
+            self,
+            name: NSMenu.didEndTrackingNotification,
+            object: nil
+        )
+        pendingCompletion = action
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(menuDidEndTracking(_:)),
+            name: NSMenu.didEndTrackingNotification,
+            object: nil
+        )
+    }
+
+    @objc
+    private func menuDidEndTracking(
+        _: Notification
+    ) {
+        NotificationCenter.default.removeObserver(
+            self,
+            name: NSMenu.didEndTrackingNotification,
+            object: nil
+        )
+
+        let completion = pendingCompletion
+        pendingCompletion = nil
+        completion?()
+    }
+}
+
+@MainActor
+struct ImmediateMenuActionScheduler: MenuActionScheduling {
+    func schedule(
+        _ action: @escaping @MainActor () -> Void
+    ) {
+        action()
+    }
+}
+
 @MainActor
 final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_body_length
+
     typealias PanelBuilder = @MainActor (
         _ store: BrowserPickerStore,
         _ onSelect: @escaping (BrowserLaunchTarget, Bool) -> Void,
@@ -10,6 +67,7 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
     ) -> any BrowserPickerPresenting
 
     private let dependencies: AppDependencies
+    private let menuActionScheduler: any MenuActionScheduling
     private let panelBuilder: PanelBuilder
     private var launchTask: Task<Void, Never>?
     private var panel: (any BrowserPickerPresenting)?
@@ -27,6 +85,7 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
 
     init(
         dependencies: AppDependencies,
+        menuActionScheduler: any MenuActionScheduling = MenuTrackingActionScheduler(),
         panelBuilder: @escaping PanelBuilder = { store, onSelect, onCancel in
             let view = BrowserPickerView(
                 store: store,
@@ -45,6 +104,7 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
         }
     ) {
         self.dependencies = dependencies
+        self.menuActionScheduler = menuActionScheduler
         self.panelBuilder = panelBuilder
     }
 
@@ -78,6 +138,13 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
         }
     }
 
+    func openClipboardURL() {
+        let url = dependencies.clipboardURLClient.currentURL()
+        menuActionScheduler.schedule { [weak self] in
+            self?.applyClipboardURL(url)
+        }
+    }
+
     func route(
         _ request: RoutingRequest
     ) {
@@ -87,6 +154,16 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
         }
 
         start(request)
+    }
+
+    private func applyClipboardURL(
+        _ url: URL?
+    ) {
+        if let url {
+            handle(url)
+        } else {
+            record(ClipboardURLReadError.noRoutableURL)
+        }
     }
 
     func cancel() {

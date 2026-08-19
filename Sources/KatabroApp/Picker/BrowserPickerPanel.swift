@@ -48,7 +48,7 @@ final class BrowserPickerPanel: NSPanel {
 
     func presentNearPointer() {
         positionNearPointer()
-        NSApplication.shared.activate()
+        NSApplication.shared.activate(ignoringOtherApps: true)
         makeKeyAndOrderFront(nil)
     }
 

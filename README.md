@@ -30,6 +30,9 @@ release artifacts, notarization, and an installer are not available yet.
   plus exact-host rules through a user-selected folder.
 - Bundles a `katabro` command-line helper inside the application.
 - Keeps URL validation and routing policy in a portable Swift package.
+- Opens absolute HTTP, HTTPS, and local file URLs from the clipboard only when
+  requested, without monitoring clipboard history. Clipboard managers such as
+  Maccy require no special integration.
 
 ## Build and run from source
 

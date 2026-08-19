@@ -13,6 +13,94 @@ struct BrowserPickerCoordinatorTests { // swiftlint:disable:this type_body_lengt
         case expected
     }
 
+    @Test("clipboard command reads once and routes the returned URL")
+    func opensClipboardURL() async throws {
+        let browser = makeBrowser()
+        let discovery = BrowserDiscoveryFake(browsers: [browser])
+        var readCount = 0
+        let destination = try #require(
+            URL(string: "https://example.com/clipboard")
+        )
+        let menuActionScheduler = ControlledMenuActionScheduler()
+        let coordinator = makeCoordinator(
+            discovery: discovery,
+            launcher: BrowserLauncherFake(),
+            clipboardURLClient: ClipboardURLClient {
+                readCount += 1
+                return destination
+            },
+            menuActionScheduler: menuActionScheduler
+        )
+
+        coordinator.openClipboardURL()
+        #expect(readCount == 1)
+        #expect(discovery.destinations.isEmpty)
+        #expect(coordinator.presentedStore == nil)
+
+        menuActionScheduler.runPendingCompletion()
+        await coordinator.waitForPendingOperations()
+        let expectedDestination = try IncomingURL(destination)
+
+        #expect(readCount == 1)
+        #expect(discovery.destinations == [expectedDestination])
+        #expect(coordinator.presentedStore?.destination == expectedDestination)
+
+        menuActionScheduler.runPendingCompletion()
+        await coordinator.waitForPendingOperations()
+        #expect(discovery.destinations == [expectedDestination])
+    }
+
+    @Test("empty clipboard presents an error without routing side effects")
+    func rejectsEmptyClipboard() {
+        var readCount = 0
+        var preferenceWriteCount = 0
+        let discovery = BrowserDiscoveryFake()
+        let launcher = BrowserLauncherFake()
+        let errorPresenter = RoutingErrorPresenterFake()
+        let presentation = BrowserPickerPresentationFake()
+        let menuActionScheduler = ControlledMenuActionScheduler()
+        let preferencesStore = PreferencesStore { _ in
+            preferenceWriteCount += 1
+        }
+        let coordinator = makeCoordinator(
+            discovery: discovery,
+            launcher: launcher,
+            errorPresenter: errorPresenter,
+            preferencesStore: preferencesStore,
+            clipboardURLClient: ClipboardURLClient {
+                readCount += 1
+                return nil
+            },
+            menuActionScheduler: menuActionScheduler
+        ) { _, _, _ in
+            presentation
+        }
+
+        coordinator.openClipboardURL()
+
+        #expect(readCount == 1)
+        #expect(errorPresenter.presentedErrors.isEmpty)
+        #expect(discovery.destinations.isEmpty)
+        #expect(launcher.openedRequests.isEmpty)
+        #expect(!presentation.isPresented)
+        #expect(preferenceWriteCount == 0)
+        #expect(coordinator.pendingRequestCount == 0)
+        #expect(coordinator.presentedStore == nil)
+
+        menuActionScheduler.runPendingCompletion()
+
+        #expect(errorPresenter.presentedErrors == ["noRoutableURL"])
+        #expect(discovery.destinations.isEmpty)
+        #expect(launcher.openedRequests.isEmpty)
+        #expect(!presentation.isPresented)
+        #expect(preferenceWriteCount == 0)
+        #expect(coordinator.pendingRequestCount == 0)
+        #expect(coordinator.presentedStore == nil)
+
+        menuActionScheduler.runPendingCompletion()
+        #expect(errorPresenter.presentedErrors == ["noRoutableURL"])
+    }
+
     @Test("new presentations capture the latest picker preference snapshot")
     func capturesLatestPickerPreferences() async throws {
         let browser = makeBrowser()
@@ -877,6 +965,8 @@ extension BrowserPickerCoordinatorTests {
         preferencesStore: PreferencesStore = PreferencesStore(),
         routingDecisionClient: RoutingDecisionClient = .exactHostRules,
         browserProfileStore: BrowserProfileStore = BrowserProfileStore(),
+        clipboardURLClient: ClipboardURLClient = .development(url: nil),
+        menuActionScheduler: any MenuActionScheduling = MenuTrackingActionScheduler(),
         userScriptBridge: UserScriptBridge = UserScriptBridge(
             initialInstallationState: .missing
         ),
@@ -905,10 +995,28 @@ extension BrowserPickerCoordinatorTests {
                 routingDecisionClient: routingDecisionClient,
                 browserProfileStore: browserProfileStore,
                 preferencesStore: preferencesStore,
+                clipboardURLClient: clipboardURLClient,
                 userScriptBridge: userScriptBridge
             ),
+            menuActionScheduler: menuActionScheduler,
             panelBuilder: panelBuilder
         )
+    }
+
+    private final class ControlledMenuActionScheduler: MenuActionScheduling {
+        private var pendingCompletion: (@MainActor () -> Void)?
+
+        func schedule(
+            _ action: @escaping @MainActor () -> Void
+        ) {
+            pendingCompletion = action
+        }
+
+        func runPendingCompletion() {
+            let completion = pendingCompletion
+            pendingCompletion = nil
+            completion?()
+        }
     }
 
     private func makeBrowser(

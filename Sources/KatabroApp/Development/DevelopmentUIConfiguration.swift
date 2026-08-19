@@ -591,7 +591,6 @@
                     )
                 case .menu:
                     MenuBarView(
-                        clipboardURLClient: dependencies.clipboardURLClient,
                         defaultBrowserClient: dependencies.defaultBrowserClient,
                         onboardingCoordinator: onboardingCoordinator,
                         pickerCoordinator: pickerCoordinator,
@@ -698,7 +697,14 @@
             self.configuration = configuration
             self.dependencies = dependencies
             self.onboardingCoordinator = onboardingCoordinator
-            self.pickerCoordinator = pickerCoordinator
+            self.pickerCoordinator = if configuration.surface == .menu {
+                BrowserPickerCoordinator(
+                    dependencies: dependencies,
+                    menuActionScheduler: ImmediateMenuActionScheduler()
+                )
+            } else {
+                pickerCoordinator
+            }
         }
 
         func present() {
