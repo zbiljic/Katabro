@@ -70,6 +70,43 @@ final class KatabroUITests: XCTestCase {
     }
 
     @MainActor
+    func testMenuSettingsBringsSettingsForward() {
+        let application = launch(
+            surface: "menu",
+            state: "normal"
+        )
+        defer {
+            application.terminate()
+        }
+
+        let reviewWindow = application.windows["Katabro UI Review — Menu"]
+        let settingsMenuItem = application.buttons["menu.settings"]
+        assertExists(reviewWindow)
+        assertExists(settingsMenuItem)
+
+        settingsMenuItem.click()
+
+        let settingsForm = application.scrollViews["settings.general.form"]
+        assertExists(settingsForm)
+        XCTAssertTrue(settingsForm.isHittable)
+        settingsForm.click()
+        XCTAssertTrue(settingsForm.isHittable)
+
+        application.typeKey(",", modifierFlags: [.command])
+        XCTAssertEqual(
+            application.scrollViews.matching(
+                identifier: "settings.general.form"
+            ).count,
+            1
+        )
+        XCTAssertTrue(settingsForm.isHittable)
+        attachScreenshot(
+            named: "Menu-settings-foreground-system",
+            from: application
+        )
+    }
+
+    @MainActor
     func testMenuReadyState() {
         let application = launch(
             surface: "menu",

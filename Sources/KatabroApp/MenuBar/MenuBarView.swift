@@ -46,8 +46,8 @@ struct MenuBarView: View {
 
             Divider()
 
-            SettingsLink {
-                Text("Settings…")
+            Button("Settings…") {
+                presentSettings()
             }
             .keyboardShortcut(",", modifiers: .command)
             .accessibilityIdentifier(
@@ -107,6 +107,17 @@ struct MenuBarView: View {
         pane: SettingsPane
     ) {
         settingsNavigationStore.select(pane)
-        openSettings()
+        presentSettings()
+    }
+
+    @MainActor
+    private func presentSettings() {
+        let openSettings = openSettings
+        RunLoop.main.perform(inModes: [.default]) {
+            MainActor.assumeIsolated {
+                openSettings()
+                NSApplication.shared.activate(ignoringOtherApps: true)
+            }
+        }
     }
 }
