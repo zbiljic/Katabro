@@ -124,8 +124,8 @@ struct BrowserPickerCoordinatorTests { // swiftlint:disable:this type_body_lengt
         #expect(coordinator.presentedStore?.pickerPreferences == firstPreferences)
     }
 
-    @Test("preview presents current visible targets and never launches or remembers")
-    func previewsCurrentSettingsWithoutSystemActions() async throws { // swiftlint:disable:this function_body_length
+    @Test("preview opens example.com without routing or remembering")
+    func previewsWithoutRoutingOrRemembering() async throws { // swiftlint:disable:this function_body_length
         let first = makeBrowser(
             identifier: "com.example.first",
             name: "First"
@@ -204,7 +204,14 @@ struct BrowserPickerCoordinatorTests { // swiftlint:disable:this type_body_lengt
         select(makeTarget(second), true)
         await coordinator.waitForPendingOperations()
 
-        #expect(launcher.openedRequests.isEmpty)
+        #expect(
+            launcher.openedRequests == [
+                BrowserLauncherFake.OpenedRequest(
+                    destination: previewDestination,
+                    target: makeTarget(second)
+                ),
+            ]
+        )
         #expect(preferenceWriteCount == 0)
         #expect(preferencesStore.exactHostRoutingRules == [existingRule])
         #expect(presentation.isClosed)

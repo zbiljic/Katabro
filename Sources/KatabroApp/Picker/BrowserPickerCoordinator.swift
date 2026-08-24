@@ -418,8 +418,17 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
         _ target: BrowserLaunchTarget,
         remembersSelection: Bool
     ) {
-        guard !presentsPreview else {
-            finishCurrentRequest()
+        if presentsPreview {
+            guard let request else {
+                finishCurrentRequest()
+                return
+            }
+
+            launch(
+                request: request,
+                target: target,
+                ruleIntent: nil
+            )
             return
         }
 
