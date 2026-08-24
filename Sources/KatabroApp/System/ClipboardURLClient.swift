@@ -20,22 +20,29 @@ enum ClipboardURLWriteError: LocalizedError {
 @MainActor
 struct ClipboardURLClient {
     typealias CurrentURLHandler = @MainActor () -> URL?
+    typealias ChangeCountHandler = @MainActor () -> Int
     typealias CopyURLHandler = @MainActor (URL) throws -> Void
 
     private let currentURLHandler: CurrentURLHandler
+    private let changeCountHandler: ChangeCountHandler
     private let copyURLHandler: CopyURLHandler
 
     init(
         currentURLHandler: @escaping CurrentURLHandler,
+        changeCountHandler: @escaping ChangeCountHandler = { 0 },
         copyURLHandler: @escaping CopyURLHandler = { _ in }
     ) {
         self.currentURLHandler = currentURLHandler
+        self.changeCountHandler = changeCountHandler
         self.copyURLHandler = copyURLHandler
     }
 
     static let live = Self(
         currentURLHandler: {
             currentURL(in: NSPasteboard.general)
+        },
+        changeCountHandler: {
+            NSPasteboard.general.changeCount
         },
         copyURLHandler: { url in
             try copy(url, to: NSPasteboard.general)
@@ -44,6 +51,10 @@ struct ClipboardURLClient {
 
     func currentURL() -> URL? {
         currentURLHandler()
+    }
+
+    func changeCount() -> Int {
+        changeCountHandler()
     }
 
     func copy(

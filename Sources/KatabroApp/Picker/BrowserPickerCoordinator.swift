@@ -12,39 +12,15 @@ protocol MenuActionScheduling {
 }
 
 @MainActor
-final class MenuTrackingActionScheduler: NSObject, MenuActionScheduling {
-    private var pendingCompletion: (@MainActor () -> Void)?
-
+struct MenuTrackingActionScheduler: MenuActionScheduling {
     func schedule(
         _ action: @escaping @MainActor () -> Void
     ) {
-        NotificationCenter.default.removeObserver(
-            self,
-            name: NSMenu.didEndTrackingNotification,
-            object: nil
-        )
-        pendingCompletion = action
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(menuDidEndTracking(_:)),
-            name: NSMenu.didEndTrackingNotification,
-            object: nil
-        )
-    }
-
-    @objc
-    private func menuDidEndTracking(
-        _: Notification
-    ) {
-        NotificationCenter.default.removeObserver(
-            self,
-            name: NSMenu.didEndTrackingNotification,
-            object: nil
-        )
-
-        let completion = pendingCompletion
-        pendingCompletion = nil
-        completion?()
+        RunLoop.main.perform(inModes: [.default]) {
+            MainActor.assumeIsolated {
+                action()
+            }
+        }
     }
 }
 
@@ -140,8 +116,9 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
         }
     }
 
-    func openClipboardURL() {
-        let url = dependencies.clipboardURLClient.currentURL()
+    func openClipboardURL(
+        _ url: URL?
+    ) {
         menuActionScheduler.schedule { [weak self] in
             self?.applyClipboardURL(url)
         }

@@ -13,11 +13,10 @@ struct BrowserPickerCoordinatorTests { // swiftlint:disable:this type_body_lengt
         case expected
     }
 
-    @Test("clipboard command reads once and routes the returned URL")
+    @Test("clipboard command routes the captured URL after menu tracking")
     func opensClipboardURL() async throws {
         let browser = makeBrowser()
         let discovery = BrowserDiscoveryFake(browsers: [browser])
-        var readCount = 0
         let destination = try #require(
             URL(string: "https://example.com/clipboard")
         )
@@ -25,15 +24,10 @@ struct BrowserPickerCoordinatorTests { // swiftlint:disable:this type_body_lengt
         let coordinator = makeCoordinator(
             discovery: discovery,
             launcher: BrowserLauncherFake(),
-            clipboardURLClient: ClipboardURLClient {
-                readCount += 1
-                return destination
-            },
             menuActionScheduler: menuActionScheduler
         )
 
-        coordinator.openClipboardURL()
-        #expect(readCount == 1)
+        coordinator.openClipboardURL(destination)
         #expect(discovery.destinations.isEmpty)
         #expect(coordinator.presentedStore == nil)
 
@@ -41,7 +35,6 @@ struct BrowserPickerCoordinatorTests { // swiftlint:disable:this type_body_lengt
         await coordinator.waitForPendingOperations()
         let expectedDestination = try IncomingURL(destination)
 
-        #expect(readCount == 1)
         #expect(discovery.destinations == [expectedDestination])
         #expect(coordinator.presentedStore?.destination == expectedDestination)
 
@@ -52,7 +45,6 @@ struct BrowserPickerCoordinatorTests { // swiftlint:disable:this type_body_lengt
 
     @Test("empty clipboard presents an error without routing side effects")
     func rejectsEmptyClipboard() {
-        var readCount = 0
         var preferenceWriteCount = 0
         let discovery = BrowserDiscoveryFake()
         let launcher = BrowserLauncherFake()
@@ -67,18 +59,13 @@ struct BrowserPickerCoordinatorTests { // swiftlint:disable:this type_body_lengt
             launcher: launcher,
             errorPresenter: errorPresenter,
             preferencesStore: preferencesStore,
-            clipboardURLClient: ClipboardURLClient {
-                readCount += 1
-                return nil
-            },
             menuActionScheduler: menuActionScheduler
         ) { _, _, _, _ in
             presentation
         }
 
-        coordinator.openClipboardURL()
+        coordinator.openClipboardURL(nil)
 
-        #expect(readCount == 1)
         #expect(errorPresenter.presentedErrors.isEmpty)
         #expect(discovery.destinations.isEmpty)
         #expect(launcher.openedRequests.isEmpty)

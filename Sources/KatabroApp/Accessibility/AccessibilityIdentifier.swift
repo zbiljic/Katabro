@@ -1,5 +1,6 @@
 enum AccessibilityIdentifier {
     static let menuOpenClipboard = "menu.open-url-from-clipboard"
+    static let menuClipboardURLPreview = "menu.clipboard-url-preview"
     static let menuSetupRequired = "menu.setup-required"
     static let menuSetupGuide = "menu.setup-guide"
     static let menuSettings = "menu.settings"

@@ -119,6 +119,12 @@ final class KatabroUITests: XCTestCase {
         assertExists(
             application.buttons["menu.open-url-from-clipboard"]
         )
+        let clipboardPreview = application.staticTexts["menu.clipboard-url-preview"]
+        assertExists(clipboardPreview)
+        XCTAssertEqual(
+            clipboardPreview.value as? String,
+            "https://example.com"
+        )
         assertDoesNotExist(
             application.buttons["menu.setup-required"]
         )
@@ -174,6 +180,64 @@ final class KatabroUITests: XCTestCase {
 
         application.typeKey(.escape, modifierFlags: [])
         assertDoesNotExist(picker)
+    }
+
+    @MainActor
+    func testMenuLongClipboardURLPreview() {
+        let application = launch(
+            surface: "menu",
+            state: "many-browsers"
+        )
+        defer {
+            application.terminate()
+        }
+
+        let clipboardPreview = application.staticTexts["menu.clipboard-url-preview"]
+        assertExists(clipboardPreview)
+        XCTAssertEqual(
+            clipboardPreview.value as? String,
+            "https://documentation.preview.long-subdomain.example.com/guides/browser-routing?source=clipboard-fixture"
+        )
+        attachScreenshot(
+            named: "Menu-long-clipboard-preview",
+            from: application
+        )
+    }
+
+    @MainActor
+    func testStatusItemMenuUsesClipboardSnapshot() {
+        let application = launch(
+            surface: "menu",
+            state: "many-browsers"
+        )
+        defer {
+            application.terminate()
+        }
+
+        let statusItem = application.statusItems.firstMatch
+        assertExists(statusItem)
+        statusItem.click()
+
+        let statusMenu = statusItem.menus.firstMatch
+        assertExists(statusMenu)
+        let clipboardAction = statusMenu.descendants(
+            matching: .any
+        )["Open URL from Clipboard"]
+        let clipboardPreview = statusMenu.descendants(
+            matching: .any
+        )["https://documentation.previ…ing?source=clipboard-fixture"]
+        assertExists(clipboardAction)
+        assertExists(clipboardPreview)
+        XCTAssertFalse(clipboardPreview.isEnabled)
+
+        clipboardAction.click()
+
+        let destination = application.descendants(matching: .any)["picker.destination"]
+        assertExists(destination)
+        XCTAssertEqual(
+            destination.value as? String,
+            "https://documentation.preview.long-subdomain.example.com/guides/browser-routing?source=clipboard-fixture"
+        )
     }
 
     @MainActor

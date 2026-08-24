@@ -320,7 +320,9 @@
                 browserProfileStore: profileStore,
                 preferencesStore: preferencesStore,
                 clipboardURLClient: .development(
-                    url: URL(string: "https://example.com")
+                    url: clipboardURL(
+                        for: state
+                    )
                 ),
                 settingsNavigationStore: SettingsNavigationStore(
                     selectedPane: state.settingsInitialPane
@@ -329,6 +331,21 @@
                 userScriptBridge: userScriptBridge,
                 allowsSystemProfileConfiguration: state == .scriptSetup || state == .scriptReplace
             )
+        }
+
+        private static func clipboardURL(
+            for state: DevelopmentUIState
+        ) -> URL? {
+            let rawValue = switch state {
+            case .manyBrowsers:
+                "https://documentation.preview.long-subdomain.example.com/guides/browser-routing?source=clipboard-fixture"
+            case .fileURL:
+                "file:///fixture/index.html"
+            default:
+                "https://example.com"
+            }
+
+            return URL(string: rawValue)
         }
 
         static func browsers(
@@ -560,6 +577,7 @@
     struct DevelopmentUIReviewView: View {
         let configuration: DevelopmentUIConfiguration
         let dependencies: AppDependencies
+        let clipboardURLSnapshotStore: ClipboardURLSnapshotStore
         let onboardingCoordinator: OnboardingWindowCoordinator
         let pickerCoordinator: BrowserPickerCoordinator
 
@@ -591,6 +609,7 @@
                     )
                 case .menu:
                     MenuBarView(
+                        clipboardURLSnapshotStore: clipboardURLSnapshotStore,
                         defaultBrowserClient: dependencies.defaultBrowserClient,
                         onboardingCoordinator: onboardingCoordinator,
                         pickerCoordinator: pickerCoordinator,
@@ -698,6 +717,7 @@
     final class DevelopmentUIWindowCoordinator: NSObject, NSWindowDelegate {
         private let configuration: DevelopmentUIConfiguration
         private let dependencies: AppDependencies
+        private let clipboardURLSnapshotStore: ClipboardURLSnapshotStore
         private let onboardingCoordinator: OnboardingWindowCoordinator
         private let pickerCoordinator: BrowserPickerCoordinator
         private var window: NSWindow?
@@ -705,11 +725,13 @@
         init(
             configuration: DevelopmentUIConfiguration,
             dependencies: AppDependencies,
+            clipboardURLSnapshotStore: ClipboardURLSnapshotStore,
             onboardingCoordinator: OnboardingWindowCoordinator,
             pickerCoordinator: BrowserPickerCoordinator
         ) {
             self.configuration = configuration
             self.dependencies = dependencies
+            self.clipboardURLSnapshotStore = clipboardURLSnapshotStore
             self.onboardingCoordinator = onboardingCoordinator
             self.pickerCoordinator = if configuration.surface == .menu {
                 BrowserPickerCoordinator(
@@ -746,6 +768,7 @@
                 rootView: DevelopmentUIReviewView(
                     configuration: configuration,
                     dependencies: dependencies,
+                    clipboardURLSnapshotStore: clipboardURLSnapshotStore,
                     onboardingCoordinator: onboardingCoordinator,
                     pickerCoordinator: pickerCoordinator
                 )

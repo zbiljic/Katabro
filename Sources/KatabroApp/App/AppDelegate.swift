@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DevelopmentUIWindowCoordinator(
                 configuration: $0,
                 dependencies: dependencies,
+                clipboardURLSnapshotStore: clipboardURLSnapshotStore,
                 onboardingCoordinator: onboardingCoordinator,
                 pickerCoordinator: pickerCoordinator
             )
@@ -19,6 +20,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     lazy var pickerCoordinator = BrowserPickerCoordinator(
         dependencies: dependencies
+    )
+
+    lazy var clipboardURLSnapshotStore = ClipboardURLSnapshotStore(
+        clipboardURLClient: dependencies.clipboardURLClient
     )
 
     lazy var onboardingCoordinator = OnboardingWindowCoordinator(
@@ -70,6 +75,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(
         _: Notification
     ) {
+        clipboardURLSnapshotStore.startMonitoring()
+
         #if DEBUG
             if let developmentUIWindowCoordinator {
                 developmentUIWindowCoordinator.present()
@@ -77,6 +84,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         #endif
         onboardingCoordinator.presentIfNeeded()
+    }
+
+    func applicationWillTerminate(
+        _: Notification
+    ) {
+        clipboardURLSnapshotStore.stopMonitoring()
     }
 
     func applicationDidBecomeActive(

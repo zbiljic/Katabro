@@ -5,6 +5,7 @@ struct MenuBarView: View {
     @Environment(\.openSettings)
     private var openSettings
 
+    let clipboardURLSnapshotStore: ClipboardURLSnapshotStore
     let defaultBrowserClient: DefaultBrowserClient
     let onboardingCoordinator: OnboardingWindowCoordinator
     let pickerCoordinator: BrowserPickerCoordinator
@@ -28,11 +29,28 @@ struct MenuBarView: View {
             )
         } else {
             Button("Open URL from Clipboard") {
-                pickerCoordinator.openClipboardURL()
+                pickerCoordinator.openClipboardURL(
+                    clipboardURLSnapshotStore.url
+                )
             }
             .accessibilityIdentifier(
                 AccessibilityIdentifier.menuOpenClipboard
             )
+
+            if let displayText = clipboardURLSnapshotStore.displayText {
+                Text(verbatim: displayText)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(width: 240, alignment: .leading)
+                    .accessibilityLabel("Clipboard URL")
+                    .accessibilityValue(
+                        clipboardURLSnapshotStore.url?.absoluteString ?? displayText
+                    )
+                    .accessibilityIdentifier(
+                        AccessibilityIdentifier.menuClipboardURLPreview
+                    )
+            }
         }
 
         Divider()

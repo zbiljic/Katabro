@@ -9,6 +9,7 @@ struct KatabroApp: App {
     var body: some Scene {
         MenuBarExtra {
             MenuBarView(
+                clipboardURLSnapshotStore: appDelegate.clipboardURLSnapshotStore,
                 defaultBrowserClient: appDelegate.dependencies.defaultBrowserClient,
                 onboardingCoordinator: appDelegate.onboardingCoordinator,
                 pickerCoordinator: appDelegate.pickerCoordinator,
