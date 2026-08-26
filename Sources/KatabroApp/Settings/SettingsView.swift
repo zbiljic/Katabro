@@ -6,6 +6,7 @@ struct SettingsView: View {
     let defaultBrowserClient: DefaultBrowserClient
     let loginItemClient: LoginItemClient
     let preferencesStore: PreferencesStore
+    let routingDecisionLogStore: RoutingDecisionLogStore
     let navigationStore: SettingsNavigationStore
     let configurationFolderClient: ConfigurationFolderClient
     let userScriptBridge: UserScriptBridge
@@ -18,6 +19,7 @@ struct SettingsView: View {
         defaultBrowserClient: DefaultBrowserClient,
         loginItemClient: LoginItemClient,
         preferencesStore: PreferencesStore,
+        routingDecisionLogStore: RoutingDecisionLogStore,
         navigationStore: SettingsNavigationStore = SettingsNavigationStore(),
         configurationFolderClient: ConfigurationFolderClient = .live,
         userScriptBridge: UserScriptBridge,
@@ -29,6 +31,7 @@ struct SettingsView: View {
         self.defaultBrowserClient = defaultBrowserClient
         self.loginItemClient = loginItemClient
         self.preferencesStore = preferencesStore
+        self.routingDecisionLogStore = routingDecisionLogStore
         self.navigationStore = navigationStore
         self.configurationFolderClient = configurationFolderClient
         self.userScriptBridge = userScriptBridge
@@ -89,7 +92,8 @@ struct SettingsView: View {
             .tag(SettingsPane.picker)
 
             RulesSettingsView(
-                preferencesStore: preferencesStore
+                preferencesStore: preferencesStore,
+                routingDecisionLogStore: routingDecisionLogStore
             )
             .tabItem {
                 Label(

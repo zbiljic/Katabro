@@ -3,6 +3,11 @@ import XCTest
 // UI fixture coverage intentionally shares launch and assertion helpers.
 // swiftlint:disable file_length type_body_length
 final class KatabroUITests: XCTestCase {
+    enum ScrollDirection {
+        case up
+        case down
+    }
+
     @MainActor
     func testSettingsNormalState() {
         let application = launch(
@@ -845,6 +850,277 @@ extension KatabroUITests {
         confirmRemoveAll.click()
         assertExists(
             application.descendants(matching: .any)["settings.rules.empty"]
+        )
+    }
+
+    @MainActor
+    func testRecentRoutesStates() { // swiftlint:disable:this function_body_length
+        var application = launch(
+            surface: "settings",
+            state: "recent-routes-empty",
+            appearance: "light"
+        )
+        let emptyState = application.descendants(matching: .any)[
+            "settings.recent-routes.empty"
+        ]
+        let privacyNotice = application.descendants(matching: .any)[
+            "settings.recent-routes.privacy"
+        ]
+
+        assertExists(application.scrollViews["settings.rules.form"])
+        assertExists(emptyState)
+        assertExists(privacyNotice)
+        XCTAssertEqual(emptyState.value as? String, "No recent routes yet.")
+        attachScreenshot(
+            named: "Settings-recent-routes-empty-light",
+            from: application
+        )
+        application.terminate()
+
+        let newestIDs = [
+            "00000000-0000-0000-0000-000000000206",
+            "00000000-0000-0000-0000-000000000205",
+            "00000000-0000-0000-0000-000000000204",
+        ]
+        let retainedIDs = newestIDs + [
+            "00000000-0000-0000-0000-000000000203",
+            "00000000-0000-0000-0000-000000000202",
+            "00000000-0000-0000-0000-000000000201",
+        ]
+
+        for appearance in ["light", "dark"] {
+            application = launch(
+                surface: "settings",
+                state: "recent-routes",
+                appearance: appearance
+            )
+            let form = application.scrollViews["settings.rules.form"]
+            assertExists(form)
+            XCTAssertTrue(
+                isControlOn(application.radioButtons["settings.pane.rules"])
+            )
+
+            for requestID in newestIDs {
+                assertExists(
+                    application.descendants(matching: .any)[
+                        "settings.recent-routes.preview-row.\(requestID)"
+                    ]
+                )
+            }
+            assertDoesNotExist(
+                application.descendants(matching: .any)[
+                    "settings.recent-routes.preview-row.00000000-0000-0000-0000-000000000203"
+                ]
+            )
+            assertExists(
+                application.descendants(matching: .any)[
+                    "settings.rule.exact.example.com"
+                ]
+            )
+            assertExists(
+                application.descendants(matching: .any)[
+                    "settings.rule.replace.example.com"
+                ]
+            )
+            let exactRuleRemove = application.descendants(matching: .any)[
+                "settings.rule.exact.example.com.remove"
+            ]
+            let replaceRuleRemove = application.descendants(matching: .any)[
+                "settings.rule.replace.example.com.remove"
+            ]
+            assertExists(exactRuleRemove)
+            assertExists(replaceRuleRemove)
+            XCTAssertTrue(exactRuleRemove.isHittable)
+            XCTAssertTrue(replaceRuleRemove.isHittable)
+            assertExists(
+                application.descendants(matching: .any)[
+                    "settings.recent-routes.privacy"
+                ]
+            )
+            assertExists(application.staticTexts["Couldn’t open target"])
+
+            let reviewWindow = application.windows[
+                "Katabro UI Review — Settings"
+            ]
+            assertExists(reviewWindow)
+            XCTAssertEqual(reviewWindow.frame.width, 560, accuracy: 2)
+            XCTAssertLessThanOrEqual(reviewWindow.frame.height, 620)
+
+            for requestID in newestIDs {
+                let row = application.descendants(matching: .any)[
+                    "settings.recent-routes.preview-row.\(requestID)"
+                ]
+                XCTAssertFalse(row.debugDescription.contains("fixture/private-path"))
+                XCTAssertFalse(row.debugDescription.contains("secret="))
+                XCTAssertFalse(row.debugDescription.contains("#hidden"))
+            }
+
+            attachScreenshot(
+                named: "Settings-recent-routes-collapsed-\(appearance)",
+                from: application
+            )
+
+            let showAll = application.buttons[
+                "settings.recent-routes.show-all"
+            ]
+            assertExists(showAll)
+            showAll.click()
+
+            for requestID in retainedIDs {
+                assertExists(
+                    application.descendants(matching: .any)[
+                        "settings.recent-routes.expanded-row.\(requestID)"
+                    ]
+                )
+            }
+            let exactSuccess = application.descendants(matching: .any)[
+                "settings.recent-routes.expanded-row.00000000-0000-0000-0000-000000000201"
+            ]
+            let normalPickerSuccess = application.descendants(matching: .any)[
+                "settings.recent-routes.expanded-row.00000000-0000-0000-0000-000000000202"
+            ]
+            let unavailableFallback = application.descendants(matching: .any)[
+                "settings.recent-routes.expanded-row.00000000-0000-0000-0000-000000000203"
+            ]
+            XCTAssertFalse(accessibilityCopy(in: exactSuccess).contains("com.example.browser"))
+            XCTAssertFalse(accessibilityCopy(in: normalPickerSuccess).contains("com.example.create:profile:work"))
+            XCTAssertFalse(accessibilityCopy(in: unavailableFallback).contains("com.example.replacement:private"))
+            attachScreenshot(
+                named: "Settings-recent-routes-expanded-\(appearance)",
+                from: application
+            )
+
+            let showLess = application.buttons[
+                "settings.recent-routes.show-less"
+            ]
+            makeHittable(showLess, in: form, scrolling: .up)
+            showLess.click()
+            for requestID in newestIDs {
+                assertExists(
+                    application.descendants(matching: .any)[
+                        "settings.recent-routes.preview-row.\(requestID)"
+                    ]
+                )
+            }
+            assertDoesNotExist(
+                application.descendants(matching: .any)[
+                    "settings.recent-routes.expanded-row.00000000-0000-0000-0000-000000000203"
+                ]
+            )
+
+            application.terminate()
+        }
+
+        application = launch(
+            surface: "settings",
+            state: "recent-routes",
+            appearance: "light"
+        )
+        let clear = application.descendants(matching: .any)[
+            "settings.recent-routes.clear"
+        ]
+        assertExists(clear)
+        XCTAssertEqual(clear.elementType, .button)
+        XCTAssertTrue(clear.isHittable)
+        clear.click()
+        assertExists(
+            application.descendants(matching: .any)[
+                "settings.recent-routes.empty"
+            ]
+        )
+        assertDoesNotExist(
+            application.descendants(matching: .any)[
+                "settings.recent-routes.preview-row.00000000-0000-0000-0000-000000000206"
+            ]
+        )
+        attachScreenshot(
+            named: "Settings-recent-routes-cleared-light",
+            from: application
+        )
+        application.terminate()
+    }
+
+    @MainActor
+    func testRecentRoutesCreateAndReplaceRule() { // swiftlint:disable:this function_body_length
+        let application = launch(
+            surface: "settings",
+            state: "recent-routes",
+            preferencesSuite: "recent-routes-rules-\(UUID().uuidString)",
+            resetsPreferences: true
+        )
+        defer {
+            application.terminate()
+        }
+        let form = application.scrollViews["settings.rules.form"]
+        assertExists(form)
+        XCTAssertTrue(
+            isControlOn(application.radioButtons["settings.pane.rules"])
+        )
+        application.buttons["settings.recent-routes.show-all"].click()
+
+        let createRule = application.buttons[
+            "settings.recent-routes.rule-action.00000000-0000-0000-0000-000000000202"
+        ]
+        makeHittable(createRule, in: form, scrolling: .up)
+        createRule.click()
+        let confirmCreate = dialogButton(
+            application,
+            identifier: "settings.recent-routes.rule-confirm",
+            label: "Create Rule"
+        )
+        assertExists(confirmCreate)
+        confirmCreate.click()
+
+        assertExists(
+            application.descendants(matching: .any)[
+                "settings.recent-routes.rule-exists.00000000-0000-0000-0000-000000000202"
+            ]
+        )
+        assertExists(
+            application.descendants(matching: .any)[
+                "settings.rule.create.example.com"
+            ]
+        )
+        assertExists(application.staticTexts["com.example.create:profile:work"])
+
+        let replaceRule = application.buttons[
+            "settings.recent-routes.rule-action.00000000-0000-0000-0000-000000000203"
+        ]
+        makeHittable(replaceRule, in: form, scrolling: .down)
+        replaceRule.click()
+        let cancelReplace = dialogButton(
+            application,
+            identifier: "settings.recent-routes.rule-cancel",
+            label: "Cancel"
+        )
+        assertExists(cancelReplace)
+        cancelReplace.click()
+        assertExists(application.staticTexts["com.example.previous"])
+        assertDoesNotExist(
+            application.staticTexts["com.example.replacement:private"]
+        )
+
+        let replaceAfterCancellation = application.buttons[
+            "settings.recent-routes.rule-action.00000000-0000-0000-0000-000000000203"
+        ]
+        makeHittable(replaceAfterCancellation, in: form, scrolling: .down)
+        replaceAfterCancellation.click()
+        let confirmReplace = dialogButton(
+            application,
+            identifier: "settings.recent-routes.rule-confirm",
+            label: "Replace Rule"
+        )
+        assertExists(confirmReplace)
+        confirmReplace.click()
+
+        assertExists(application.staticTexts["com.example.replacement:private"])
+        assertDoesNotExist(application.staticTexts["com.example.previous"])
+        assertExists(form)
+        XCTAssertTrue(
+            isControlOn(application.radioButtons["settings.pane.rules"])
+        )
+        assertDoesNotExist(
+            application.descendants(matching: .any)["picker.content"]
         )
     }
 
@@ -1931,6 +2207,41 @@ private extension KatabroUITests {
             exists,
             message
         )
+    }
+
+    @MainActor
+    func makeHittable(
+        _ element: XCUIElement,
+        in container: XCUIElement,
+        scrolling direction: ScrollDirection
+    ) {
+        for _ in 0 ..< 5 where !element.isHittable {
+            switch direction {
+            case .up:
+                container.swipeUp()
+            case .down:
+                container.swipeDown()
+            }
+        }
+
+        XCTAssertTrue(element.isHittable, "Expected UI element to become hittable")
+    }
+
+    @MainActor
+    func accessibilityCopy(
+        in element: XCUIElement
+    ) -> String {
+        let ownValue = element.value.map(String.init(describing:)) ?? ""
+        let descendantCopy = element
+            .descendants(matching: .staticText)
+            .allElementsBoundByIndex
+            .map { child in
+                let value = child.value.map(String.init(describing:)) ?? ""
+                return "\(child.label) \(value)"
+            }
+            .joined(separator: " ")
+
+        return "\(element.label) \(ownValue) \(descendantCopy)"
     }
 }
 

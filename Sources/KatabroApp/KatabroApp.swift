@@ -29,6 +29,7 @@ struct KatabroApp: App {
                 defaultBrowserClient: appDelegate.dependencies.defaultBrowserClient,
                 loginItemClient: appDelegate.dependencies.loginItemClient,
                 preferencesStore: appDelegate.dependencies.preferencesStore,
+                routingDecisionLogStore: appDelegate.dependencies.routingDecisionLogStore,
                 navigationStore: appDelegate.dependencies.settingsNavigationStore,
                 configurationFolderClient: appDelegate.dependencies.configurationFolderClient,
                 userScriptBridge: appDelegate.dependencies.userScriptBridge,

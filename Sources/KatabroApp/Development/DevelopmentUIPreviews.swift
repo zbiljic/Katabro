@@ -71,6 +71,20 @@
         )
     }
 
+    #Preview("Settings — Recent Routes") {
+        settingsPreview(
+            state: .recentRoutes,
+            pane: .rules
+        )
+    }
+
+    #Preview("Settings — Recent Routes Empty") {
+        settingsPreview(
+            state: .recentRoutesEmpty,
+            pane: .rules
+        )
+    }
+
     #Preview("Onboarding") {
         let dependencies = DevelopmentUIFixtures.dependencies(
             for: .normal
@@ -134,6 +148,7 @@
             defaultBrowserClient: dependencies.defaultBrowserClient,
             loginItemClient: dependencies.loginItemClient,
             preferencesStore: dependencies.preferencesStore,
+            routingDecisionLogStore: dependencies.routingDecisionLogStore,
             navigationStore: dependencies.settingsNavigationStore,
             userScriptBridge: dependencies.userScriptBridge,
             allowsSystemProfileConfiguration: dependencies.allowsSystemProfileConfiguration,

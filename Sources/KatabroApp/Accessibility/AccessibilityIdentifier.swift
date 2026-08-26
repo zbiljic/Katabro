@@ -29,6 +29,14 @@ enum AccessibilityIdentifier {
     static let settingsRulesForm = "settings.rules.form"
     static let settingsRulesEmpty = "settings.rules.empty"
     static let settingsRulesRemoveAll = "settings.rules.remove-all"
+    static let settingsRecentRoutesSection = "settings.recent-routes.section"
+    static let settingsRecentRoutesEmpty = "settings.recent-routes.empty"
+    static let settingsRecentRoutesClear = "settings.recent-routes.clear"
+    static let settingsRecentRoutesShowAll = "settings.recent-routes.show-all"
+    static let settingsRecentRoutesShowLess = "settings.recent-routes.show-less"
+    static let settingsRecentRoutesPrivacy = "settings.recent-routes.privacy"
+    static let settingsRecentRoutesRuleConfirm = "settings.recent-routes.rule-confirm"
+    static let settingsRecentRoutesRuleCancel = "settings.recent-routes.rule-cancel"
     static let settingsAboutContent = "settings.about.content"
     static let settingsAboutVersion = "settings.about.version"
     static let settingsAboutRepositoryLink = "settings.about.link.repository"
@@ -151,5 +159,29 @@ enum AccessibilityIdentifier {
         host: String
     ) -> String {
         "settings.rule.\(host).remove"
+    }
+
+    static func settingsRecentRoutePreviewRow(
+        requestID: String
+    ) -> String {
+        "settings.recent-routes.preview-row.\(requestID)"
+    }
+
+    static func settingsRecentRouteExpandedRow(
+        requestID: String
+    ) -> String {
+        "settings.recent-routes.expanded-row.\(requestID)"
+    }
+
+    static func settingsRecentRouteRuleAction(
+        requestID: String
+    ) -> String {
+        "settings.recent-routes.rule-action.\(requestID)"
+    }
+
+    static func settingsRecentRouteRuleExists(
+        requestID: String
+    ) -> String {
+        "settings.recent-routes.rule-exists.\(requestID)"
     }
 }

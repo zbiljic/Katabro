@@ -19,6 +19,7 @@ UI review surfaces:
 Fixture states:
   normal | loading | no-browsers | browser-discovery-error
   service-errors | many-browsers | file-url | browser-profiles | script-setup | script-replace
+  recent-routes | recent-routes-empty
 
 Appearances:
   system | light | dark
@@ -53,7 +54,7 @@ esac
 state=${2:-normal}
 
 case "$state" in
-    normal | loading | no-browsers | browser-discovery-error | service-errors | many-browsers | file-url | browser-profiles | script-setup | script-replace)
+    normal | loading | no-browsers | browser-discovery-error | service-errors | many-browsers | file-url | browser-profiles | script-setup | script-replace | recent-routes | recent-routes-empty)
         ;;
     *)
         echo "Unknown UI fixture state: $state" >&2

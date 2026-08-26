@@ -31,11 +31,15 @@
         case browserProfiles = "browser-profiles"
         case scriptSetup = "script-setup"
         case scriptReplace = "script-replace"
+        case recentRoutes = "recent-routes"
+        case recentRoutesEmpty = "recent-routes-empty"
 
         var settingsInitialPane: SettingsPane {
             switch self {
             case .normal, .serviceErrors:
                 .general
+            case .recentRoutes, .recentRoutesEmpty:
+                .rules
             case .loading, .noBrowsers, .browserDiscoveryError, .manyBrowsers, .fileURL, .browserProfiles, .scriptSetup,
                  .scriptReplace:
                 .browsers
@@ -148,7 +152,7 @@
 
     @MainActor
     enum DevelopmentUIFixtures { // swiftlint:disable:this type_body_length
-        // swiftlint:disable:next function_body_length
+        // swiftlint:disable:next cyclomatic_complexity function_body_length
         static func dependencies(
             for state: DevelopmentUIState,
             preferencesSuite: String? = nil,
@@ -181,7 +185,8 @@
                 discoveryBehavior = .browsers(
                     discoveredBrowsers
                 )
-            case .normal, .serviceErrors, .fileURL, .browserProfiles, .scriptSetup, .scriptReplace:
+            case .normal, .serviceErrors, .fileURL, .browserProfiles, .scriptSetup, .scriptReplace, .recentRoutes,
+                 .recentRoutesEmpty:
                 discoveredBrowsers = browsers(
                     count: 4
                 )
@@ -198,18 +203,9 @@
                     for: state
                 ),
                 hasCompletedOnboarding: true,
-                exactHostRoutingRules: state == .normal
-                    ? [
-                        ExactHostRoutingRule(
-                            host: "example.com",
-                            targetIdentifier: "com.example.browser"
-                        ),
-                        ExactHostRoutingRule(
-                            host: "developer.apple.com",
-                            targetIdentifier: "com.example.research"
-                        ),
-                    ].compactMap(\.self)
-                    : []
+                exactHostRoutingRules: exactHostRoutingRules(
+                    for: state
+                )
             )
             let preferencesStore: PreferencesStore
             let configurationFolderClient: ConfigurationFolderClient
@@ -223,6 +219,10 @@
                 initialInstallationState: state.launcherHelperInstallationState
             ) { true }
             let routingDecisionLogStore = RoutingDecisionLogStore()
+
+            if state == .recentRoutes {
+                seedRecentRoutes(in: routingDecisionLogStore)
+            }
 
             if let preferencesSuite {
                 let suiteName = "com.zbiljic.katabro.ui-review.\(preferencesSuite)"
@@ -360,7 +360,8 @@
                 browsers(
                     count: 12
                 )
-            case .normal, .serviceErrors, .fileURL, .browserProfiles, .scriptSetup, .scriptReplace:
+            case .normal, .serviceErrors, .fileURL, .browserProfiles, .scriptSetup, .scriptReplace, .recentRoutes,
+                 .recentRoutesEmpty:
                 browsers(
                     count: 4
                 )
@@ -412,6 +413,133 @@
                     "The static development URL must be valid: \(error)"
                 )
             }
+        }
+
+        private static func exactHostRoutingRules(
+            for state: DevelopmentUIState
+        ) -> [ExactHostRoutingRule] {
+            let definitions: [(String, String)] = switch state {
+            case .normal:
+                [
+                    ("example.com", "com.example.browser"),
+                    ("developer.apple.com", "com.example.research"),
+                ]
+            case .recentRoutes:
+                [
+                    ("exact.example.com", "com.example.browser"),
+                    ("replace.example.com", "com.example.previous"),
+                ]
+            default:
+                []
+            }
+
+            return definitions.compactMap { host, targetIdentifier in
+                ExactHostRoutingRule(
+                    host: host,
+                    targetIdentifier: targetIdentifier
+                )
+            }
+        }
+
+        // swiftlint:disable:next function_body_length
+        private static func seedRecentRoutes(
+            in store: RoutingDecisionLogStore
+        ) {
+            seedRecentRoute(
+                in: store,
+                id: "00000000-0000-0000-0000-000000000201",
+                timestamp: 1_777_777_201,
+                url: "https://exact.example.com/fixture/private-path?secret=one#hidden",
+                source: .system,
+                decision: .exactHostRule(
+                    targetDisplayLabel: "Example Browser"
+                ),
+                result: .opened(
+                    targetIdentifier: "com.example.browser",
+                    targetDisplayLabel: "Example Browser"
+                )
+            )
+            seedRecentRoute(
+                in: store,
+                id: "00000000-0000-0000-0000-000000000202",
+                timestamp: 1_777_777_202,
+                url: "https://create.example.com/fixture/private-path?secret=two#hidden",
+                source: .commandLine,
+                decision: .browserPicker(reason: .noMatchingRule),
+                result: .opened(
+                    targetIdentifier: "com.example.create:profile:work",
+                    targetDisplayLabel: "Work — Example Browser"
+                )
+            )
+            seedRecentRoute(
+                in: store,
+                id: "00000000-0000-0000-0000-000000000203",
+                timestamp: 1_777_777_203,
+                url: "https://replace.example.com/fixture/private-path?secret=three#hidden",
+                source: .customURL,
+                decision: .browserPicker(reason: .savedTargetUnavailable),
+                result: .opened(
+                    targetIdentifier: "com.example.replacement:private",
+                    targetDisplayLabel: "Private Window — Example Browser"
+                )
+            )
+            seedRecentRoute(
+                in: store,
+                id: "00000000-0000-0000-0000-000000000204",
+                timestamp: 1_777_777_204,
+                url: "https://copied.example.com/fixture/private-path?secret=four#hidden",
+                source: .system,
+                decision: .browserPicker(reason: .noMatchingRule),
+                result: .copiedLink
+            )
+            seedRecentRoute(
+                in: store,
+                id: "00000000-0000-0000-0000-000000000205",
+                timestamp: 1_777_777_205,
+                url: "https://cancelled.example.com/fixture/private-path?secret=five#hidden",
+                source: .commandLine,
+                decision: .browserPicker(reason: .noMatchingRule),
+                result: .cancelled
+            )
+            seedRecentRoute(
+                in: store,
+                id: "00000000-0000-0000-0000-000000000206",
+                timestamp: 1_777_777_206,
+                url: "https://failed.example.com/fixture/private-path?secret=six#hidden",
+                source: .customURL,
+                decision: .browserPicker(reason: .noMatchingRule),
+                result: .failed(.openingTarget)
+            )
+        }
+
+        // swiftlint:disable:next function_parameter_count
+        private static func seedRecentRoute(
+            in store: RoutingDecisionLogStore,
+            id: String,
+            timestamp: TimeInterval,
+            url: String,
+            source: RoutingRequest.Source,
+            decision: RoutingDecisionLogEntry.Decision,
+            result: RoutingDecisionLogEntry.Result
+        ) {
+            guard
+                let requestID = UUID(uuidString: id),
+                let destination = try? IncomingURL(url)
+            else {
+                preconditionFailure("Static recent-route fixtures must be valid.")
+            }
+
+            let request = RoutingRequest(
+                id: requestID,
+                destination: destination,
+                source: source
+            )
+            store.receive(
+                request,
+                at: Date(timeIntervalSince1970: timestamp)
+            )
+            store.updateDecision(for: requestID, to: decision)
+            store.updateResult(for: requestID, to: result)
         }
 
         private static func browsers(
@@ -593,6 +721,7 @@
                         defaultBrowserClient: dependencies.defaultBrowserClient,
                         loginItemClient: dependencies.loginItemClient,
                         preferencesStore: dependencies.preferencesStore,
+                        routingDecisionLogStore: dependencies.routingDecisionLogStore,
                         navigationStore: dependencies.settingsNavigationStore,
                         configurationFolderClient: dependencies.configurationFolderClient,
                         userScriptBridge: dependencies.userScriptBridge,
@@ -800,6 +929,17 @@
         private var contentSize: NSSize {
             switch configuration.surface {
             case .settings:
+                let usesRecentRoutesSize = [
+                    DevelopmentUIState.recentRoutes,
+                    .recentRoutesEmpty,
+                ].contains(configuration.state)
+                if usesRecentRoutesSize {
+                    return NSSize(
+                        width: 560,
+                        height: 560
+                    )
+                }
+
                 return NSSize(
                     width: 620,
                     height: 640

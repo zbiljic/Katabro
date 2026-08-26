@@ -24,6 +24,8 @@ release artifacts, notarization, and an installer are not available yet.
 - Queues simultaneous link requests instead of dropping them.
 - Can remember a browser choice for one exact host and remove that local rule
   later in **Settings > Rules**.
+- Shows up to three recent host-only routing decisions in **Settings > Rules**,
+  with an in-memory Show All view and rule creation from successful routes.
 - Provides onboarding, Settings, open-at-login control, browser ordering, and
   shortcut assignment under **Shown Browsers**.
 - Syncs browser order and picker shortcuts through iCloud, or those settings
@@ -85,6 +87,11 @@ and are not included in iCloud synchronization.
 Open **Settings > Rules** to review a rule, remove one rule, or remove them all.
 If its browser, private-window helper, or profile is unavailable, Katabro keeps
 the rule and shows the picker instead.
+
+The same pane shows the three newest **Recent Routes** for the current Katabro
+session. Expand the section to review all retained entries or create and replace
+exact-host rules from successful routes. Recent Routes stores hostnames only,
+keeps at most 50 entries in memory, and clears on Clear or when Katabro quits.
 
 ### Settings sync
 
@@ -234,12 +241,16 @@ scripts/run picker normal dark
 scripts/run picker browser-profiles dark
 scripts/run settings script-setup light
 scripts/run settings script-replace dark
+scripts/run settings recent-routes light
+scripts/run settings recent-routes dark
+scripts/run settings recent-routes-empty light
 scripts/run menu normal
 ```
 
 Available fixture states are `normal`, `loading`, `no-browsers`,
 `browser-discovery-error`, `service-errors`, `many-browsers`,
-`browser-profiles`, `script-setup`, and `script-replace`. The optional
+`browser-profiles`, `script-setup`, `script-replace`, `recent-routes`, and
+`recent-routes-empty`. The optional
 appearance is `system`, `light`, or `dark`.
 Normal `scripts/run` behavior remains menu-bar only.
 
