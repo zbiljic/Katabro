@@ -8,6 +8,7 @@ struct AppDependencies {
     let errorPresenter: any RoutingErrorPresenting
     let loginItemClient: LoginItemClient
     let routingDecisionClient: RoutingDecisionClient
+    let routingDecisionLogStore: RoutingDecisionLogStore
     var browserProfileStore = BrowserProfileStore()
     let preferencesStore: PreferencesStore
     var clipboardURLClient = ClipboardURLClient.live
@@ -34,6 +35,7 @@ struct AppDependencies {
             errorPresenter: AlertRoutingErrorPresenter(),
             loginItemClient: .live(),
             routingDecisionClient: .exactHostRules,
+            routingDecisionLogStore: RoutingDecisionLogStore(),
             browserProfileStore: .live(),
             preferencesStore: .live(),
             userScriptBridge: userScriptBridge

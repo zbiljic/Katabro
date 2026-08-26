@@ -90,6 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _: Notification
     ) {
         clipboardURLSnapshotStore.stopMonitoring()
+        dependencies.routingDecisionLogStore.clear()
     }
 
     func applicationDidBecomeActive(

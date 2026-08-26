@@ -222,6 +222,7 @@
             let userScriptBridge = UserScriptBridge(
                 initialInstallationState: state.launcherHelperInstallationState
             ) { true }
+            let routingDecisionLogStore = RoutingDecisionLogStore()
 
             if let preferencesSuite {
                 let suiteName = "com.zbiljic.katabro.ui-review.\(preferencesSuite)"
@@ -317,6 +318,7 @@
                     lastError: serviceError
                 ),
                 routingDecisionClient: .exactHostRules,
+                routingDecisionLogStore: routingDecisionLogStore,
                 browserProfileStore: profileStore,
                 preferencesStore: preferencesStore,
                 clipboardURLClient: .development(

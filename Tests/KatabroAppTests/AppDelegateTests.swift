@@ -1,5 +1,6 @@
 import AppKit
 @testable import Katabro
+import KatabroCore
 import Testing
 
 @MainActor
@@ -43,6 +44,7 @@ struct AppDelegateTests {
                 errorPresenter: RoutingErrorPresenterFake(),
                 loginItemClient: loginItemClient,
                 routingDecisionClient: .exactHostRules,
+                routingDecisionLogStore: RoutingDecisionLogStore(),
                 preferencesStore: PreferencesStore()
             )
         )
@@ -90,6 +92,7 @@ struct AppDelegateTests {
                 errorPresenter: RoutingErrorPresenterFake(),
                 loginItemClient: .development(status: .disabled),
                 routingDecisionClient: .exactHostRules,
+                routingDecisionLogStore: RoutingDecisionLogStore(),
                 preferencesStore: store
             )
         )
@@ -98,6 +101,37 @@ struct AppDelegateTests {
             Notification(name: NSApplication.didBecomeActiveNotification)
         )
         #expect(refreshCount == 1)
+    }
+
+    @Test("termination clears recent routes")
+    func clearsRecentRoutesOnTermination() throws {
+        let routingDecisionLogStore = RoutingDecisionLogStore()
+        try routingDecisionLogStore.receive(
+            RoutingRequest(
+                destination: IncomingURL("https://example.com/private"),
+                source: .system
+            )
+        )
+        let delegate = AppDelegate(
+            dependencies: AppDependencies(
+                browserDiscovery: BrowserDiscoveryFake(),
+                browserLauncher: BrowserLauncherFake(),
+                defaultBrowserClient: .development(status: .notCurrent),
+                errorPresenter: RoutingErrorPresenterFake(),
+                loginItemClient: .development(status: .disabled),
+                routingDecisionClient: .exactHostRules,
+                routingDecisionLogStore: routingDecisionLogStore,
+                preferencesStore: PreferencesStore(),
+                clipboardURLClient: .development(url: nil)
+            )
+        )
+
+        #expect(routingDecisionLogStore.entries.count == 1)
+        delegate.applicationWillTerminate(
+            Notification(name: NSApplication.willTerminateNotification)
+        )
+
+        #expect(routingDecisionLogStore.entries.isEmpty)
     }
 }
 

@@ -127,6 +127,8 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
     func route(
         _ request: RoutingRequest
     ) {
+        dependencies.routingDecisionLogStore.receive(request)
+
         guard self.request == nil else {
             requestQueue.enqueue(request)
             return
@@ -233,6 +235,12 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
                     nil
                 }
                 if let target = automaticTarget {
+                    dependencies.routingDecisionLogStore.updateDecision(
+                        for: request.id,
+                        to: .exactHostRule(
+                            targetDisplayLabel: targetDisplayLabel(target)
+                        )
+                    )
                     launch(
                         request: request,
                         target: target,
@@ -242,6 +250,15 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
                 }
 
                 let visibleTargets = visibleTargets(for: orderedBrowsers)
+                let pickerReason: RoutingDecisionLogEntry.Decision.BrowserPickerReason = if case .open = decision {
+                    .savedTargetUnavailable
+                } else {
+                    .noMatchingRule
+                }
+                dependencies.routingDecisionLogStore.updateDecision(
+                    for: request.id,
+                    to: .browserPicker(reason: pickerReason)
+                )
                 present(request: request, targets: visibleTargets)
             } catch {
                 guard
@@ -251,6 +268,10 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
                     return
                 }
 
+                dependencies.routingDecisionLogStore.updateResult(
+                    for: request.id,
+                    to: .failed(.routing)
+                )
                 record(error)
                 routingTask = nil
                 finishCurrentRequest(
@@ -359,6 +380,7 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
             store,
             { [weak self] target, remembersSelection in
                 self?.select(
+                    request: request,
                     target,
                     remembersSelection: remembersSelection
                 )
@@ -385,22 +407,30 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
 
         do {
             try dependencies.clipboardURLClient.copy(request.destination.url)
+            dependencies.routingDecisionLogStore.updateResult(
+                for: request.id,
+                to: .copiedLink
+            )
             finishCurrentRequest(id: request.id)
         } catch {
+            dependencies.routingDecisionLogStore.updateResult(
+                for: request.id,
+                to: .failed(.copyingLink)
+            )
             record(error)
         }
     }
 
     private func select(
+        request: RoutingRequest,
         _ target: BrowserLaunchTarget,
         remembersSelection: Bool
     ) {
-        if presentsPreview {
-            guard let request else {
-                finishCurrentRequest()
-                return
-            }
+        guard self.request?.id == request.id else {
+            return
+        }
 
+        if presentsPreview {
             launch(
                 request: request,
                 target: target,
@@ -410,11 +440,6 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
         }
 
         guard launchTask == nil else {
-            return
-        }
-
-        guard let request else {
-            finishCurrentRequest()
             return
         }
 
@@ -463,6 +488,14 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
                     return
                 }
 
+                dependencies.routingDecisionLogStore.updateResult(
+                    for: request.id,
+                    to: .opened(
+                        targetIdentifier: target.id,
+                        targetDisplayLabel: targetDisplayLabel(target)
+                    )
+                )
+
                 if let ruleIntent {
                     dependencies.preferencesStore.setExactHostRoutingRule(
                         for: request.destination,
@@ -471,6 +504,10 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
                 }
             } catch {
                 if self.request?.id == request.id {
+                    dependencies.routingDecisionLogStore.updateResult(
+                        for: request.id,
+                        to: .failed(.openingTarget)
+                    )
                     record(error)
                 }
             }
@@ -488,6 +525,12 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
     ) {
         guard id == nil || request?.id == id else {
             return
+        }
+
+        if let request, !presentsPreview {
+            dependencies.routingDecisionLogStore.finishIfPending(
+                requestID: request.id
+            )
         }
 
         routingTask?.cancel()
@@ -515,6 +558,16 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
         panel = nil
     }
 
+    private func targetDisplayLabel(
+        _ target: BrowserLaunchTarget
+    ) -> String {
+        guard let detail = target.detail else {
+            return target.displayName
+        }
+
+        return "\(target.displayName) — \(detail)"
+    }
+
     private func record(
         _ error: any Error
     ) {
@@ -527,7 +580,11 @@ extension BrowserPickerCoordinator: NSWindowDelegate {
     func windowDidResignKey(
         _ notification: Notification
     ) {
-        guard notification.object as? BrowserPickerPanel === panel else {
+        guard
+            let notificationPanel = notification.object as AnyObject?,
+            let panel,
+            notificationPanel === panel
+        else {
             return
         }
 
@@ -537,7 +594,11 @@ extension BrowserPickerCoordinator: NSWindowDelegate {
     func windowWillClose(
         _ notification: Notification
     ) {
-        guard notification.object as? BrowserPickerPanel === panel else {
+        guard
+            let notificationPanel = notification.object as AnyObject?,
+            let panel,
+            notificationPanel === panel
+        else {
             return
         }
 
