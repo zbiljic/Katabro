@@ -5,6 +5,9 @@ struct GeneralSettingsView: View {
 
     let defaultBrowserClient: DefaultBrowserClient
     let loginItemClient: LoginItemClient
+    let screenURLCaptureSettings: ScreenURLCaptureSettings
+    let screenCaptureClient: ScreenCaptureClient
+    let visionURLRecognitionClient: VisionURLRecognitionClient
     let preferencesStore: PreferencesStore
     let configurationFolderClient: ConfigurationFolderClient
     @State private var showingFolderDisclosure = false
@@ -66,6 +69,12 @@ struct GeneralSettingsView: View {
                         )
                 }
             }
+
+            ScreenURLCaptureSettingsView(
+                settings: screenURLCaptureSettings,
+                screenCaptureClient: screenCaptureClient,
+                visionURLRecognitionClient: visionURLRecognitionClient
+            )
 
             Section("Sync") {
                 Picker(
@@ -130,6 +139,7 @@ struct GeneralSettingsView: View {
         .task {
             defaultBrowserClient.refresh()
             loginItemClient.refresh()
+            screenURLCaptureSettings.refreshScreenCaptureAuthorization()
         }
         .confirmationDialog(
             "Sync exact-host rules with this folder?",

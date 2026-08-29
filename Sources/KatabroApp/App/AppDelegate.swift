@@ -22,6 +22,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         dependencies: dependencies
     )
 
+    lazy var screenURLCaptureCoordinator = ScreenURLCaptureCoordinator(
+        dependencies: dependencies,
+        pickerCoordinator: pickerCoordinator
+    )
+
+    lazy var screenURLCaptureSettings = ScreenURLCaptureSettings(
+        registrar: dependencies.globalHotKeyRegistrar,
+        screenCaptureClient: dependencies.screenCaptureClient,
+        isCaptureAvailable: dependencies.visionURLRecognitionClient.isAvailable(),
+        onCaptureDisabled: { [weak self] in
+            self?.screenURLCaptureCoordinator.cancel()
+        },
+        onShortcut: { [weak self] in
+            self?.screenURLCaptureCoordinator.capture()
+        }
+    )
+
     lazy var clipboardURLSnapshotStore = ClipboardURLSnapshotStore(
         clipboardURLClient: dependencies.clipboardURLClient
     )
@@ -83,6 +100,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
         #endif
+        screenURLCaptureSettings.start()
         onboardingCoordinator.presentIfNeeded()
     }
 
@@ -90,6 +108,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _: Notification
     ) {
         clipboardURLSnapshotStore.stopMonitoring()
+        screenURLCaptureSettings.unregister()
         dependencies.routingDecisionLogStore.clear()
     }
 
@@ -99,6 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         dependencies.defaultBrowserClient.refresh()
         dependencies.loginItemClient.refresh()
         dependencies.preferencesStore.refreshActiveSync()
+        screenURLCaptureSettings.refreshScreenCaptureAuthorization()
     }
 
     func application(

@@ -20,6 +20,7 @@ struct AppDependencies {
     var allowsSystemProfileConfiguration = true
     var screenCaptureClient = ScreenCaptureClient.inert
     var visionURLRecognitionClient = VisionURLRecognitionClient.unavailable
+    var globalHotKeyRegistrar: any GlobalHotKeyRegistering = InertGlobalHotKeyRegistrar()
 
     static let live: Self = {
         let userScriptBridge = UserScriptBridge()
@@ -42,7 +43,8 @@ struct AppDependencies {
             preferencesStore: .live(),
             userScriptBridge: userScriptBridge,
             screenCaptureClient: .live,
-            visionURLRecognitionClient: .live
+            visionURLRecognitionClient: .live,
+            globalHotKeyRegistrar: GlobalHotKeyRegistrar()
         )
     }()
 }

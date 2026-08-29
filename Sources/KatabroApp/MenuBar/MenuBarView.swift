@@ -9,6 +9,8 @@ struct MenuBarView: View {
     let defaultBrowserClient: DefaultBrowserClient
     let onboardingCoordinator: OnboardingWindowCoordinator
     let pickerCoordinator: BrowserPickerCoordinator
+    let screenURLCaptureCoordinator: ScreenURLCaptureCoordinator
+    let screenURLCaptureSettings: ScreenURLCaptureSettings
     let preferencesStore: PreferencesStore
     let settingsNavigationStore: SettingsNavigationStore
 
@@ -28,10 +30,13 @@ struct MenuBarView: View {
                 AccessibilityIdentifier.menuSetupRequired
             )
         } else {
-            Button("Open URL from Clipboard") {
+            Button {
                 pickerCoordinator.openClipboardURL(
                     clipboardURLSnapshotStore.url
                 )
+            } label: {
+                Label("Open URL from Clipboard", systemImage: "doc.on.clipboard")
+                    .imageScale(.medium)
             }
             .accessibilityIdentifier(
                 AccessibilityIdentifier.menuOpenClipboard
@@ -51,6 +56,22 @@ struct MenuBarView: View {
                         AccessibilityIdentifier.menuClipboardURLPreview
                     )
             }
+        }
+
+        if screenURLCaptureSettings.isCaptureEnabled, screenURLCaptureSettings.isCaptureAvailable {
+            Button {
+                screenURLCaptureCoordinator.capture()
+            } label: {
+                Label("Capture URLs from Screen", systemImage: "text.viewfinder")
+                    .imageScale(.medium)
+            }
+            .keyboardShortcut(captureKeyboardShortcut)
+            .accessibilityValue(
+                screenURLCaptureSettings.isEnabled
+                    ? screenURLCaptureSettings.shortcut.displayValue
+                    : ""
+            )
+            .accessibilityIdentifier(AccessibilityIdentifier.menuCaptureScreenURLs)
         }
 
         Divider()
@@ -109,6 +130,34 @@ struct MenuBarView: View {
     private var setupRequired: Bool {
         !preferencesStore.hasCompletedOnboarding
             || defaultBrowserClient.status != .current
+    }
+
+    private var captureKeyboardShortcut: KeyboardShortcut? {
+        let shortcut = screenURLCaptureSettings.shortcut
+        guard
+            screenURLCaptureSettings.isCaptureEnabled,
+            screenURLCaptureSettings.isCaptureAvailable,
+            screenURLCaptureSettings.isEnabled,
+            shortcut.displayKey.count == 1,
+            let character = shortcut.displayKey.lowercased().first
+        else {
+            return nil
+        }
+
+        var modifiers: EventModifiers = []
+        if shortcut.modifiers.contains(.command) {
+            modifiers.insert(.command)
+        }
+        if shortcut.modifiers.contains(.option) {
+            modifiers.insert(.option)
+        }
+        if shortcut.modifiers.contains(.control) {
+            modifiers.insert(.control)
+        }
+        if shortcut.modifiers.contains(.shift) {
+            modifiers.insert(.shift)
+        }
+        return KeyboardShortcut(KeyEquivalent(character), modifiers: modifiers)
     }
 
     private func showSettings(

@@ -5,6 +5,9 @@ struct SettingsView: View {
     let browserProfileStore: BrowserProfileStore
     let defaultBrowserClient: DefaultBrowserClient
     let loginItemClient: LoginItemClient
+    let screenURLCaptureSettings: ScreenURLCaptureSettings
+    let screenCaptureClient: ScreenCaptureClient
+    let visionURLRecognitionClient: VisionURLRecognitionClient
     let preferencesStore: PreferencesStore
     let routingDecisionLogStore: RoutingDecisionLogStore
     let navigationStore: SettingsNavigationStore
@@ -18,6 +21,9 @@ struct SettingsView: View {
         browserProfileStore: BrowserProfileStore,
         defaultBrowserClient: DefaultBrowserClient,
         loginItemClient: LoginItemClient,
+        screenURLCaptureSettings: ScreenURLCaptureSettings,
+        screenCaptureClient: ScreenCaptureClient,
+        visionURLRecognitionClient: VisionURLRecognitionClient,
         preferencesStore: PreferencesStore,
         routingDecisionLogStore: RoutingDecisionLogStore,
         navigationStore: SettingsNavigationStore = SettingsNavigationStore(),
@@ -30,6 +36,9 @@ struct SettingsView: View {
         self.browserProfileStore = browserProfileStore
         self.defaultBrowserClient = defaultBrowserClient
         self.loginItemClient = loginItemClient
+        self.screenURLCaptureSettings = screenURLCaptureSettings
+        self.screenCaptureClient = screenCaptureClient
+        self.visionURLRecognitionClient = visionURLRecognitionClient
         self.preferencesStore = preferencesStore
         self.routingDecisionLogStore = routingDecisionLogStore
         self.navigationStore = navigationStore
@@ -46,6 +55,9 @@ struct SettingsView: View {
             GeneralSettingsView(
                 defaultBrowserClient: defaultBrowserClient,
                 loginItemClient: loginItemClient,
+                screenURLCaptureSettings: screenURLCaptureSettings,
+                screenCaptureClient: screenCaptureClient,
+                visionURLRecognitionClient: visionURLRecognitionClient,
                 preferencesStore: preferencesStore,
                 configurationFolderClient: configurationFolderClient
             )

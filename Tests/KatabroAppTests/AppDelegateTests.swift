@@ -3,6 +3,8 @@ import AppKit
 import KatabroCore
 import Testing
 
+// swiftlint:disable multiline_arguments
+
 @MainActor
 @Suite("Application lifecycle")
 struct AppDelegateTests {
@@ -133,6 +135,26 @@ struct AppDelegateTests {
 
         #expect(routingDecisionLogStore.entries.isEmpty)
     }
+
+    @Test("termination unregisters an enabled screen URL shortcut exactly once")
+    func terminationUnregistersShortcut() {
+        let registrar = AppDelegateRegistrarFake()
+        UserDefaults.standard.removeObject(forKey: ScreenURLCaptureSettings.enabledKey)
+        defer { UserDefaults.standard.removeObject(forKey: ScreenURLCaptureSettings.enabledKey) }
+        let delegate = AppDelegate(
+            dependencies: AppDependencies(
+                browserDiscovery: BrowserDiscoveryFake(), browserLauncher: BrowserLauncherFake(),
+                defaultBrowserClient: .development(status: .notCurrent), errorPresenter: RoutingErrorPresenterFake(),
+                loginItemClient: .development(status: .disabled), routingDecisionClient: .exactHostRules,
+                routingDecisionLogStore: RoutingDecisionLogStore(), preferencesStore: PreferencesStore(),
+                globalHotKeyRegistrar: registrar
+            )
+        )
+        delegate.screenURLCaptureSettings.setEnabled(true)
+        let beforeTermination = registrar.unregisterCount
+        delegate.applicationWillTerminate(Notification(name: NSApplication.willTerminateNotification))
+        #expect(registrar.unregisterCount == beforeTermination + 1)
+    }
 }
 
 @MainActor
@@ -143,3 +165,20 @@ private final class AppLifecycleState {
     ]
     var loginItemStatus = LoginItemClient.Status.disabled
 }
+
+@MainActor
+private final class AppDelegateRegistrarFake: GlobalHotKeyRegistering {
+    var unregisterCount = 0
+    func register(
+        _: GlobalShortcut,
+        handler _: @escaping @MainActor () -> Void
+    ) -> GlobalHotKeyRegistrationResult {
+        .registered
+    }
+
+    func unregister() {
+        unregisterCount += 1
+    }
+}
+
+// swiftlint:enable multiline_arguments

@@ -710,6 +710,29 @@
         let clipboardURLSnapshotStore: ClipboardURLSnapshotStore
         let onboardingCoordinator: OnboardingWindowCoordinator
         let pickerCoordinator: BrowserPickerCoordinator
+        @State private var screenURLCaptureSettings: ScreenURLCaptureSettings
+
+        init(
+            configuration: DevelopmentUIConfiguration,
+            dependencies: AppDependencies,
+            clipboardURLSnapshotStore: ClipboardURLSnapshotStore,
+            onboardingCoordinator: OnboardingWindowCoordinator,
+            pickerCoordinator: BrowserPickerCoordinator
+        ) {
+            self.configuration = configuration
+            self.dependencies = dependencies
+            self.clipboardURLSnapshotStore = clipboardURLSnapshotStore
+            self.onboardingCoordinator = onboardingCoordinator
+            self.pickerCoordinator = pickerCoordinator
+            _screenURLCaptureSettings = State(
+                initialValue: ScreenURLCaptureSettings(
+                    defaults: screenURLDefaults(for: configuration),
+                    registrar: dependencies.globalHotKeyRegistrar,
+                    screenCaptureClient: dependencies.screenCaptureClient,
+                    isCaptureAvailable: dependencies.visionURLRecognitionClient.isAvailable()
+                )
+            )
+        }
 
         var body: some View {
             Group {
@@ -720,6 +743,9 @@
                         browserProfileStore: dependencies.browserProfileStore,
                         defaultBrowserClient: dependencies.defaultBrowserClient,
                         loginItemClient: dependencies.loginItemClient,
+                        screenURLCaptureSettings: screenURLCaptureSettings,
+                        screenCaptureClient: dependencies.screenCaptureClient,
+                        visionURLRecognitionClient: dependencies.visionURLRecognitionClient,
                         preferencesStore: dependencies.preferencesStore,
                         routingDecisionLogStore: dependencies.routingDecisionLogStore,
                         navigationStore: dependencies.settingsNavigationStore,
@@ -744,6 +770,11 @@
                         defaultBrowserClient: dependencies.defaultBrowserClient,
                         onboardingCoordinator: onboardingCoordinator,
                         pickerCoordinator: pickerCoordinator,
+                        screenURLCaptureCoordinator: ScreenURLCaptureCoordinator(
+                            dependencies: dependencies,
+                            pickerCoordinator: pickerCoordinator
+                        ),
+                        screenURLCaptureSettings: screenURLCaptureSettings,
                         preferencesStore: dependencies.preferencesStore,
                         settingsNavigationStore: dependencies.settingsNavigationStore
                     )
@@ -755,6 +786,20 @@
                 configuration.appearance.colorScheme
             )
         }
+    }
+
+    @MainActor
+    private func screenURLDefaults(for configuration: DevelopmentUIConfiguration) -> UserDefaults {
+        let suite = configuration.preferencesSuite.map { "\($0).screen-url-capture" }
+            ?? "com.zbiljic.katabro.screen-url-fixture.review."
+            + "\(configuration.surface.rawValue).\(configuration.state.rawValue)"
+        guard let defaults = UserDefaults(suiteName: suite) else {
+            fatalError("Could not create isolated Screen URL fixture defaults")
+        }
+        if configuration.preferencesSuite == nil || configuration.resetsPreferences {
+            defaults.removePersistentDomain(forName: suite)
+        }
+        return defaults
     }
 
     private struct DevelopmentPickerReviewView: View {

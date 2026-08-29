@@ -147,6 +147,14 @@
             browserProfileStore: dependencies.browserProfileStore,
             defaultBrowserClient: dependencies.defaultBrowserClient,
             loginItemClient: dependencies.loginItemClient,
+            screenURLCaptureSettings: ScreenURLCaptureSettings(
+                defaults: isolatedPreviewScreenURLDefaults(),
+                registrar: dependencies.globalHotKeyRegistrar,
+                screenCaptureClient: dependencies.screenCaptureClient,
+                isCaptureAvailable: dependencies.visionURLRecognitionClient.isAvailable()
+            ),
+            screenCaptureClient: dependencies.screenCaptureClient,
+            visionURLRecognitionClient: dependencies.visionURLRecognitionClient,
             preferencesStore: dependencies.preferencesStore,
             routingDecisionLogStore: dependencies.routingDecisionLogStore,
             navigationStore: dependencies.settingsNavigationStore,
@@ -154,5 +162,14 @@
             allowsSystemProfileConfiguration: dependencies.allowsSystemProfileConfiguration,
             onPreviewPicker: pickerCoordinator.preview
         )
+    }
+
+    private func isolatedPreviewScreenURLDefaults() -> UserDefaults {
+        let suite = "com.zbiljic.katabro.screen-url-preview"
+        guard let defaults = UserDefaults(suiteName: suite) else {
+            fatalError("Could not create isolated Screen URL preview defaults")
+        }
+        defaults.removePersistentDomain(forName: suite)
+        return defaults
     }
 #endif
