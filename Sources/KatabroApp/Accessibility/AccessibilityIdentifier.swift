@@ -1,5 +1,6 @@
 enum AccessibilityIdentifier {
     static let menuOpenClipboard = "menu.open-url-from-clipboard"
+    static let menuCaptureScreenURLs = "menu.capture-screen-urls"
     static let menuClipboardURLPreview = "menu.clipboard-url-preview"
     static let menuSetupRequired = "menu.setup-required"
     static let menuSetupGuide = "menu.setup-guide"
@@ -49,6 +50,35 @@ enum AccessibilityIdentifier {
     static let settingsLoginItemToggle = "settings.login-item.toggle"
     static let settingsLoginItemStatus = "settings.login-item.status"
     static let settingsLoginItemError = "settings.login-item.error"
+    static let settingsScreenURLCaptureSection = "settings.screen-url-capture.section"
+    static let settingsScreenURLCaptureToggle = "settings.screen-url-capture.toggle"
+    static let settingsScreenURLCaptureUnavailable = "settings.screen-url-capture.unavailable"
+    static let settingsScreenURLShortcutToggle = "settings.screen-url-capture.shortcut-toggle"
+    static let settingsScreenURLShortcutField = "settings.screen-url-capture.shortcut-field"
+    static let settingsScreenURLShortcutStatus = "settings.screen-url-capture.shortcut-status"
+    static let settingsScreenURLPermissionStatus = "settings.screen-url-capture.permission-status"
+    static let settingsScreenURLPermissionGranted = "settings.screen-url-capture.permission-authorized-status"
+    static let settingsScreenURLRequestAccess = "settings.screen-url-capture.request-access"
+    static let settingsScreenURLOpenSystemSettings = "settings.screen-url-capture.open-system-settings"
+    static let screenURLPicker = "screen-url-picker"
+    static let screenURLEmptyState = "screen-url-picker.empty-state"
+    static let screenURLLoadingState = "screen-url-picker.loading-state"
+    static let screenURLPermissionState = "screen-url-picker.permission-state"
+    static let screenURLOpenSystemSettings = "screen-url-picker.open-system-settings"
+    static let screenURLCaptureFailureState = "screen-url-picker.capture-failure-state"
+    static let screenURLVisionUnavailableState = "screen-url-picker.vision-unavailable-state"
+    static let screenURLOpenAll = "screen-url-picker.open-all"
+    static let screenURLSelectionReceipt = "screen-url-picker.selection-receipt"
+    static let screenURLCancellationReceipt = "screen-url-picker.cancellation-receipt"
+
+    static func screenURLRow(_ index: Int) -> String {
+        "screen-url-picker.row.\(index)"
+    }
+
+    static func screenURLShortcut(_ index: Int) -> String {
+        "screen-url-picker.shortcut.\(index)"
+    }
+
     static let settingsICloudStatus = "settings.icloud.status"
     static let settingsSyncMethod = "settings.sync.method"
     // Keep the original identifier stable for UI clients while the section

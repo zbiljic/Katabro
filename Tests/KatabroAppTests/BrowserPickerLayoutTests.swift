@@ -214,7 +214,7 @@ struct BrowserPickerHoverArbitratorTests {
     @Test("stationary pointer cannot overwrite keyboard selection")
     func stationaryPointerIsSuppressed() {
         let pointerPosition = CGPoint(x: 240, y: 160)
-        var arbitrator = BrowserPickerHoverSelectionArbitrator()
+        var arbitrator = PointerHoverSelectionArbitrator()
 
         arbitrator.keyboardNavigationOccurred(at: pointerPosition)
         let shouldSelect = arbitrator.shouldSelectForHover(at: pointerPosition)
@@ -227,7 +227,7 @@ struct BrowserPickerHoverArbitratorTests {
     func pointerMovementRestoresHover() {
         let keyboardPosition = CGPoint(x: 240, y: 160)
         let movedPosition = CGPoint(x: 241, y: 160)
-        var arbitrator = BrowserPickerHoverSelectionArbitrator()
+        var arbitrator = PointerHoverSelectionArbitrator()
         arbitrator.keyboardNavigationOccurred(at: keyboardPosition)
         let shouldSelectAfterMoving = arbitrator.shouldSelectForHover(at: movedPosition)
         let shouldKeepSelecting = arbitrator.shouldSelectForHover(at: movedPosition)

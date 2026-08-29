@@ -18,6 +18,8 @@ struct AppDependencies {
         initialInstallationState: .missing
     )
     var allowsSystemProfileConfiguration = true
+    var screenCaptureClient = ScreenCaptureClient.inert
+    var visionURLRecognitionClient = VisionURLRecognitionClient.unavailable
 
     static let live: Self = {
         let userScriptBridge = UserScriptBridge()
@@ -38,7 +40,9 @@ struct AppDependencies {
             routingDecisionLogStore: RoutingDecisionLogStore(),
             browserProfileStore: .live(),
             preferencesStore: .live(),
-            userScriptBridge: userScriptBridge
+            userScriptBridge: userScriptBridge,
+            screenCaptureClient: .live,
+            visionURLRecognitionClient: .live
         )
     }()
 }

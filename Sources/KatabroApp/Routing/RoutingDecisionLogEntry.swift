@@ -160,6 +160,8 @@ struct RoutingDecisionLogEntry: Equatable, Identifiable, Sendable {
             "Command Line"
         case .customURL:
             "Custom URL"
+        case .screenCapture:
+            "Screen Capture"
         }
     }
 

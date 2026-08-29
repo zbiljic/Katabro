@@ -5,7 +5,7 @@ import SwiftUI
 // Compact orientation-specific controls intentionally share picker semantics.
 // swiftlint:disable file_length
 
-struct BrowserPickerHoverSelectionArbitrator: Equatable {
+struct PointerHoverSelectionArbitrator: Equatable {
     private(set) var keyboardPointerPosition: CGPoint?
 
     mutating func keyboardNavigationOccurred(at pointerPosition: CGPoint) {
@@ -45,7 +45,7 @@ struct BrowserPickerView: View {
     private var colorSchemeContrast
 
     @FocusState private var isFocused: Bool
-    @State private var hoverSelectionArbitrator = BrowserPickerHoverSelectionArbitrator()
+    @State private var hoverSelectionArbitrator = PointerHoverSelectionArbitrator()
     @State private var selectionScrollPolicy = BrowserPickerSelectionScrollPolicy()
 
     let store: BrowserPickerStore

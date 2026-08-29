@@ -5,6 +5,7 @@ public struct RoutingRequest: Hashable, Identifiable, Sendable {
         case system
         case commandLine
         case customURL
+        case screenCapture
     }
 
     public let id: UUID

@@ -291,6 +291,7 @@ struct RoutingDecisionLogStoreTests {
         (RoutingRequest.Source.system, "System"),
         (RoutingRequest.Source.commandLine, "Command Line"),
         (RoutingRequest.Source.customURL, "Custom URL"),
+        (RoutingRequest.Source.screenCapture, "Screen Capture"),
     ])
     func sourceDisplayNames(
         source: RoutingRequest.Source,
