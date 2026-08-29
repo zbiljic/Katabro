@@ -171,12 +171,13 @@ private final class AppDelegateRegistrarFake: GlobalHotKeyRegistering {
     var unregisterCount = 0
     func register(
         _: GlobalShortcut,
+        for _: GlobalHotKeyIdentifier,
         handler _: @escaping @MainActor () -> Void
     ) -> GlobalHotKeyRegistrationResult {
         .registered
     }
 
-    func unregister() {
+    func unregister(_: GlobalHotKeyIdentifier) {
         unregisterCount += 1
     }
 }

@@ -9,8 +9,26 @@ struct GlobalShortcutField: NSViewRepresentable {
     let shortcut: GlobalShortcut
     let isEnabled: Bool
     let accessibilityIdentifier: String
+    let accessibilityHelp: String
     let onChange: (GlobalShortcut) -> Void
     let onRecordingChanged: (Bool) -> Void
+
+    init(
+        shortcut: GlobalShortcut,
+        isEnabled: Bool,
+        accessibilityIdentifier: String,
+        accessibilityHelp: String = "Click, then press a shortcut with at least two modifier keys. "
+            + "Press Escape to cancel.",
+        onChange: @escaping (GlobalShortcut) -> Void,
+        onRecordingChanged: @escaping (Bool) -> Void
+    ) {
+        self.shortcut = shortcut
+        self.isEnabled = isEnabled
+        self.accessibilityIdentifier = accessibilityIdentifier
+        self.accessibilityHelp = accessibilityHelp
+        self.onChange = onChange
+        self.onRecordingChanged = onRecordingChanged
+    }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -25,9 +43,7 @@ struct GlobalShortcutField: NSViewRepresentable {
         field.isEditable = true
         field.isSelectable = true
         field.setAccessibilityLabel("Global shortcut")
-        field.setAccessibilityHelp(
-            "Click, then press a shortcut with at least two modifier keys. Press Escape to cancel."
-        )
+        field.setAccessibilityHelp(accessibilityHelp)
         field.setAccessibilityIdentifier(accessibilityIdentifier)
         update(field, with: shortcut)
         return field
@@ -36,8 +52,13 @@ struct GlobalShortcutField: NSViewRepresentable {
     func updateNSView(_ field: ShortcutTextField, context: Context) {
         context.coordinator.parent = self
         field.isEnabled = isEnabled
+        field.setAccessibilityHelp(accessibilityHelp)
         field.setAccessibilityIdentifier(accessibilityIdentifier)
         update(field, with: shortcut)
+    }
+
+    static func dismantleNSView(_ field: ShortcutTextField, coordinator: Coordinator) {
+        coordinator.stopRecording(in: field)
     }
 
     private func update(_ field: NSTextField, with shortcut: GlobalShortcut) {
@@ -92,11 +113,7 @@ struct GlobalShortcutField: NSViewRepresentable {
         }
 
         override func keyDown(with event: NSEvent) {
-            guard
-                isRecording,
-                let editor = currentEditor(),
-                window?.firstResponder === editor
-            else {
+            guard isRecording, let editor = currentEditor(), window?.firstResponder === editor else {
                 super.keyDown(with: event)
                 return
             }
@@ -104,11 +121,7 @@ struct GlobalShortcutField: NSViewRepresentable {
         }
 
         override func performKeyEquivalent(with event: NSEvent) -> Bool {
-            guard
-                isRecording,
-                let editor = currentEditor(),
-                window?.firstResponder === editor
-            else {
+            guard isRecording, let editor = currentEditor(), window?.firstResponder === editor else {
                 return super.performKeyEquivalent(with: event)
             }
             (delegate as? Coordinator)?.record(event, in: self)
@@ -120,6 +133,7 @@ struct GlobalShortcutField: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextFieldDelegate {
         var parent: GlobalShortcutField
         private var didNotifyRecording = false
+        private var keyDownMonitor: Any?
 
         init(parent: GlobalShortcutField) {
             self.parent = parent
@@ -171,11 +185,41 @@ struct GlobalShortcutField: NSViewRepresentable {
 
         func beginRecording(in field: ShortcutTextField) {
             field.beginPointerRecording()
+            installKeyDownMonitor(for: field)
             if !didNotifyRecording {
                 didNotifyRecording = true
                 parent.onRecordingChanged(true)
             }
             showRecordingPrompt(in: field)
+        }
+
+        func stopRecording(in field: ShortcutTextField) {
+            finishRecording(field)
+        }
+
+        private func installKeyDownMonitor(for field: ShortcutTextField) {
+            guard keyDownMonitor == nil else { return }
+
+            keyDownMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self, weak field] event in
+                guard
+                    let coordinator = self,
+                    let field,
+                    field.isRecording,
+                    event.window === field.window,
+                    let editor = field.currentEditor(),
+                    field.window?.firstResponder === editor
+                else {
+                    return event
+                }
+
+                if event.keyCode == 53 {
+                    coordinator.restore(field)
+                    field.window?.makeFirstResponder(nil)
+                } else {
+                    coordinator.record(event, in: field)
+                }
+                return nil
+            }
         }
 
         private func restore(_ field: NSControl) {
@@ -193,6 +237,10 @@ struct GlobalShortcutField: NSViewRepresentable {
 
         private func finishRecording(_ field: NSControl) {
             (field as? ShortcutTextField)?.endRecording()
+            if let keyDownMonitor {
+                NSEvent.removeMonitor(keyDownMonitor)
+                self.keyDownMonitor = nil
+            }
             if didNotifyRecording {
                 didNotifyRecording = false
                 parent.onRecordingChanged(false)

@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 
 // swiftlint:disable attributes is_disjoint
 
@@ -15,7 +16,16 @@ struct GlobalShortcut: Codable, Equatable, Sendable {
     let displayKey: String
     let modifiers: Modifiers
 
-    static let `default` = Self(keyCode: 7, displayKey: "X", modifiers: [.control, .command])
+    static let screenURLCaptureDefault = Self(
+        keyCode: 7,
+        displayKey: "X",
+        modifiers: [.control, .command]
+    )
+    static let openURLFromClipboardDefault = Self(
+        keyCode: 11,
+        displayKey: "B",
+        modifiers: [.control, .command]
+    )
 
     var isValid: Bool {
         modifiers.rawValue.nonzeroBitCount >= 2
@@ -26,6 +36,26 @@ struct GlobalShortcut: Codable, Equatable, Sendable {
 
     var displayValue: String {
         "\(modifiers.contains(.control) ? "⌃" : "")\(modifiers.contains(.option) ? "⌥" : "")\(modifiers.contains(.shift) ? "⇧" : "")\(modifiers.contains(.command) ? "⌘" : "")\(displayKey)"
+    }
+
+    var keyboardShortcut: KeyboardShortcut? {
+        guard displayKey.count == 1, let character = displayKey.lowercased().first else {
+            return nil
+        }
+        var eventModifiers: EventModifiers = []
+        if modifiers.contains(.command) {
+            eventModifiers.insert(.command)
+        }
+        if modifiers.contains(.option) {
+            eventModifiers.insert(.option)
+        }
+        if modifiers.contains(.control) {
+            eventModifiers.insert(.control)
+        }
+        if modifiers.contains(.shift) {
+            eventModifiers.insert(.shift)
+        }
+        return KeyboardShortcut(KeyEquivalent(character), modifiers: eventModifiers)
     }
 }
 

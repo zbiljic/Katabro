@@ -748,18 +748,25 @@
 
     @MainActor
     private final class DevelopmentGlobalHotKeyRegistrar: GlobalHotKeyRegistering {
-        private var handler: (@MainActor () -> Void)?
+        private var handlers: [GlobalHotKeyIdentifier: @MainActor () -> Void] = [:]
+        private var shortcuts: [GlobalHotKeyIdentifier: GlobalShortcut] = [:]
 
         func register(
-            _: GlobalShortcut,
+            _ shortcut: GlobalShortcut,
+            for identifier: GlobalHotKeyIdentifier,
             handler: @escaping @MainActor () -> Void
         ) -> GlobalHotKeyRegistrationResult {
-            self.handler = handler
+            if shortcuts.contains(where: { $0.key != identifier && $0.value == shortcut }) {
+                return .conflict
+            }
+            shortcuts[identifier] = shortcut
+            handlers[identifier] = handler
             return .registered
         }
 
-        func unregister() {
-            handler = nil
+        func unregister(_ identifier: GlobalHotKeyIdentifier) {
+            shortcuts.removeValue(forKey: identifier)
+            handlers.removeValue(forKey: identifier)
         }
     }
 

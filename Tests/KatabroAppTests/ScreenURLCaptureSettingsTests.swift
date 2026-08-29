@@ -37,12 +37,12 @@ struct ScreenURLCaptureSettingsTests {
             onShortcut: { calls += 1 }
         )
         settings.setEnabled(true)
-        registrar.fire()
+        registrar.fire(identifier: .screenURLCapture)
         #expect(calls == 1)
         #expect(registrar.registerCount == 1)
 
         settings.setCaptureEnabled(false)
-        registrar.fire()
+        registrar.fire(identifier: .screenURLCapture)
         #expect(!settings.isCaptureEnabled)
         #expect(settings.registrationStatus == .disabled)
         #expect(calls == 1)
@@ -63,7 +63,7 @@ struct ScreenURLCaptureSettingsTests {
         #expect(reload.shortcut == shortcut)
 
         reload.setCaptureEnabled(true)
-        reloadRegistrar.fire()
+        reloadRegistrar.fire(identifier: .screenURLCapture)
         #expect(reload.isCaptureEnabled)
         #expect(reloadRegistrar.registerCount == 1)
         #expect(calls == 2)
@@ -131,7 +131,7 @@ struct ScreenURLCaptureSettingsTests {
     @Test("invalid recorder input restores the stored shortcut and rejects raw text")
     func invalidRecorderInput() throws {
         let field = GlobalShortcutField.ShortcutTextField()
-        let shortcut = GlobalShortcut.default
+        let shortcut = GlobalShortcut.screenURLCaptureDefault
         let recorder = GlobalShortcutField(
             shortcut: shortcut,
             isEnabled: true,
@@ -204,18 +204,18 @@ struct ScreenURLCaptureSettingsTests {
             onShortcut: { calls += 1 }
         )
         settings.setEnabled(true)
-        registrar.fire()
+        registrar.fire(identifier: .screenURLCapture)
         #expect(calls == 1)
         #expect(registrar.registerCount == 1)
 
         settings.setShortcutRecording(true)
-        registrar.fire()
+        registrar.fire(identifier: .screenURLCapture)
         settings.setShortcut(settings.shortcut)
         #expect(calls == 1)
         #expect(registrar.registerCount == 1)
 
         settings.setShortcutRecording(false)
-        registrar.fire()
+        registrar.fire(identifier: .screenURLCapture)
         #expect(calls == 2)
         #expect(registrar.registerCount == 2)
         #expect(settings.registrationStatus == .registered)
@@ -237,7 +237,7 @@ struct ScreenURLCaptureSettingsTests {
             defaults: isolatedDefaults(), registrar: registrar, onShortcut: { calls += 1 }
         )
         settings.setEnabled(true)
-        registrar.fire()
+        registrar.fire(identifier: .screenURLCapture)
         #expect(calls == 1)
     }
 
@@ -273,24 +273,28 @@ private final class RegistrarFake: GlobalHotKeyRegistering {
     var registerCount = 0
     var unregisterCount = 0
     private let result: GlobalHotKeyRegistrationResult
-    private var handler: (@MainActor () -> Void)?
+    private var handlers: [GlobalHotKeyIdentifier: @MainActor () -> Void] = [:]
 
     init(result: GlobalHotKeyRegistrationResult = .registered) {
         self.result = result
     }
 
-    func register(_: GlobalShortcut, handler: @escaping @MainActor () -> Void) -> GlobalHotKeyRegistrationResult {
+    func register(
+        _: GlobalShortcut,
+        for identifier: GlobalHotKeyIdentifier,
+        handler: @escaping @MainActor () -> Void
+    ) -> GlobalHotKeyRegistrationResult {
         registerCount += 1
-        self.handler = handler
+        handlers[identifier] = handler
         return result
     }
 
-    func unregister() {
+    func unregister(_ identifier: GlobalHotKeyIdentifier) {
         unregisterCount += 1
-        handler = nil
+        handlers.removeValue(forKey: identifier)
     }
 
-    func fire() {
-        handler?()
+    func fire(identifier: GlobalHotKeyIdentifier) {
+        handlers[identifier]?()
     }
 }
