@@ -35,6 +35,10 @@ release artifacts, notarization, and an installer are not available yet.
 - Opens absolute HTTP, HTTPS, and local file URLs from the clipboard only when
   requested, without monitoring clipboard history. Clipboard managers such as
   Maccy require no special integration.
+- Captures the complete display under the pointer on demand, recognizes web URLs
+  locally with Apple Vision, and routes selected URLs through the existing
+  browser picker. Screenshots, recognized text, and detected URLs stay in memory
+  only and are not saved or sent to a service.
 - Copies the pending web or local-file link with Command-C or the destination's
   **Copy Link** context-menu action.
 
@@ -62,6 +66,20 @@ with:
 ```sh
 scripts/stop
 ```
+
+### Screen URL capture
+
+Choose **Capture URLs from Screen** from Katabro's menu to capture the display
+under the pointer. Katabro requires Screen Recording access only for that
+explicit action (or **Request Access…** in Settings), uses on-device Apple
+Vision, and lists only detected HTTP(S) URLs. Nothing from the screen capture is
+saved, copied to the pasteboard, synced, or sent over the network.
+
+In **Settings > General > Screen URL Capture**, the feature can be disabled
+completely. Disabling it removes the menu command and unregisters its optional
+device-local shortcut while preserving that shortcut for later. The shortcut
+defaults to `⌃⌘X`, is off by default, and does not request Screen Recording,
+Accessibility, or Input Monitoring access when configured.
 
 ## Set up Katabro
 
@@ -227,10 +245,12 @@ The `Katabro iCloud` scheme is the only scheme that instantiates the live iCloud
 key-value store. Both schemes compile the same synchronization implementation,
 and the default scheme exercises it through deterministic in-memory tests.
 
-## Review the interface
+## Deterministic UI review
 
 Debug builds can open deterministic review windows without reading or changing
-the real default-browser, login-item, or Launch Services state:
+the real default-browser, login-item, or Launch Services state. Screen URL
+fixtures also avoid calling ScreenCaptureKit, Vision, Carbon, or system
+permissions:
 
 ```sh
 scripts/run settings normal
@@ -245,13 +265,20 @@ scripts/run settings recent-routes light
 scripts/run settings recent-routes dark
 scripts/run settings recent-routes-empty light
 scripts/run menu normal
+scripts/run screen-urls normal light
+scripts/run screen-urls many-urls dark
+scripts/run screen-urls no-urls light
+scripts/run screen-urls screen-capture-denied dark
+scripts/run screen-urls service-errors light
+scripts/run screen-urls vision-unavailable light
 ```
 
 Available fixture states are `normal`, `loading`, `no-browsers`,
 `browser-discovery-error`, `service-errors`, `many-browsers`,
-`browser-profiles`, `script-setup`, `script-replace`, `recent-routes`, and
-`recent-routes-empty`. The optional
-appearance is `system`, `light`, or `dark`.
+`file-url`, `browser-profiles`, `script-setup`, `script-replace`,
+`recent-routes`, `recent-routes-empty`, `no-urls`, `many-urls`,
+`screen-capture-denied`, and `vision-unavailable`. The optional appearance is
+`system`, `light`, or `dark`.
 Normal `scripts/run` behavior remains menu-bar only.
 
 The `KatabroUITests` target exercises these surfaces and keeps screenshots as
