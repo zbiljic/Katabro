@@ -4,6 +4,11 @@ import Testing
 
 @Suite("Clipboard URL client")
 struct ClipboardURLClientTests {
+    struct AcceptedCase: Sendable {
+        let rawValue: String
+        let expectedAbsoluteString: String
+    }
+
     @Test("reads web URLs from string representations")
     func readsStringRepresentation() {
         withPasteboard { pasteboard in
@@ -14,6 +19,20 @@ struct ClipboardURLClientTests {
             #expect(
                 ClipboardURLClient.currentURL(in: pasteboard)
                     == URL(string: "https://example.com/string")
+            )
+        }
+    }
+
+    @Test("infers HTTPS for a domain-like string representation")
+    func infersHTTPSFromStringRepresentation() {
+        withPasteboard { pasteboard in
+            let item = NSPasteboardItem()
+            item.setString("github.com/github/gh", forType: .string)
+            #expect(pasteboard.writeObjects([item]))
+
+            #expect(
+                ClipboardURLClient.currentURL(in: pasteboard)
+                    == URL(string: "https://github.com/github/gh")
             )
         }
     }
@@ -117,25 +136,72 @@ struct ClipboardURLClientTests {
         }
     }
 
-    @Test("accepts supported absolute URLs", arguments: [
-        "https://example.com/path",
-        " http://example.com \n",
-        "file:///Users/example/document.html",
+    @Test("accepts supported clipboard URLs", arguments: [
+        AcceptedCase(
+            rawValue: "github.com/github/gh",
+            expectedAbsoluteString: "https://github.com/github/gh"
+        ),
+        AcceptedCase(
+            rawValue: " \nMiXeD.Example.COM:8443/Some/Path?Query=Value#Fragment\t ",
+            expectedAbsoluteString: "https://MiXeD.Example.COM:8443/Some/Path?Query=Value#Fragment"
+        ),
+        AcceptedCase(
+            rawValue: "127.0.0.1:8443/path",
+            expectedAbsoluteString: "https://127.0.0.1:8443/path"
+        ),
+        AcceptedCase(
+            rawValue: "[2001:db8::1]/path",
+            expectedAbsoluteString: "https://[2001:db8::1]/path"
+        ),
+        AcceptedCase(
+            rawValue: "example.xn--p1ai/path",
+            expectedAbsoluteString: "https://example.xn--p1ai/path"
+        ),
+        AcceptedCase(
+            rawValue: "example.com./path",
+            expectedAbsoluteString: "https://example.com./path"
+        ),
+        AcceptedCase(
+            rawValue: "http://example.com/path",
+            expectedAbsoluteString: "http://example.com/path"
+        ),
+        AcceptedCase(
+            rawValue: " https://example.com/path \n",
+            expectedAbsoluteString: "https://example.com/path"
+        ),
+        AcceptedCase(
+            rawValue: "file:///Users/example/document.html",
+            expectedAbsoluteString: "file:///Users/example/document.html"
+        ),
     ])
     func acceptsSupportedURL(
-        rawValue: String
+        testCase: AcceptedCase
     ) {
         #expect(
-            ClipboardURLClient.validatedURL(from: rawValue) != nil
+            ClipboardURLClient.validatedURL(from: testCase.rawValue)?.absoluteString
+                == testCase.expectedAbsoluteString
         )
     }
 
     @Test("rejects text that cannot be routed", arguments: [
         nil,
         "",
-        "example.com",
+        " \n\t ",
+        "not-a-url",
+        "docs/index.html",
+        "localhost:3000/path",
+        "intranet/path",
         "mailto:hello@example.com",
-        "not a URL",
+        "ftp://example.com/file",
+        "user@example.com/path",
+        "example..com",
+        "-example.com",
+        "example_com/path",
+        "example.123/path",
+        "256.1.1.1/path",
+        "[gggg::1]/path",
+        "[hello]/path",
+        "example.com some prose",
     ])
     func rejectsUnsupportedURL(
         rawValue: String?

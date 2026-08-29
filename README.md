@@ -32,9 +32,10 @@ release artifacts, notarization, and an installer are not available yet.
   plus exact-host rules through a user-selected folder.
 - Bundles a `katabro` command-line helper inside the application.
 - Keeps URL validation and routing policy in a portable Swift package.
-- Opens absolute HTTP, HTTPS, and local file URLs from the clipboard only when
-  requested, without monitoring clipboard history. Clipboard managers such as
-  Maccy require no special integration.
+- Opens absolute HTTP, HTTPS, and local file URLs plus unambiguous scheme-less
+  web addresses from the clipboard only when requested. Scheme-less addresses
+  open as HTTPS, without monitoring clipboard history. Clipboard managers such
+  as Maccy require no special integration.
 - Captures the complete display under the pointer on demand, recognizes web URLs
   locally with Apple Vision, and routes selected URLs through the existing
   browser picker. Screenshots, recognized text, and detected URLs stay in memory
