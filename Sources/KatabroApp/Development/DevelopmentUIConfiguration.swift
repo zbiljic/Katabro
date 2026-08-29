@@ -18,6 +18,7 @@
         case onboarding
         case picker
         case settings
+        case screenURLs = "screen-urls"
     }
 
     enum DevelopmentUIState: String, CaseIterable {
@@ -33,10 +34,14 @@
         case scriptReplace = "script-replace"
         case recentRoutes = "recent-routes"
         case recentRoutesEmpty = "recent-routes-empty"
+        case noURLs = "no-urls"
+        case manyURLs = "many-urls"
+        case screenCaptureDenied = "screen-capture-denied"
+        case visionUnavailable = "vision-unavailable"
 
         var settingsInitialPane: SettingsPane {
             switch self {
-            case .normal, .serviceErrors:
+            case .normal, .serviceErrors, .noURLs, .manyURLs, .screenCaptureDenied, .visionUnavailable:
                 .general
             case .recentRoutes, .recentRoutesEmpty:
                 .rules
@@ -186,7 +191,7 @@
                     discoveredBrowsers
                 )
             case .normal, .serviceErrors, .fileURL, .browserProfiles, .scriptSetup, .scriptReplace, .recentRoutes,
-                 .recentRoutesEmpty:
+                 .recentRoutesEmpty, .noURLs, .manyURLs, .screenCaptureDenied, .visionUnavailable:
                 discoveredBrowsers = browsers(
                     count: 4
                 )
@@ -331,8 +336,52 @@
                 ),
                 configurationFolderClient: configurationFolderClient,
                 userScriptBridge: userScriptBridge,
-                allowsSystemProfileConfiguration: state == .scriptSetup || state == .scriptReplace
+                allowsSystemProfileConfiguration: state == .scriptSetup || state == .scriptReplace,
+                screenCaptureClient: ScreenCaptureClient(
+                    authorizationStatus: { state == .screenCaptureDenied ? .notAuthorized : .authorized },
+                    requestAuthorization: { true },
+                    capture: {
+                        guard state != .serviceErrors else {
+                            throw ScreenCaptureClientError.captureFailed
+                        }
+                        return screenCaptureFixtureImage()
+                    }
+                ),
+                visionURLRecognitionClient: VisionURLRecognitionClient(
+                    isAvailable: { state != .visionUnavailable },
+                    recognizeURLs: { _ in
+                        guard state != .noURLs else { return [] }
+                        return screenURLFixtures(count: state == .manyURLs ? 12 : 3)
+                    }
+                ),
+                globalHotKeyRegistrar: DevelopmentGlobalHotKeyRegistrar()
             )
+        }
+
+        private static func screenCaptureFixtureImage() -> CGImage {
+            guard
+                let context = CGContext(
+                    data: nil,
+                    width: 1,
+                    height: 1,
+                    bitsPerComponent: 8,
+                    bytesPerRow: 4,
+                    space: CGColorSpaceCreateDeviceRGB(),
+                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                ),
+                let image = context.makeImage()
+            else {
+                preconditionFailure("Could not create the deterministic screen capture fixture")
+            }
+            return image
+        }
+
+        private static func screenURLFixtures(count: Int) -> [DetectedURL] {
+            (1 ... count).compactMap { index in
+                try? DetectedURL(
+                    destination: IncomingURL("https://screen\(index).example/path?item=\(index)")
+                )
+            }
         }
 
         private static func clipboardURL(
@@ -361,7 +410,7 @@
                     count: 12
                 )
             case .normal, .serviceErrors, .fileURL, .browserProfiles, .scriptSetup, .scriptReplace, .recentRoutes,
-                 .recentRoutesEmpty:
+                 .recentRoutesEmpty, .noURLs, .manyURLs, .screenCaptureDenied, .visionUnavailable:
                 browsers(
                     count: 4
                 )
@@ -698,6 +747,23 @@
     }
 
     @MainActor
+    private final class DevelopmentGlobalHotKeyRegistrar: GlobalHotKeyRegistering {
+        private var handler: (@MainActor () -> Void)?
+
+        func register(
+            _: GlobalShortcut,
+            handler: @escaping @MainActor () -> Void
+        ) -> GlobalHotKeyRegistrationResult {
+            self.handler = handler
+            return .registered
+        }
+
+        func unregister() {
+            handler = nil
+        }
+    }
+
+    @MainActor
     private struct DevelopmentRoutingErrorPresenter: RoutingErrorPresenting {
         func present(
             _: any Error
@@ -724,14 +790,16 @@
             self.clipboardURLSnapshotStore = clipboardURLSnapshotStore
             self.onboardingCoordinator = onboardingCoordinator
             self.pickerCoordinator = pickerCoordinator
-            _screenURLCaptureSettings = State(
-                initialValue: ScreenURLCaptureSettings(
-                    defaults: screenURLDefaults(for: configuration),
-                    registrar: dependencies.globalHotKeyRegistrar,
-                    screenCaptureClient: dependencies.screenCaptureClient,
-                    isCaptureAvailable: dependencies.visionURLRecognitionClient.isAvailable()
-                )
+            let screenURLCaptureSettings = ScreenURLCaptureSettings(
+                defaults: screenURLDefaults(for: configuration),
+                registrar: dependencies.globalHotKeyRegistrar,
+                screenCaptureClient: dependencies.screenCaptureClient,
+                isCaptureAvailable: dependencies.visionURLRecognitionClient.isAvailable()
             )
+            if configuration.surface == .menu, configuration.state == .normal {
+                screenURLCaptureSettings.setEnabled(true)
+            }
+            _screenURLCaptureSettings = State(initialValue: screenURLCaptureSettings)
         }
 
         var body: some View {
@@ -780,6 +848,8 @@
                     )
                     .padding(12)
                     .frame(width: 280)
+                case .screenURLs:
+                    DevelopmentScreenURLReviewView(state: configuration.state)
                 }
             }
             .preferredColorScheme(
@@ -886,6 +956,60 @@
         ) {
             selectedBrowserName = target.displayName
             selectionCount += 1
+        }
+    }
+
+    private struct DevelopmentScreenURLReviewView: View {
+        @State private var selectionCount = 0
+        @State private var cancellationCount = 0
+        @State private var selectedReceipt = "No selection"
+        @State private var didSelect = false
+        @State private var didCancel = false
+        let store: ScreenURLPickerStore
+
+        init(state: DevelopmentUIState) {
+            let urls = Self.urls(count: state == .manyURLs ? 12 : 3)
+            let pickerState: ScreenURLPickerStore.State = switch state {
+            case .loading: .loading
+            case .noURLs: .empty
+            case .screenCaptureDenied: .permissionRequired
+            case .visionUnavailable: .visionUnavailable
+            case .serviceErrors: .captureFailed
+            default: .results(urls)
+            }
+            store = ScreenURLPickerStore(state: pickerState)
+        }
+
+        var body: some View {
+            VStack(spacing: 4) {
+                ScreenURLPickerView(
+                    store: store,
+                    onSelect: { selection in
+                        guard !didSelect else { return }
+                        didSelect = true
+                        selectionCount += 1
+                        selectedReceipt = switch selection {
+                        case let .url(index): "URL \(index + 1)"
+                        case .all: "Open all"
+                        }
+                    },
+                    onCancel: {
+                        guard !didCancel else { return }
+                        didCancel = true
+                        cancellationCount += 1
+                    }
+                )
+                Text("Selections: \(selectionCount) — \(selectedReceipt)")
+                    .accessibilityIdentifier(AccessibilityIdentifier.screenURLSelectionReceipt)
+                Text("Cancellations: \(cancellationCount)")
+                    .accessibilityIdentifier(AccessibilityIdentifier.screenURLCancellationReceipt)
+            }
+        }
+
+        private static func urls(count: Int) -> [DetectedURL] {
+            (1 ... count).compactMap { index in
+                try? DetectedURL(destination: IncomingURL("https://screen\(index).example/path?item=\(index)"))
+            }
         }
     }
 
@@ -1013,6 +1137,11 @@
                 return NSSize(
                     width: 300,
                     height: 320
+                )
+            case .screenURLs:
+                return NSSize(
+                    width: 460,
+                    height: 430
                 )
             }
         }

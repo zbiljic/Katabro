@@ -1,4 +1,5 @@
 #if DEBUG
+    import KatabroCore
     import SwiftUI
 
     #Preview("Settings — General Normal") {
@@ -127,6 +128,25 @@
             onCopyLink: {},
             onCancel: {}
         )
+    }
+
+    #Preview("Screen URLs — Normal") { screenURLsPreview(.results(screenURLs(count: 3))) }
+    #Preview("Screen URLs — Loading") { screenURLsPreview(.loading) }
+    #Preview("Screen URLs — Empty") { screenURLsPreview(.empty) }
+    #Preview("Screen URLs — Permission") { screenURLsPreview(.permissionRequired) }
+    #Preview("Screen URLs — Error") { screenURLsPreview(.captureFailed) }
+    #Preview("Screen URLs — Many") { screenURLsPreview(.results(screenURLs(count: 12))) }
+
+    @MainActor
+    private func screenURLsPreview(_ state: ScreenURLPickerStore.State) -> some View {
+        ScreenURLPickerView(store: ScreenURLPickerStore(state: state), onSelect: { _ in }, onCancel: {})
+            .padding()
+    }
+
+    private func screenURLs(count: Int) -> [DetectedURL] {
+        (1 ... count).compactMap { index in
+            try? DetectedURL(destination: IncomingURL("https://preview\(index).example/path"))
+        }
     }
 
     @MainActor

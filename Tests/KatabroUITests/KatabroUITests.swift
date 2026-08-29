@@ -9,6 +9,215 @@ final class KatabroUITests: XCTestCase {
     }
 
     @MainActor
+    func testScreenURLPickerStates() {
+        let expected = [
+            ("normal", "screen-url-picker.open-all", "Open all 3 URLs"),
+            ("loading", "screen-url-picker.loading-state", "URLs Found on Screen"),
+            ("no-urls", "screen-url-picker.empty-state", "No Web URLs Found"),
+            ("screen-capture-denied", "screen-url-picker.permission-state", "Screen Recording Access Required"),
+            ("service-errors", "screen-url-picker.capture-failure-state", "Couldn’t Capture Screen"),
+            (
+                "vision-unavailable",
+                "screen-url-picker.vision-unavailable-state",
+                "On-device Text Recognition Unavailable"
+            ),
+        ]
+        for appearance in ["light", "dark"] {
+            for (state, identifier, title) in expected {
+                let application = launch(surface: "screen-urls", state: state, appearance: appearance)
+                assertExists(application.descendants(matching: .any)["screen-url-picker"])
+                assertExists(application.descendants(matching: .any)[identifier])
+                if state == "normal" {
+                    let openAll = application.descendants(matching: .any)["screen-url-picker.open-all"]
+                    assertExists(openAll)
+                    XCTAssertEqual(openAll.label, "Open all 3 detected URLs")
+                } else if state == "screen-capture-denied" {
+                    XCTAssertTrue(application.staticTexts[title].exists)
+                    assertExists(application.buttons["screen-url-picker.open-system-settings"])
+                } else {
+                    XCTAssertTrue(application.staticTexts[title].exists)
+                }
+                XCTAssertTrue(application.staticTexts["Esc Cancel"].exists)
+                XCTAssertTrue(application.staticTexts["↑↓ Select"].exists)
+                XCTAssertTrue(application.staticTexts["↩ Open"].exists)
+                XCTAssertLessThan(
+                    application.staticTexts["Esc Cancel"].frame.minX,
+                    application.staticTexts["↑↓ Select"].frame.minX
+                )
+                XCTAssertLessThan(
+                    application.staticTexts["↑↓ Select"].frame.minX,
+                    application.staticTexts["↩ Open"].frame.minX
+                )
+                attachScreenshot(named: "Screen-URLs-\(state)-\(appearance)", from: application)
+                application.terminate()
+            }
+        }
+    }
+
+    @MainActor
+    func testScreenURLPickerShortcutPresentation() {
+        for appearance in ["light", "dark"] {
+            let many = launch(surface: "screen-urls", state: "many-urls", appearance: appearance)
+            let scroll = many.scrollViews.firstMatch
+            assertExists(scroll)
+            many.typeKey(.downArrow, modifierFlags: [])
+            many.typeKey(.return, modifierFlags: [])
+            let receipt = many.staticTexts["screen-url-picker.selection-receipt"]
+            assertExists(receipt)
+            XCTAssertTrue((receipt.value as? String)?.hasPrefix("Selections: 1 — URL ") == true)
+            attachScreenshot(named: "Screen-URLs-many-urls-\(appearance)", from: many)
+            assertManyURLShortcutPresentation(in: many, scroll: scroll)
+            assertExists(many.descendants(matching: .any)["screen-url-picker.open-all"])
+            many.terminate()
+        }
+    }
+
+    @MainActor
+    func testScreenURLPickerKeyboardSelection() {
+        for key in 1 ... 9 {
+            let application = launch(surface: "screen-urls", state: "many-urls")
+            assertExists(application.descendants(matching: .any)["screen-url-picker"].firstMatch)
+            application.typeText("\(key)")
+            assertReceipt(
+                application.staticTexts["screen-url-picker.selection-receipt"],
+                equals: "Selections: 1 — URL \(key)"
+            )
+            application.typeText("\(key)")
+            assertReceipt(
+                application.staticTexts["screen-url-picker.selection-receipt"],
+                equals: "Selections: 1 — URL \(key)"
+            )
+            application.terminate()
+        }
+
+        var application = launch(surface: "screen-urls", state: "normal")
+        application.typeKey(.downArrow, modifierFlags: [])
+        XCTAssertTrue(application.descendants(matching: .any)["screen-url-picker.row.1"].isSelected)
+        application.typeKey(.upArrow, modifierFlags: [])
+        XCTAssertTrue(application.descendants(matching: .any)["screen-url-picker.row.0"].isSelected)
+        application.typeKey(.downArrow, modifierFlags: [])
+        application.typeKey(.space, modifierFlags: [])
+        assertReceipt(application.staticTexts["screen-url-picker.selection-receipt"], equals: "Selections: 1 — URL 2")
+        application.typeKey(.space, modifierFlags: [])
+        assertReceipt(application.staticTexts["screen-url-picker.selection-receipt"], equals: "Selections: 1 — URL 2")
+        application.terminate()
+
+        application = launch(surface: "screen-urls", state: "normal")
+        assertExists(application.descendants(matching: .any)["screen-url-picker"].firstMatch)
+        application.typeText("0")
+        XCTAssertEqual(
+            application.staticTexts["screen-url-picker.selection-receipt"].value as? String,
+            "Selections: 0 — No selection"
+        )
+        XCTAssertEqual(
+            application.descendants(matching: .any)["screen-url-picker.open-all"].value as? String,
+            "Selected"
+        )
+        application.typeKey(.return, modifierFlags: [])
+        assertReceipt(
+            application.staticTexts["screen-url-picker.selection-receipt"],
+            equals: "Selections: 1 — Open all"
+        )
+        application.typeKey(.return, modifierFlags: [])
+        assertReceipt(
+            application.staticTexts["screen-url-picker.selection-receipt"],
+            equals: "Selections: 1 — Open all"
+        )
+        application.typeKey(.escape, modifierFlags: [])
+        application.typeKey(.escape, modifierFlags: [])
+        assertReceipt(application.staticTexts["screen-url-picker.cancellation-receipt"], equals: "Cancellations: 1")
+        application.terminate()
+    }
+
+    @MainActor
+    func testScreenURLPickerKeyboardSelectionWinsUntilPointerMoves() {
+        let application = launch(surface: "screen-urls", state: "many-urls")
+        defer { application.terminate() }
+        let firstRow = application.descendants(matching: .any)["screen-url-picker.row.0"]
+        let scroll = application.scrollViews.firstMatch
+        assertExists(firstRow)
+        assertExists(scroll)
+        makeHittable(firstRow, in: scroll, scrolling: .down)
+        application.staticTexts["URLs Found on Screen"].hover()
+        firstRow.hover()
+        assertSelected(firstRow)
+
+        for index in 1 ... 8 {
+            application.typeKey(.downArrow, modifierFlags: [])
+            assertSelected(application.descendants(matching: .any)["screen-url-picker.row.\(index)"])
+        }
+
+        let ninthRow = application.descendants(matching: .any)["screen-url-picker.row.8"]
+        assertExists(ninthRow)
+        XCTAssertTrue(ninthRow.isHittable)
+        assertSelected(ninthRow)
+        assertRemainsSelected(ninthRow)
+
+        let movedPointerTarget = application.descendants(matching: .any)["screen-url-picker.open-all"]
+        assertExists(movedPointerTarget)
+        XCTAssertTrue(movedPointerTarget.isHittable)
+        movedPointerTarget.hover()
+        assertSelected(movedPointerTarget)
+        XCTAssertFalse(ninthRow.isSelected)
+    }
+
+    @MainActor
+    func testScreenURLSettings() {
+        let preferencesSuite = "KatabroUITests.screen-url-capture.\(UUID().uuidString)"
+        var application = launch(
+            surface: "settings",
+            state: "normal",
+            appearance: "light",
+            preferencesSuite: preferencesSuite,
+            resetsPreferences: true
+        )
+        defer { application.terminate() }
+        let form = application.scrollViews["settings.general.form"]
+        assertExists(form)
+        let captureToggle = application.descendants(matching: .any)[
+            "settings.screen-url-capture.toggle"
+        ].firstMatch
+        let toggle = application.descendants(matching: .any)["settings.screen-url-capture.shortcut-toggle"].firstMatch
+        for _ in 0 ..< 4 where !captureToggle.exists || !toggle.exists {
+            form.swipeUp()
+        }
+        assertExists(captureToggle)
+        XCTAssertTrue(isControlOn(captureToggle))
+        assertExists(toggle)
+        makeHittable(toggle, in: form, scrolling: .up)
+        XCTAssertFalse(isControlOn(toggle))
+        toggle.click()
+        XCTAssertTrue(isControlOn(toggle))
+        let status = application.descendants(matching: .any)["settings.screen-url-capture.shortcut-status"]
+        assertExists(status)
+        XCTAssertEqual(status.value as? String, "Global shortcut is registered.")
+        let recorder = application.descendants(matching: .any)["settings.screen-url-capture.shortcut-field"]
+        assertExists(recorder)
+        recorder.click()
+        XCTAssertEqual(shortcutValue(recorder), "Press keys")
+        attachScreenshot(named: "Settings-screen-URL-shortcut-recording", from: application)
+        recorder.typeKey(.delete, modifierFlags: [])
+        XCTAssertEqual(shortcutValue(recorder), "Press keys")
+        recorder.typeKey("x", modifierFlags: [.control, .command])
+        XCTAssertEqual(shortcutValue(recorder), "⌃⌘X")
+        recorder.click()
+        recorder.typeKey("c", modifierFlags: [.command, .option])
+        XCTAssertEqual(shortcutValue(recorder), "⌥⌘C")
+        recorder.click()
+        XCTAssertEqual(shortcutValue(recorder), "Press keys")
+        recorder.typeKey(.escape, modifierFlags: [])
+        XCTAssertEqual(shortcutValue(recorder), "⌥⌘C")
+        XCTAssertEqual(status.value as? String, "Global shortcut is registered.")
+        XCTAssertFalse(application.alerts.firstMatch.exists)
+        attachScreenshot(named: "Settings-screen-URL-shortcut-enabled", from: application)
+        verifyCaptureFeatureSwitch(
+            in: &application,
+            preferencesSuite: preferencesSuite
+        )
+        verifyCapturePermissionAndAvailabilityStates(in: &application)
+    }
+
+    @MainActor
     func testSettingsNormalState() {
         let application = launch(
             surface: "settings",
@@ -136,6 +345,20 @@ final class KatabroUITests: XCTestCase {
         assertExists(
             application.buttons["menu.settings"]
         )
+        let capture = application.buttons["menu.capture-screen-urls"]
+        assertExists(capture)
+        XCTAssertEqual(capture.value as? String, "⌃⌘X")
+
+        let statusItem = application.statusItems.firstMatch
+        assertExists(statusItem)
+        statusItem.click()
+        let statusMenu = statusItem.menus.firstMatch
+        assertExists(statusMenu)
+        let statusCapture = statusMenu.descendants(matching: .any)["Capture URLs from Screen"]
+        assertExists(statusCapture)
+        attachScreenshot(named: "Menu-ready-shortcut-enabled", from: application)
+        application.typeKey(.escape, modifierFlags: [])
+
         assertExists(
             application.descendants(matching: .any)["menu.more"]
         )
@@ -160,6 +383,56 @@ final class KatabroUITests: XCTestCase {
         assertExists(
             application.scrollViews["settings.rules.form"]
         )
+    }
+
+    @MainActor
+    func testMenuSourceActionsLightAndDark() {
+        for appearance in ["light", "dark"] {
+            let application = launch(
+                surface: "menu",
+                state: "normal",
+                appearance: appearance
+            )
+            assertExists(application.buttons["menu.open-url-from-clipboard"])
+            assertExists(application.buttons["menu.capture-screen-urls"])
+            attachScreenshot(named: "Menu-source-actions-\(appearance)", from: application)
+            application.terminate()
+        }
+    }
+
+    @MainActor
+    func testMenuCapturePresentsFirstWindow() {
+        let application = launch(surface: "menu", state: "normal")
+        defer { application.terminate() }
+
+        let reviewWindow = application.windows["Katabro UI Review — Menu"]
+        assertExists(reviewWindow)
+        application.typeKey("w", modifierFlags: [.command])
+        assertDoesNotExist(reviewWindow)
+
+        XCUIApplication(bundleIdentifier: "com.apple.finder").activate()
+
+        let statusItem = application.statusItems.firstMatch
+        assertExists(statusItem)
+        statusItem.click()
+        let statusCapture = statusItem.menus.firstMatch.descendants(matching: .any)[
+            "Capture URLs from Screen"
+        ]
+        assertExists(statusCapture)
+        statusCapture.click()
+
+        let screenURLPicker = application.descendants(matching: .any)["screen-url-picker"].firstMatch
+        assertExists(screenURLPicker)
+        XCTAssertTrue(screenURLPicker.isHittable)
+        for index in 0 ..< 3 {
+            assertExists(
+                application.descendants(matching: .any)[
+                    "screen-url-picker.row.\(index)"
+                ]
+            )
+        }
+        attachScreenshot(named: "Menu-capture-first-window", from: application)
+        application.typeKey(.escape, modifierFlags: [])
     }
 
     @MainActor
@@ -930,6 +1203,7 @@ extension KatabroUITests {
             ]
             assertExists(exactRuleRemove)
             assertExists(replaceRuleRemove)
+            application.activate()
             XCTAssertTrue(exactRuleRemove.isHittable)
             XCTAssertTrue(replaceRuleRemove.isHittable)
             assertExists(
@@ -1021,6 +1295,7 @@ extension KatabroUITests {
         ]
         assertExists(clear)
         XCTAssertEqual(clear.elementType, .button)
+        application.activate()
         XCTAssertTrue(clear.isHittable)
         clear.click()
         assertExists(
@@ -1536,6 +1811,7 @@ extension KatabroUITests {
         XCTAssertEqual(destination.value as? String, fullURL)
         XCTAssertEqual(remember.label, "Remember for documentation.preview.long-subdomain.example.com")
         XCTAssertTrue(firstTarget.isSelected)
+        application.activate()
         XCTAssertTrue(firstTarget.isHittable)
         XCTAssertLessThanOrEqual(firstTarget.frame.minY, scrollArea.frame.minY + 2)
         for _ in 0 ..< 10 {
@@ -1543,12 +1819,14 @@ extension KatabroUITests {
         }
         assertExists(lateTarget)
         XCTAssertTrue(lateTarget.isSelected)
+        application.activate()
         XCTAssertTrue(lateTarget.isHittable)
         application.typeKey(.return, modifierFlags: [])
         assertReceipt(receipt, equals: "DuckDuckGo Privacy Browser — Long Name Fixture selected 1 time")
         application.typeKey(.downArrow, modifierFlags: [])
         application.typeKey(.downArrow, modifierFlags: [])
         XCTAssertTrue(firstTarget.isSelected)
+        application.activate()
         XCTAssertTrue(firstTarget.isHittable)
         XCTAssertEqual(receipt.value as? String, "DuckDuckGo Privacy Browser — Long Name Fixture selected 1 time")
     }
@@ -2086,6 +2364,105 @@ private extension KatabroUITests {
     }
 
     @MainActor
+    func assertManyURLShortcutPresentation(in application: XCUIApplication, scroll: XCUIElement) {
+        let ninthRow = application.descendants(matching: .any)["screen-url-picker.row.8"]
+        let tenthRow = application.descendants(matching: .any)["screen-url-picker.row.9"]
+        for _ in 0 ..< 3 where !tenthRow.exists {
+            scroll.swipeUp()
+        }
+        assertExists(ninthRow)
+        assertExists(tenthRow)
+        let ninthShortcut = application.descendants(matching: .any)["screen-url-picker.shortcut.8"]
+        assertExists(ninthShortcut)
+        XCTAssertEqual(ninthShortcut.label, "Keyboard shortcut 9")
+        XCTAssertEqual(ninthShortcut.frame.midY, ninthRow.frame.midY, accuracy: 1)
+        assertDoesNotExist(application.descendants(matching: .any)["screen-url-picker.shortcut.9"])
+    }
+
+    @MainActor
+    func verifyCaptureFeatureSwitch(
+        in application: inout XCUIApplication,
+        preferencesSuite: String
+    ) {
+        var form = application.scrollViews["settings.general.form"]
+        var captureToggle = application.descendants(matching: .any)["settings.screen-url-capture.toggle"].firstMatch
+        makeHittable(captureToggle, in: form, scrolling: .down)
+        captureToggle.click()
+        XCTAssertFalse(isControlOn(captureToggle))
+        assertDoesNotExist(
+            application.descendants(matching: .any)["settings.screen-url-capture.shortcut-toggle"]
+        )
+        assertDoesNotExist(
+            application.descendants(matching: .any)["settings.screen-url-capture.shortcut-field"]
+        )
+        assertDoesNotExist(
+            application.descendants(matching: .any)["settings.screen-url-capture.shortcut-status"]
+        )
+        assertDoesNotExist(
+            application.descendants(matching: .any)["settings.screen-url-capture.permission-authorized-status"]
+        )
+        attachScreenshot(named: "Settings-screen-URL-capture-disabled", from: application)
+
+        application.terminate()
+        application = launch(surface: "menu", state: "normal", preferencesSuite: preferencesSuite)
+        assertDoesNotExist(application.buttons["menu.capture-screen-urls"])
+        attachScreenshot(named: "Menu-screen-URL-capture-disabled", from: application)
+
+        application.terminate()
+        application = launch(surface: "settings", state: "normal", preferencesSuite: preferencesSuite)
+        form = application.scrollViews["settings.general.form"]
+        assertExists(form)
+        captureToggle = application.descendants(matching: .any)["settings.screen-url-capture.toggle"].firstMatch
+        for _ in 0 ..< 4 where !captureToggle.exists {
+            form.swipeUp()
+        }
+        assertExists(captureToggle)
+        XCTAssertFalse(isControlOn(captureToggle))
+        captureToggle.click()
+        XCTAssertTrue(isControlOn(captureToggle))
+        let shortcutToggle = application.descendants(matching: .any)[
+            "settings.screen-url-capture.shortcut-toggle"
+        ].firstMatch
+        let recorder = application.descendants(matching: .any)["settings.screen-url-capture.shortcut-field"]
+        assertExists(shortcutToggle)
+        XCTAssertTrue(isControlOn(shortcutToggle))
+        assertExists(recorder)
+        XCTAssertEqual(shortcutValue(recorder), "⌥⌘C")
+    }
+
+    @MainActor
+    func verifyCapturePermissionAndAvailabilityStates(in application: inout XCUIApplication) {
+        application.terminate()
+        application = launch(surface: "settings", state: "screen-capture-denied")
+        var form = application.scrollViews["settings.general.form"]
+        assertExists(form)
+        let requestAccess = application.buttons["settings.screen-url-capture.request-access"]
+        let openSettings = application.buttons["settings.screen-url-capture.open-system-settings"]
+        for _ in 0 ..< 4 where !openSettings.exists {
+            form.swipeUp()
+        }
+        assertExists(requestAccess)
+        assertExists(openSettings)
+        attachScreenshot(named: "Settings-screen-URL-permission-required", from: application)
+
+        application.terminate()
+        application = launch(surface: "settings", state: "vision-unavailable")
+        form = application.scrollViews["settings.general.form"]
+        assertExists(form)
+        let captureToggle = application.descendants(matching: .any)["settings.screen-url-capture.toggle"].firstMatch
+        for _ in 0 ..< 4 where !captureToggle.exists {
+            form.swipeUp()
+        }
+        assertExists(captureToggle)
+        XCTAssertFalse(captureToggle.isEnabled)
+        assertExists(application.staticTexts["settings.screen-url-capture.unavailable"])
+        assertDoesNotExist(
+            application.descendants(matching: .any)["settings.screen-url-capture.shortcut-toggle"]
+        )
+        attachScreenshot(named: "Settings-screen-URL-capture-unavailable", from: application)
+    }
+
+    @MainActor
     func enterShortcut(
         _ value: String,
         in shortcutField: XCUIElement
@@ -2190,6 +2567,24 @@ private extension KatabroUITests {
         )
         XCTAssertEqual(
             XCTWaiter.wait(for: [expectation], timeout: 5),
+            .completed,
+            message
+        )
+    }
+
+    @MainActor
+    func assertRemainsSelected(
+        _ element: XCUIElement,
+        duration: TimeInterval = 1,
+        message: String = "Expected UI element to remain selected"
+    ) {
+        let expectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "selected == false"),
+            object: element
+        )
+        expectation.isInverted = true
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [expectation], timeout: duration),
             .completed,
             message
         )

@@ -14,12 +14,13 @@ Usage:
   scripts/run <surface> [state] [appearance]
 
 UI review surfaces:
-  settings | onboarding | picker | menu
+  settings | onboarding | picker | menu | screen-urls
 
 Fixture states:
   normal | loading | no-browsers | browser-discovery-error
   service-errors | many-browsers | file-url | browser-profiles | script-setup | script-replace
   recent-routes | recent-routes-empty
+  no-urls | many-urls | screen-capture-denied | vision-unavailable
 
 Appearances:
   system | light | dark
@@ -43,7 +44,7 @@ if test -z "$surface"; then
 fi
 
 case "$surface" in
-    settings | onboarding | picker | menu)
+    settings | onboarding | picker | menu | screen-urls)
         ;;
     *)
         echo "Unknown UI review surface: $surface" >&2
@@ -54,7 +55,7 @@ esac
 state=${2:-normal}
 
 case "$state" in
-    normal | loading | no-browsers | browser-discovery-error | service-errors | many-browsers | file-url | browser-profiles | script-setup | script-replace | recent-routes | recent-routes-empty)
+    normal | loading | no-browsers | browser-discovery-error | service-errors | many-browsers | file-url | browser-profiles | script-setup | script-replace | recent-routes | recent-routes-empty | no-urls | many-urls | screen-capture-denied | vision-unavailable)
         ;;
     *)
         echo "Unknown UI fixture state: $state" >&2
