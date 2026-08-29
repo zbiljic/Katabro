@@ -3,7 +3,7 @@ import Foundation
 @testable import Katabro
 import Testing
 
-// swiftlint:disable force_unwrapping trailing_closure
+// swiftlint:disable force_unwrapping
 
 @MainActor
 @Suite("Global shortcut settings")
@@ -15,6 +15,7 @@ struct GlobalShortcutSettingsTests {
         #expect(!settings.isEnabled)
         #expect(settings.shortcut == .openURLFromClipboardDefault)
         #expect(settings.registrationStatus == .disabled)
+        #expect(settings.registeredDisplayValue.isEmpty)
     }
 
     @Test("enables, changes, persists, and disables one registration")
@@ -27,6 +28,7 @@ struct GlobalShortcutSettingsTests {
         settings.setEnabled(true)
         #expect(registrar.registeredIdentifiers == [.openURLFromClipboard])
         #expect(settings.registrationStatus == .registered)
+        #expect(settings.registeredDisplayValue == "⌃⌘B")
 
         settings.setShortcut(replacement)
         #expect(registrar.shortcuts[.openURLFromClipboard] == replacement)
@@ -53,11 +55,13 @@ struct GlobalShortcutSettingsTests {
         settings.setEnabled(true)
         #expect(settings.registrationStatus == .conflict)
         #expect(settings.shortcut == original)
+        #expect(settings.registeredDisplayValue.isEmpty)
 
         registrar.forcedResult = .failed
         settings.setShortcut(.init(keyCode: 8, displayKey: "C", modifiers: [.command, .option]))
         #expect(settings.registrationStatus == .failed)
         #expect(settings.shortcut.displayKey == "C")
+        #expect(settings.registeredDisplayValue.isEmpty)
     }
 
     @Test("recording suspends and restores only its command")
@@ -137,19 +141,30 @@ struct GlobalShortcutSettingsTests {
         field.beginPointerRecording()
         recorder.beginRecording(in: field)
         let invalid = try #require(NSEvent.keyEvent(
-            with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
-            windowNumber: 0, context: nil, characters: "x", charactersIgnoringModifiers: "x",
-            isARepeat: false, keyCode: 7
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: "x",
+            charactersIgnoringModifiers: "x",
+            isARepeat: false,
+            keyCode: 7
         ))
 
         recorder.record(invalid, in: field)
         #expect(field.stringValue == GlobalShortcutField.recordingPrompt)
         #expect(!recorder.control(
-            field, textView: NSTextView(),
-            shouldChangeCharactersIn: NSRange(location: 0, length: 0), replacementString: "z"
+            field,
+            textView: NSTextView(),
+            shouldChangeCharactersIn: NSRange(location: 0, length: 0),
+            replacementString: "z"
         ))
         #expect(recorder.control(
-            field, textView: NSTextView(), doCommandBy: #selector(NSResponder.cancelOperation(_:))
+            field,
+            textView: NSTextView(),
+            doCommandBy: #selector(NSResponder.cancelOperation(_:))
         ))
         #expect(field.stringValue == shortcut.displayValue)
         #expect(!field.isRecording)
@@ -256,4 +271,4 @@ final class KeyedRegistrarFake: GlobalHotKeyRegistering {
     }
 }
 
-// swiftlint:enable force_unwrapping trailing_closure
+// swiftlint:enable force_unwrapping

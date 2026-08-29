@@ -161,6 +161,98 @@ final class KatabroUITests: XCTestCase {
         XCTAssertFalse(ninthRow.isSelected)
     }
 
+    // swiftlint:disable function_body_length
+    @MainActor
+    func testClipboardURLShortcutSettings() {
+        let preferencesSuite = "KatabroUITests.clipboard-shortcut.\(UUID().uuidString)"
+        var application = launch(
+            surface: "settings",
+            state: "normal",
+            appearance: "light",
+            preferencesSuite: preferencesSuite,
+            resetsPreferences: true
+        )
+        defer { application.terminate() }
+        var form = application.scrollViews["settings.general.form"]
+        assertExists(form)
+        var toggle = application.descendants(matching: .any)[
+            "settings.clipboard-url.shortcut-toggle"
+        ].firstMatch
+        var recorder = application.descendants(matching: .any)[
+            "settings.clipboard-url.shortcut-field"
+        ].firstMatch
+        assertExists(toggle)
+        assertExists(recorder)
+        XCTAssertFalse(isControlOn(toggle))
+        XCTAssertEqual(shortcutValue(recorder), "⌃⌘B")
+        toggle.click()
+        XCTAssertTrue(isControlOn(toggle))
+        var status = application.descendants(matching: .any)[
+            "settings.clipboard-url.shortcut-status"
+        ].firstMatch
+        assertExists(status)
+        XCTAssertEqual(status.value as? String, "Global shortcut is registered.")
+
+        let screenToggle = application.descendants(matching: .any)[
+            "settings.screen-url-capture.shortcut-toggle"
+        ].firstMatch
+        for _ in 0 ..< 4 where !screenToggle.exists {
+            form.swipeUp()
+        }
+        assertExists(screenToggle)
+        makeHittable(screenToggle, in: form, scrolling: .up)
+        screenToggle.click()
+        XCTAssertTrue(isControlOn(screenToggle))
+
+        makeHittable(recorder, in: form, scrolling: .down)
+        recorder.click()
+        XCTAssertEqual(shortcutValue(recorder), "Press keys")
+        recorder.typeKey(.delete, modifierFlags: [])
+        XCTAssertEqual(shortcutValue(recorder), "Press keys")
+        recorder.typeKey("x", modifierFlags: [.control, .command])
+        XCTAssertEqual(shortcutValue(recorder), "⌃⌘X")
+        status = application.descendants(matching: .any)[
+            "settings.clipboard-url.shortcut-status"
+        ].firstMatch
+        XCTAssertEqual(
+            status.value as? String,
+            "This shortcut is already in use by another app or Katabro command."
+        )
+
+        recorder.click()
+        recorder.typeKey("b", modifierFlags: [.control, .command])
+        XCTAssertEqual(shortcutValue(recorder), "⌃⌘B")
+        XCTAssertEqual(status.value as? String, "Global shortcut is registered.")
+        recorder.click()
+        recorder.typeKey(.escape, modifierFlags: [])
+        XCTAssertEqual(shortcutValue(recorder), "⌃⌘B")
+        XCTAssertFalse(application.alerts.firstMatch.exists)
+        attachScreenshot(named: "Settings-clipboard-shortcut-enabled", from: application)
+
+        application.terminate()
+        application = launch(
+            surface: "settings",
+            state: "normal",
+            appearance: "dark",
+            preferencesSuite: preferencesSuite
+        )
+        form = application.scrollViews["settings.general.form"]
+        toggle = application.descendants(matching: .any)[
+            "settings.clipboard-url.shortcut-toggle"
+        ].firstMatch
+        recorder = application.descendants(matching: .any)[
+            "settings.clipboard-url.shortcut-field"
+        ].firstMatch
+        assertExists(form)
+        assertExists(toggle)
+        assertExists(recorder)
+        XCTAssertTrue(isControlOn(toggle))
+        XCTAssertEqual(shortcutValue(recorder), "⌃⌘B")
+        attachScreenshot(named: "Settings-clipboard-shortcut-persisted-dark", from: application)
+    }
+
+    // swiftlint:enable function_body_length
+
     @MainActor
     func testScreenURLSettings() {
         let preferencesSuite = "KatabroUITests.screen-url-capture.\(UUID().uuidString)"
@@ -320,6 +412,7 @@ final class KatabroUITests: XCTestCase {
         )
     }
 
+    // swiftlint:disable function_body_length
     @MainActor
     func testMenuReadyState() {
         let application = launch(
@@ -332,6 +425,10 @@ final class KatabroUITests: XCTestCase {
 
         assertExists(
             application.buttons["menu.open-url-from-clipboard"]
+        )
+        XCTAssertEqual(
+            application.buttons["menu.open-url-from-clipboard"].value as? String,
+            "⌃⌘B"
         )
         let clipboardPreview = application.staticTexts["menu.clipboard-url-preview"]
         assertExists(clipboardPreview)
@@ -355,7 +452,11 @@ final class KatabroUITests: XCTestCase {
         let statusMenu = statusItem.menus.firstMatch
         assertExists(statusMenu)
         let statusCapture = statusMenu.descendants(matching: .any)["Capture URLs from Screen"]
+        let statusClipboard = statusMenu.descendants(matching: .any)["Open URL from Clipboard"]
+        assertExists(statusClipboard)
         assertExists(statusCapture)
+        // XCTest exposes native menu items, but not their shortcut-column glyph values.
+        // The attached screenshot and manual visual review own that platform assertion.
         attachScreenshot(named: "Menu-ready-shortcut-enabled", from: application)
         application.typeKey(.escape, modifierFlags: [])
 
@@ -384,6 +485,8 @@ final class KatabroUITests: XCTestCase {
             application.scrollViews["settings.rules.form"]
         )
     }
+
+    // swiftlint:enable function_body_length
 
     @MainActor
     func testMenuSourceActionsLightAndDark() {

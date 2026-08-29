@@ -1,4 +1,3 @@
-import AppKit
 import Foundation
 @testable import Katabro
 import Testing
@@ -126,99 +125,6 @@ struct ScreenURLCaptureSettingsTests {
             GlobalShortcut(keyCode: 48, displayKey: "⇥", modifiers: [.command, .option]),
         ]
         #expect(rejected.allSatisfy { !$0.isValid })
-    }
-
-    @Test("invalid recorder input restores the stored shortcut and rejects raw text")
-    func invalidRecorderInput() throws {
-        let field = GlobalShortcutField.ShortcutTextField()
-        let shortcut = GlobalShortcut.screenURLCaptureDefault
-        let recorder = GlobalShortcutField(
-            shortcut: shortcut,
-            isEnabled: true,
-            accessibilityIdentifier: "test.shortcut",
-            onChange: { _ in },
-            onRecordingChanged: { _ in }
-        ).makeCoordinator()
-        field.delegate = recorder
-        field.stringValue = shortcut.displayValue
-        field.beginPointerRecording()
-        recorder.beginRecording(in: field)
-        let invalid = try #require(NSEvent.keyEvent(
-            with: .keyDown,
-            location: .zero,
-            modifierFlags: [],
-            timestamp: 0,
-            windowNumber: 0,
-            context: nil,
-            characters: "x",
-            charactersIgnoringModifiers: "x",
-            isARepeat: false,
-            keyCode: 7
-        ))
-
-        recorder.record(invalid, in: field)
-        #expect(field.stringValue == GlobalShortcutField.recordingPrompt)
-        #expect(field.isRecording)
-        #expect(!recorder.control(
-            field,
-            textView: NSTextView(),
-            shouldChangeCharactersIn: NSRange(location: 0, length: 0),
-            replacementString: "z"
-        ))
-        #expect(field.stringValue == GlobalShortcutField.recordingPrompt)
-        #expect(field.isRecording)
-        #expect(recorder.control(
-            field,
-            textView: NSTextView(),
-            doCommandBy: #selector(NSResponder.cancelOperation(_:))
-        ))
-        #expect(field.stringValue == shortcut.displayValue)
-        #expect(!field.isRecording)
-    }
-
-    @Test("shortcut recorder arms focus only for explicit pointer interaction")
-    func recorderRequiresPointerInteraction() {
-        let field = GlobalShortcutField.ShortcutTextField()
-
-        #expect(field.refusesFirstResponder)
-        #expect(!field.isRecording)
-
-        field.beginPointerRecording()
-
-        #expect(!field.refusesFirstResponder)
-        #expect(field.isRecording)
-
-        field.endRecording()
-
-        #expect(field.refusesFirstResponder)
-        #expect(!field.isRecording)
-    }
-
-    @Test("temporarily suspends the registered shortcut while recording")
-    func recordingSuspendsRegistration() {
-        var calls = 0
-        let registrar = RegistrarFake()
-        let settings = ScreenURLCaptureSettings(
-            defaults: isolatedDefaults(),
-            registrar: registrar,
-            onShortcut: { calls += 1 }
-        )
-        settings.setEnabled(true)
-        registrar.fire(identifier: .screenURLCapture)
-        #expect(calls == 1)
-        #expect(registrar.registerCount == 1)
-
-        settings.setShortcutRecording(true)
-        registrar.fire(identifier: .screenURLCapture)
-        settings.setShortcut(settings.shortcut)
-        #expect(calls == 1)
-        #expect(registrar.registerCount == 1)
-
-        settings.setShortcutRecording(false)
-        registrar.fire(identifier: .screenURLCapture)
-        #expect(calls == 2)
-        #expect(registrar.registerCount == 2)
-        #expect(settings.registrationStatus == .registered)
     }
 
     @Test(arguments: [GlobalHotKeyRegistrationResult.conflict, .failed])
