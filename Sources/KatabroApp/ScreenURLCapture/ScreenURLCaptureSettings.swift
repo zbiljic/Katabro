@@ -1,8 +1,6 @@
 import Foundation
 import Observation
 
-// swiftlint:disable opening_brace
-
 @MainActor
 @Observable
 final class ScreenURLCaptureSettings {
@@ -104,5 +102,3 @@ final class ScreenURLCaptureSettings {
         globalShortcutSettings.unregister()
     }
 }
-
-// swiftlint:enable opening_brace

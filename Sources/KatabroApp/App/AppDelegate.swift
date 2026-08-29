@@ -2,6 +2,9 @@ import AppKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    static let clipboardShortcutEnabledKey = "clipboardURL.globalShortcutEnabled.v1"
+    static let clipboardShortcutKey = "clipboardURL.globalShortcut.v1"
+
     let dependencies: AppDependencies
 
     #if DEBUG
@@ -28,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
 
     lazy var screenURLCaptureSettings = ScreenURLCaptureSettings(
+        defaults: dependencies.globalShortcutDefaults,
         registrar: dependencies.globalHotKeyRegistrar,
         screenCaptureClient: dependencies.screenCaptureClient,
         isCaptureAvailable: dependencies.visionURLRecognitionClient.isAvailable(),
@@ -42,6 +46,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var clipboardURLSnapshotStore = ClipboardURLSnapshotStore(
         clipboardURLClient: dependencies.clipboardURLClient
     )
+
+    lazy var clipboardURLShortcutSettings = GlobalShortcutSettings(
+        configuration: .init(
+            identifier: .openURLFromClipboard,
+            enabledKey: Self.clipboardShortcutEnabledKey,
+            shortcutKey: Self.clipboardShortcutKey,
+            defaultShortcut: .openURLFromClipboardDefault,
+            registrationAllowed: true
+        ),
+        defaults: dependencies.globalShortcutDefaults,
+        registrar: dependencies.globalHotKeyRegistrar
+    ) { [weak self] in
+        self?.openClipboardURL()
+    }
 
     lazy var onboardingCoordinator = OnboardingWindowCoordinator(
         defaultBrowserClient: dependencies.defaultBrowserClient,
@@ -101,6 +119,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         #endif
         screenURLCaptureSettings.start()
+        clipboardURLShortcutSettings.start()
         onboardingCoordinator.presentIfNeeded()
     }
 
@@ -109,6 +128,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ) {
         clipboardURLSnapshotStore.stopMonitoring()
         screenURLCaptureSettings.unregister()
+        clipboardURLShortcutSettings.unregister()
         dependencies.routingDecisionLogStore.clear()
     }
 
@@ -126,5 +146,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         open urls: [URL]
     ) {
         pickerCoordinator.handle(urls)
+    }
+
+    func openClipboardURL() {
+        clipboardURLSnapshotStore.refresh()
+        pickerCoordinator.openClipboardURL(clipboardURLSnapshotStore.url)
     }
 }

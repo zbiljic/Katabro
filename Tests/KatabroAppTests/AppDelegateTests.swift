@@ -136,24 +136,193 @@ struct AppDelegateTests {
         #expect(routingDecisionLogStore.entries.isEmpty)
     }
 
-    @Test("termination unregisters an enabled screen URL shortcut exactly once")
-    func terminationUnregistersShortcut() {
+    @Test("termination unregisters both global commands exactly once")
+    func terminationUnregistersShortcuts() {
         let registrar = AppDelegateRegistrarFake()
-        UserDefaults.standard.removeObject(forKey: ScreenURLCaptureSettings.enabledKey)
-        defer { UserDefaults.standard.removeObject(forKey: ScreenURLCaptureSettings.enabledKey) }
+        let defaults = isolatedShortcutDefaults()
         let delegate = AppDelegate(
             dependencies: AppDependencies(
                 browserDiscovery: BrowserDiscoveryFake(), browserLauncher: BrowserLauncherFake(),
                 defaultBrowserClient: .development(status: .notCurrent), errorPresenter: RoutingErrorPresenterFake(),
                 loginItemClient: .development(status: .disabled), routingDecisionClient: .exactHostRules,
                 routingDecisionLogStore: RoutingDecisionLogStore(), preferencesStore: PreferencesStore(),
-                globalHotKeyRegistrar: registrar
+                globalHotKeyRegistrar: registrar,
+                globalShortcutDefaults: defaults
             )
         )
         delegate.screenURLCaptureSettings.setEnabled(true)
-        let beforeTermination = registrar.unregisterCount
+        delegate.clipboardURLShortcutSettings.setEnabled(true)
+        let beforeTermination = registrar.unregisterCalls
         delegate.applicationWillTerminate(Notification(name: NSApplication.willTerminateNotification))
-        #expect(registrar.unregisterCount == beforeTermination + 1)
+        #expect(
+            registrar.unregisterCalls.dropFirst(beforeTermination.count) == [
+                .screenURLCapture,
+                .openURLFromClipboard,
+            ]
+        )
+    }
+
+    @Test("clipboard shortcut refreshes the current generation and routes exactly once")
+    func clipboardShortcutRefreshesAndRoutes() async throws {
+        let state = ClipboardCommandState()
+        let discovery = BrowserDiscoveryFake(browsers: [makeBrowser()])
+        let registrar = AppDelegateRegistrarFake()
+        let dependencies = AppDependencies(
+            browserDiscovery: discovery,
+            browserLauncher: BrowserLauncherFake(),
+            defaultBrowserClient: .development(status: .current),
+            errorPresenter: RoutingErrorPresenterFake(),
+            loginItemClient: .development(status: .disabled),
+            routingDecisionClient: .exactHostRules,
+            routingDecisionLogStore: RoutingDecisionLogStore(),
+            preferencesStore: PreferencesStore(),
+            clipboardURLClient: ClipboardURLClient(
+                currentURLHandler: {
+                    state.readCount += 1
+                    return state.currentURL
+                },
+                changeCountHandler: { state.changeCount }
+            ),
+            globalHotKeyRegistrar: registrar,
+            globalShortcutDefaults: isolatedShortcutDefaults()
+        )
+        let delegate = AppDelegate(dependencies: dependencies)
+        delegate.clipboardURLSnapshotStore.refresh()
+        let freshURL = try #require(URL(string: "https://fresh.example/path"))
+        state.currentURL = freshURL
+        state.changeCount += 1
+        delegate.pickerCoordinator = BrowserPickerCoordinator(
+            dependencies: dependencies,
+            menuActionScheduler: ImmediateMenuActionScheduler()
+        ) { _, _, _, _ in BrowserPickerPresentationFake() }
+
+        delegate.clipboardURLShortcutSettings.setEnabled(true)
+        registrar.fire(.openURLFromClipboard)
+        await delegate.pickerCoordinator.waitForPendingOperations()
+
+        #expect(state.readCount == 2)
+        #expect(delegate.clipboardURLSnapshotStore.url == freshURL)
+        #expect(try discovery.destinations == [IncomingURL(freshURL)])
+    }
+
+    @Test("empty clipboard command uses the existing picker error path")
+    func emptyClipboardUsesExistingError() {
+        let errorPresenter = RoutingErrorPresenterFake()
+        let dependencies = AppDependencies(
+            browserDiscovery: BrowserDiscoveryFake(),
+            browserLauncher: BrowserLauncherFake(),
+            defaultBrowserClient: .development(status: .current),
+            errorPresenter: errorPresenter,
+            loginItemClient: .development(status: .disabled),
+            routingDecisionClient: .exactHostRules,
+            routingDecisionLogStore: RoutingDecisionLogStore(),
+            preferencesStore: PreferencesStore(),
+            clipboardURLClient: .development(url: nil),
+            globalShortcutDefaults: isolatedShortcutDefaults()
+        )
+        let delegate = AppDelegate(dependencies: dependencies)
+        delegate.pickerCoordinator = BrowserPickerCoordinator(
+            dependencies: dependencies,
+            menuActionScheduler: ImmediateMenuActionScheduler()
+        )
+
+        delegate.openClipboardURL()
+
+        #expect(errorPresenter.presentedErrors == ["noRoutableURL"])
+    }
+
+    @Test("global shortcut callbacks do not cross-trigger")
+    func globalShortcutCallbacksAreIsolated() async throws { // swiftlint:disable:this function_body_length
+        let state = ShortcutCallbackState()
+        let context = try #require(CGContext(
+            data: nil,
+            width: 1,
+            height: 1,
+            bitsPerComponent: 8,
+            bytesPerRow: 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        let image = try #require(context.makeImage())
+        let clipboardURL = try #require(URL(string: "https://clipboard.example/path"))
+        let discovery = BrowserDiscoveryFake(browsers: [makeBrowser()])
+        let registrar = AppDelegateRegistrarFake()
+        let screenCaptureClient = ScreenCaptureClient(
+            authorizationStatus: { .authorized },
+            requestAuthorization: { false },
+            capture: {
+                state.captureCount += 1
+                return image
+            }
+        )
+        let recognitionClient = VisionURLRecognitionClient(
+            isAvailable: { true },
+            recognizeURLs: { _ in [] }
+        )
+        let dependencies = AppDependencies(
+            browserDiscovery: discovery,
+            browserLauncher: BrowserLauncherFake(),
+            defaultBrowserClient: .development(status: .current),
+            errorPresenter: RoutingErrorPresenterFake(),
+            loginItemClient: .development(status: .disabled),
+            routingDecisionClient: .exactHostRules,
+            routingDecisionLogStore: RoutingDecisionLogStore(),
+            preferencesStore: PreferencesStore(),
+            clipboardURLClient: ClipboardURLClient {
+                state.clipboardReadCount += 1
+                return clipboardURL
+            },
+            screenCaptureClient: screenCaptureClient,
+            visionURLRecognitionClient: recognitionClient,
+            globalHotKeyRegistrar: registrar,
+            globalShortcutDefaults: isolatedShortcutDefaults()
+        )
+        let delegate = AppDelegate(dependencies: dependencies)
+        delegate.pickerCoordinator = BrowserPickerCoordinator(
+            dependencies: dependencies,
+            menuActionScheduler: ImmediateMenuActionScheduler()
+        ) { _, _, _, _ in BrowserPickerPresentationFake() }
+        delegate.screenURLCaptureCoordinator = ScreenURLCaptureCoordinator(
+            captureClient: screenCaptureClient,
+            recognitionClient: recognitionClient,
+            route: { _ in state.screenRouteCount += 1 },
+            panelBuilder: { _, _, _ in AppDelegateScreenPanelFake() }
+        )
+        delegate.screenURLCaptureSettings.setEnabled(true)
+        delegate.clipboardURLShortcutSettings.setEnabled(true)
+
+        registrar.fire(.screenURLCapture)
+        await delegate.screenURLCaptureCoordinator.waitForPendingOperations()
+
+        #expect(state.captureCount == 1)
+        #expect(state.clipboardReadCount == 0)
+        #expect(discovery.destinations.isEmpty)
+        #expect(state.screenRouteCount == 0)
+
+        registrar.fire(.openURLFromClipboard)
+        await delegate.pickerCoordinator.waitForPendingOperations()
+
+        #expect(state.captureCount == 1)
+        #expect(state.clipboardReadCount == 1)
+        #expect(try discovery.destinations == [IncomingURL(clipboardURL)])
+        #expect(state.screenRouteCount == 0)
+    }
+
+    private func makeBrowser() -> BrowserApplication {
+        BrowserApplication(
+            browser: Browser(bundleIdentifier: "com.example.browser", displayName: "Example Browser"),
+            applicationURL: URL(fileURLWithPath: "/Applications/Example Browser.app"),
+            icon: NSImage(size: NSSize(width: 32, height: 32))
+        )
+    }
+
+    private func isolatedShortcutDefaults() -> UserDefaults {
+        let suite = "AppDelegateTests.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suite) else {
+            fatalError("Could not create isolated shortcut defaults")
+        }
+        defaults.removePersistentDomain(forName: suite)
+        return defaults
     }
 }
 
@@ -167,18 +336,46 @@ private final class AppLifecycleState {
 }
 
 @MainActor
+private final class ClipboardCommandState {
+    var currentURL = URL(string: "https://stale.example")
+    var changeCount = 1
+    var readCount = 0
+}
+
+@MainActor
+private final class ShortcutCallbackState {
+    var captureCount = 0
+    var clipboardReadCount = 0
+    var screenRouteCount = 0
+}
+
+@MainActor
+private final class AppDelegateScreenPanelFake: ScreenURLPickerPresenting {
+    func presentNearPointer() {}
+    func close() {}
+}
+
+@MainActor
 private final class AppDelegateRegistrarFake: GlobalHotKeyRegistering {
-    var unregisterCount = 0
+    private var handlers: [GlobalHotKeyIdentifier: @MainActor () -> Void] = [:]
+    private(set) var unregisterCalls: [GlobalHotKeyIdentifier] = []
+
     func register(
         _: GlobalShortcut,
-        for _: GlobalHotKeyIdentifier,
-        handler _: @escaping @MainActor () -> Void
+        for identifier: GlobalHotKeyIdentifier,
+        handler: @escaping @MainActor () -> Void
     ) -> GlobalHotKeyRegistrationResult {
-        .registered
+        handlers[identifier] = handler
+        return .registered
     }
 
-    func unregister(_: GlobalHotKeyIdentifier) {
-        unregisterCount += 1
+    func unregister(_ identifier: GlobalHotKeyIdentifier) {
+        unregisterCalls.append(identifier)
+        handlers.removeValue(forKey: identifier)
+    }
+
+    func fire(_ identifier: GlobalHotKeyIdentifier) {
+        handlers[identifier]?()
     }
 }
 

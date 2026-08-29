@@ -36,6 +36,9 @@ release artifacts, notarization, and an installer are not available yet.
   web addresses from the clipboard only when requested. Scheme-less addresses
   open as HTTPS, without monitoring clipboard history. Clipboard managers such
   as Maccy require no special integration.
+- Offers an optional, device-local `⌃⌘B` global shortcut for **Open URL from
+  Clipboard**. It is off by default, customizable in **Settings > General >
+  Clipboard URL**, and needs neither Accessibility nor Input Monitoring access.
 - Captures the complete display under the pointer on demand, recognizes web URLs
   locally with Apple Vision, and routes selected URLs through the existing
   browser picker. Screenshots, recognized text, and detected URLs stay in memory
@@ -81,6 +84,16 @@ completely. Disabling it removes the menu command and unregisters its optional
 device-local shortcut while preserving that shortcut for later. The shortcut
 defaults to `⌃⌘X`, is off by default, and does not request Screen Recording,
 Accessibility, or Input Monitoring access when configured.
+
+### Clipboard URL shortcut
+
+In **Settings > General > Clipboard URL**, enable the optional global shortcut
+to open the current clipboard URL through Katabro from any app. Its proposed
+chord is `⌃⌘B`, it stays local to this Mac, and it is off by default. Katabro
+reports registration conflicts inline and keeps the menu command clickable if
+the shortcut is disabled or unavailable. The shortcut uses the same
+permission-free clipboard validation, routing rules, request queue, and browser
+picker as **Open URL from Clipboard** in the menu.
 
 ## Set up Katabro
 

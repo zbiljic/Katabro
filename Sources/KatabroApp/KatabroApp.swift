@@ -10,12 +10,14 @@ struct KatabroApp: App {
         MenuBarExtra {
             MenuBarView(
                 clipboardURLSnapshotStore: appDelegate.clipboardURLSnapshotStore,
+                clipboardURLShortcutSettings: appDelegate.clipboardURLShortcutSettings,
                 defaultBrowserClient: appDelegate.dependencies.defaultBrowserClient,
                 onboardingCoordinator: appDelegate.onboardingCoordinator,
-                pickerCoordinator: appDelegate.pickerCoordinator,
+                onOpenClipboardURL: appDelegate.openClipboardURL,
                 screenURLCaptureCoordinator: appDelegate.screenURLCaptureCoordinator,
                 screenURLCaptureSettings: appDelegate.screenURLCaptureSettings,
                 preferencesStore: appDelegate.dependencies.preferencesStore,
+                settingsActionScheduler: MenuTrackingActionScheduler(),
                 settingsNavigationStore: appDelegate.dependencies.settingsNavigationStore
             )
         } label: {
@@ -30,6 +32,7 @@ struct KatabroApp: App {
                 browserProfileStore: appDelegate.dependencies.browserProfileStore,
                 defaultBrowserClient: appDelegate.dependencies.defaultBrowserClient,
                 loginItemClient: appDelegate.dependencies.loginItemClient,
+                clipboardURLShortcutSettings: appDelegate.clipboardURLShortcutSettings,
                 screenURLCaptureSettings: appDelegate.screenURLCaptureSettings,
                 screenCaptureClient: appDelegate.dependencies.screenCaptureClient,
                 visionURLRecognitionClient: appDelegate.dependencies.visionURLRecognitionClient,

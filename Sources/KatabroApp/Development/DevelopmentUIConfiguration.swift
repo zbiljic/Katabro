@@ -354,8 +354,29 @@
                         return screenURLFixtures(count: state == .manyURLs ? 12 : 3)
                     }
                 ),
-                globalHotKeyRegistrar: DevelopmentGlobalHotKeyRegistrar()
+                globalHotKeyRegistrar: DevelopmentGlobalHotKeyRegistrar(),
+                globalShortcutDefaults: developmentShortcutDefaults(
+                    for: state,
+                    preferencesSuite: preferencesSuite,
+                    resetsPreferences: resetsPreferences
+                )
             )
+        }
+
+        private static func developmentShortcutDefaults(
+            for state: DevelopmentUIState,
+            preferencesSuite: String?,
+            resetsPreferences: Bool
+        ) -> UserDefaults {
+            let suite = preferencesSuite.map { "com.zbiljic.katabro.ui-review.\($0).shortcuts" }
+                ?? "com.zbiljic.katabro.shortcut-fixture.\(state.rawValue)"
+            guard let defaults = UserDefaults(suiteName: suite) else {
+                fatalError("Could not create isolated global shortcut fixture defaults")
+            }
+            if preferencesSuite == nil || resetsPreferences {
+                defaults.removePersistentDomain(forName: suite)
+            }
+            return defaults
         }
 
         private static func screenCaptureFixtureImage() -> CGImage {
@@ -783,6 +804,7 @@
         let clipboardURLSnapshotStore: ClipboardURLSnapshotStore
         let onboardingCoordinator: OnboardingWindowCoordinator
         let pickerCoordinator: BrowserPickerCoordinator
+        @State private var clipboardURLShortcutSettings: GlobalShortcutSettings
         @State private var screenURLCaptureSettings: ScreenURLCaptureSettings
 
         init(
@@ -798,15 +820,31 @@
             self.onboardingCoordinator = onboardingCoordinator
             self.pickerCoordinator = pickerCoordinator
             let screenURLCaptureSettings = ScreenURLCaptureSettings(
-                defaults: screenURLDefaults(for: configuration),
+                defaults: dependencies.globalShortcutDefaults,
                 registrar: dependencies.globalHotKeyRegistrar,
                 screenCaptureClient: dependencies.screenCaptureClient,
                 isCaptureAvailable: dependencies.visionURLRecognitionClient.isAvailable()
             )
+            let clipboardURLShortcutSettings = GlobalShortcutSettings(
+                configuration: .init(
+                    identifier: .openURLFromClipboard,
+                    enabledKey: AppDelegate.clipboardShortcutEnabledKey,
+                    shortcutKey: AppDelegate.clipboardShortcutKey,
+                    defaultShortcut: .openURLFromClipboardDefault,
+                    registrationAllowed: true
+                ),
+                defaults: dependencies.globalShortcutDefaults,
+                registrar: dependencies.globalHotKeyRegistrar
+            ) {
+                clipboardURLSnapshotStore.refresh()
+                pickerCoordinator.openClipboardURL(clipboardURLSnapshotStore.url)
+            }
             if configuration.surface == .menu, configuration.state == .normal {
                 screenURLCaptureSettings.setEnabled(true)
+                clipboardURLShortcutSettings.setEnabled(true)
             }
             _screenURLCaptureSettings = State(initialValue: screenURLCaptureSettings)
+            _clipboardURLShortcutSettings = State(initialValue: clipboardURLShortcutSettings)
         }
 
         var body: some View {
@@ -818,6 +856,7 @@
                         browserProfileStore: dependencies.browserProfileStore,
                         defaultBrowserClient: dependencies.defaultBrowserClient,
                         loginItemClient: dependencies.loginItemClient,
+                        clipboardURLShortcutSettings: clipboardURLShortcutSettings,
                         screenURLCaptureSettings: screenURLCaptureSettings,
                         screenCaptureClient: dependencies.screenCaptureClient,
                         visionURLRecognitionClient: dependencies.visionURLRecognitionClient,
@@ -842,15 +881,20 @@
                 case .menu:
                     MenuBarView(
                         clipboardURLSnapshotStore: clipboardURLSnapshotStore,
+                        clipboardURLShortcutSettings: clipboardURLShortcutSettings,
                         defaultBrowserClient: dependencies.defaultBrowserClient,
                         onboardingCoordinator: onboardingCoordinator,
-                        pickerCoordinator: pickerCoordinator,
+                        onOpenClipboardURL: {
+                            clipboardURLSnapshotStore.refresh()
+                            pickerCoordinator.openClipboardURL(clipboardURLSnapshotStore.url)
+                        },
                         screenURLCaptureCoordinator: ScreenURLCaptureCoordinator(
                             dependencies: dependencies,
                             pickerCoordinator: pickerCoordinator
                         ),
                         screenURLCaptureSettings: screenURLCaptureSettings,
                         preferencesStore: dependencies.preferencesStore,
+                        settingsActionScheduler: DeferredMainQueueActionScheduler(),
                         settingsNavigationStore: dependencies.settingsNavigationStore
                     )
                     .padding(12)
@@ -863,20 +907,6 @@
                 configuration.appearance.colorScheme
             )
         }
-    }
-
-    @MainActor
-    private func screenURLDefaults(for configuration: DevelopmentUIConfiguration) -> UserDefaults {
-        let suite = configuration.preferencesSuite.map { "\($0).screen-url-capture" }
-            ?? "com.zbiljic.katabro.screen-url-fixture.review."
-            + "\(configuration.surface.rawValue).\(configuration.state.rawValue)"
-        guard let defaults = UserDefaults(suiteName: suite) else {
-            fatalError("Could not create isolated Screen URL fixture defaults")
-        }
-        if configuration.preferencesSuite == nil || configuration.resetsPreferences {
-            defaults.removePersistentDomain(forName: suite)
-        }
-        return defaults
     }
 
     private struct DevelopmentPickerReviewView: View {
@@ -1043,7 +1073,7 @@
             self.pickerCoordinator = if configuration.surface == .menu {
                 BrowserPickerCoordinator(
                     dependencies: dependencies,
-                    menuActionScheduler: ImmediateMenuActionScheduler()
+                    menuActionScheduler: DeferredMainQueueActionScheduler()
                 )
             } else {
                 pickerCoordinator

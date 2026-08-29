@@ -38,6 +38,10 @@ final class GlobalShortcutSettings {
     private(set) var shortcut: GlobalShortcut
     private(set) var registrationStatus: RegistrationStatus = .disabled
 
+    var registeredDisplayValue: String {
+        registrationStatus == .registered ? shortcut.displayValue : ""
+    }
+
     init(
         configuration: Configuration,
         defaults: UserDefaults = .standard,
@@ -50,14 +54,13 @@ final class GlobalShortcutSettings {
         self.onShortcut = onShortcut
         registrationAllowed = configuration.registrationAllowed
         isEnabled = defaults.bool(forKey: configuration.enabledKey)
-        if
-            let data = defaults.data(forKey: configuration.shortcutKey),
-            let stored = try? JSONDecoder().decode(GlobalShortcut.self, from: data)
-        {
-            shortcut = stored
-        } else {
-            shortcut = configuration.defaultShortcut
+        let storedData = defaults.data(
+            forKey: configuration.shortcutKey
+        )
+        let storedShortcut = storedData.flatMap {
+            try? JSONDecoder().decode(GlobalShortcut.self, from: $0)
         }
+        shortcut = storedShortcut ?? configuration.defaultShortcut
     }
 
     func start() {

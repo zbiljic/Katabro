@@ -1,7 +1,5 @@
 import Carbon
 
-// swiftlint:disable multiline_arguments
-
 struct GlobalHotKeyIdentifier: RawRepresentable, Hashable, Sendable {
     static let signature: UInt32 = 0x4B41_5452
     static let screenURLCapture = Self(rawValue: 1)
@@ -170,5 +168,3 @@ final class InertGlobalHotKeyRegistrar: GlobalHotKeyRegistering {
 
     func unregister(_: GlobalHotKeyIdentifier) {}
 }
-
-// swiftlint:enable multiline_arguments

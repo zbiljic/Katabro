@@ -34,6 +34,17 @@ struct ImmediateMenuActionScheduler: MenuActionScheduling {
 }
 
 @MainActor
+struct DeferredMainQueueActionScheduler: MenuActionScheduling {
+    func schedule(
+        _ action: @escaping @MainActor () -> Void
+    ) {
+        DispatchQueue.main.async {
+            action()
+        }
+    }
+}
+
+@MainActor
 final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_body_length
 
     typealias PanelBuilder = @MainActor (

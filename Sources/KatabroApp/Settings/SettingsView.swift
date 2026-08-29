@@ -5,6 +5,7 @@ struct SettingsView: View {
     let browserProfileStore: BrowserProfileStore
     let defaultBrowserClient: DefaultBrowserClient
     let loginItemClient: LoginItemClient
+    let clipboardURLShortcutSettings: GlobalShortcutSettings
     let screenURLCaptureSettings: ScreenURLCaptureSettings
     let screenCaptureClient: ScreenCaptureClient
     let visionURLRecognitionClient: VisionURLRecognitionClient
@@ -21,6 +22,7 @@ struct SettingsView: View {
         browserProfileStore: BrowserProfileStore,
         defaultBrowserClient: DefaultBrowserClient,
         loginItemClient: LoginItemClient,
+        clipboardURLShortcutSettings: GlobalShortcutSettings,
         screenURLCaptureSettings: ScreenURLCaptureSettings,
         screenCaptureClient: ScreenCaptureClient,
         visionURLRecognitionClient: VisionURLRecognitionClient,
@@ -36,6 +38,7 @@ struct SettingsView: View {
         self.browserProfileStore = browserProfileStore
         self.defaultBrowserClient = defaultBrowserClient
         self.loginItemClient = loginItemClient
+        self.clipboardURLShortcutSettings = clipboardURLShortcutSettings
         self.screenURLCaptureSettings = screenURLCaptureSettings
         self.screenCaptureClient = screenCaptureClient
         self.visionURLRecognitionClient = visionURLRecognitionClient
@@ -55,6 +58,7 @@ struct SettingsView: View {
             GeneralSettingsView(
                 defaultBrowserClient: defaultBrowserClient,
                 loginItemClient: loginItemClient,
+                clipboardURLShortcutSettings: clipboardURLShortcutSettings,
                 screenURLCaptureSettings: screenURLCaptureSettings,
                 screenCaptureClient: screenCaptureClient,
                 visionURLRecognitionClient: visionURLRecognitionClient,

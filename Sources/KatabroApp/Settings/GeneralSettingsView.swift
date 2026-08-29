@@ -5,6 +5,7 @@ struct GeneralSettingsView: View {
 
     let defaultBrowserClient: DefaultBrowserClient
     let loginItemClient: LoginItemClient
+    let clipboardURLShortcutSettings: GlobalShortcutSettings
     let screenURLCaptureSettings: ScreenURLCaptureSettings
     let screenCaptureClient: ScreenCaptureClient
     let visionURLRecognitionClient: VisionURLRecognitionClient
@@ -69,6 +70,8 @@ struct GeneralSettingsView: View {
                         )
                 }
             }
+
+            ClipboardURLShortcutSettingsView(settings: clipboardURLShortcutSettings)
 
             ScreenURLCaptureSettingsView(
                 settings: screenURLCaptureSettings,

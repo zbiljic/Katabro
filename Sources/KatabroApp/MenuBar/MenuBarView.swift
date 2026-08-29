@@ -6,12 +6,14 @@ struct MenuBarView: View {
     private var openSettings
 
     let clipboardURLSnapshotStore: ClipboardURLSnapshotStore
+    let clipboardURLShortcutSettings: GlobalShortcutSettings
     let defaultBrowserClient: DefaultBrowserClient
     let onboardingCoordinator: OnboardingWindowCoordinator
-    let pickerCoordinator: BrowserPickerCoordinator
+    let onOpenClipboardURL: () -> Void
     let screenURLCaptureCoordinator: ScreenURLCaptureCoordinator
     let screenURLCaptureSettings: ScreenURLCaptureSettings
     let preferencesStore: PreferencesStore
+    let settingsActionScheduler: any MenuActionScheduling
     let settingsNavigationStore: SettingsNavigationStore
 
     var body: some View {
@@ -31,13 +33,15 @@ struct MenuBarView: View {
             )
         } else {
             Button {
-                pickerCoordinator.openClipboardURL(
-                    clipboardURLSnapshotStore.url
-                )
+                onOpenClipboardURL()
             } label: {
                 Label("Open URL from Clipboard", systemImage: "doc.on.clipboard")
                     .imageScale(.medium)
             }
+            .keyboardShortcut(clipboardKeyboardShortcut)
+            .accessibilityValue(
+                clipboardURLShortcutSettings.registeredDisplayValue
+            )
             .accessibilityIdentifier(
                 AccessibilityIdentifier.menuOpenClipboard
             )
@@ -67,9 +71,7 @@ struct MenuBarView: View {
             }
             .keyboardShortcut(captureKeyboardShortcut)
             .accessibilityValue(
-                screenURLCaptureSettings.isEnabled
-                    ? screenURLCaptureSettings.shortcut.displayValue
-                    : ""
+                screenURLCaptureSettings.globalShortcutSettings.registeredDisplayValue
             )
             .accessibilityIdentifier(AccessibilityIdentifier.menuCaptureScreenURLs)
         }
@@ -132,32 +134,23 @@ struct MenuBarView: View {
             || defaultBrowserClient.status != .current
     }
 
+    private var clipboardKeyboardShortcut: KeyboardShortcut? {
+        guard clipboardURLShortcutSettings.registrationStatus == .registered else {
+            return nil
+        }
+        return clipboardURLShortcutSettings.shortcut.keyboardShortcut
+    }
+
     private var captureKeyboardShortcut: KeyboardShortcut? {
-        let shortcut = screenURLCaptureSettings.shortcut
         guard
             screenURLCaptureSettings.isCaptureEnabled,
             screenURLCaptureSettings.isCaptureAvailable,
             screenURLCaptureSettings.isEnabled,
-            shortcut.displayKey.count == 1,
-            let character = shortcut.displayKey.lowercased().first
+            screenURLCaptureSettings.registrationStatus == .registered
         else {
             return nil
         }
-
-        var modifiers: EventModifiers = []
-        if shortcut.modifiers.contains(.command) {
-            modifiers.insert(.command)
-        }
-        if shortcut.modifiers.contains(.option) {
-            modifiers.insert(.option)
-        }
-        if shortcut.modifiers.contains(.control) {
-            modifiers.insert(.control)
-        }
-        if shortcut.modifiers.contains(.shift) {
-            modifiers.insert(.shift)
-        }
-        return KeyboardShortcut(KeyEquivalent(character), modifiers: modifiers)
+        return screenURLCaptureSettings.shortcut.keyboardShortcut
     }
 
     private func showSettings(
@@ -170,11 +163,9 @@ struct MenuBarView: View {
     @MainActor
     private func presentSettings() {
         let openSettings = openSettings
-        RunLoop.main.perform(inModes: [.default]) {
-            MainActor.assumeIsolated {
-                openSettings()
-                NSApplication.shared.activate(ignoringOtherApps: true)
-            }
+        settingsActionScheduler.schedule {
+            openSettings()
+            NSApplication.shared.activate(ignoringOtherApps: true)
         }
     }
 }

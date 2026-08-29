@@ -161,12 +161,24 @@
             dependencies: dependencies
         )
         dependencies.settingsNavigationStore.select(pane)
+        let clipboardURLShortcutSettings = GlobalShortcutSettings(
+            configuration: .init(
+                identifier: .openURLFromClipboard,
+                enabledKey: AppDelegate.clipboardShortcutEnabledKey,
+                shortcutKey: AppDelegate.clipboardShortcutKey,
+                defaultShortcut: .openURLFromClipboardDefault,
+                registrationAllowed: true
+            ),
+            defaults: dependencies.globalShortcutDefaults,
+            registrar: dependencies.globalHotKeyRegistrar
+        )
 
         return SettingsView(
             browserDiscovery: dependencies.browserDiscovery,
             browserProfileStore: dependencies.browserProfileStore,
             defaultBrowserClient: dependencies.defaultBrowserClient,
             loginItemClient: dependencies.loginItemClient,
+            clipboardURLShortcutSettings: clipboardURLShortcutSettings,
             screenURLCaptureSettings: ScreenURLCaptureSettings(
                 defaults: isolatedPreviewScreenURLDefaults(),
                 registrar: dependencies.globalHotKeyRegistrar,

@@ -1,3 +1,4 @@
+import Foundation
 import KatabroCore
 
 @MainActor
@@ -21,6 +22,7 @@ struct AppDependencies {
     var screenCaptureClient = ScreenCaptureClient.inert
     var visionURLRecognitionClient = VisionURLRecognitionClient.unavailable
     var globalHotKeyRegistrar: any GlobalHotKeyRegistering = InertGlobalHotKeyRegistrar()
+    var globalShortcutDefaults: UserDefaults = .standard
 
     static let live: Self = {
         let userScriptBridge = UserScriptBridge()
@@ -44,7 +46,8 @@ struct AppDependencies {
             userScriptBridge: userScriptBridge,
             screenCaptureClient: .live,
             visionURLRecognitionClient: .live,
-            globalHotKeyRegistrar: GlobalHotKeyRegistrar()
+            globalHotKeyRegistrar: GlobalHotKeyRegistrar(),
+            globalShortcutDefaults: .standard
         )
     }()
 }
