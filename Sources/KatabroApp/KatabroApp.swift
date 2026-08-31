@@ -61,6 +61,7 @@ struct KatabroApp: App {
                 browserProfileStore: appDelegate.dependencies.browserProfileStore,
                 defaultBrowserClient: appDelegate.dependencies.defaultBrowserClient,
                 loginItemClient: appDelegate.dependencies.loginItemClient,
+                menuBarShortcutSettings: appDelegate.menuBarShortcutSettings,
                 clipboardURLShortcutSettings: appDelegate.clipboardURLShortcutSettings,
                 screenURLCaptureSettings: appDelegate.screenURLCaptureSettings,
                 screenCaptureClient: appDelegate.dependencies.screenCaptureClient,

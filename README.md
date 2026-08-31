@@ -39,6 +39,9 @@ release artifacts, notarization, and an installer are not available yet.
 - Offers an optional, device-local `⌃⌘B` global shortcut for **Open URL from
   Clipboard**. It is off by default, customizable in **Settings > General >
   Clipboard URL**, and needs neither Accessibility nor Input Monitoring access.
+- Shows or hides Katabro's menu from any app with an optional, device-local
+  `⌥⌘K` shortcut. It is off by default and customizable in **Settings > General
+  > Menu Bar**.
 - Captures the complete display under the pointer on demand, recognizes web URLs
   locally with Apple Vision, and routes selected URLs through the existing
   browser picker. Screenshots, recognized text, and detected URLs stay in memory
@@ -94,6 +97,15 @@ reports registration conflicts inline and keeps the menu command clickable if
 the shortcut is disabled or unavailable. The shortcut uses the same
 permission-free clipboard validation, routing rules, request queue, and browser
 picker as **Open URL from Clipboard** in the menu.
+
+### Menu bar shortcut
+
+In **Settings > General > Menu Bar**, enable the optional **Show or Hide Katabro
+Menu** global shortcut to toggle Katabro's native status menu from another app.
+Its proposed chord is `⌥⌘K`, it stays local to this Mac, and it is off by
+default. Katabro reports registration conflicts inline, and the shortcut
+requires neither Accessibility nor Input Monitoring access. Escape, clicking
+outside the menu, and choosing a command also dismiss it normally.
 
 ## Set up Katabro
 

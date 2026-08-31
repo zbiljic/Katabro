@@ -85,3 +85,27 @@ struct ClipboardURLShortcutSettingsView: View {
         }
     }
 }
+
+struct MenuBarShortcutSettingsView: View {
+    let settings: GlobalShortcutSettings
+
+    var body: some View {
+        Section {
+            GlobalShortcutSettingsRow(
+                settings: settings,
+                toggleAccessibilityIdentifier: AccessibilityIdentifier.settingsMenuBarShortcutToggle,
+                fieldAccessibilityIdentifier: AccessibilityIdentifier.settingsMenuBarShortcutField,
+                statusAccessibilityIdentifier: AccessibilityIdentifier.settingsMenuBarShortcutStatus,
+                accessibilityHelp: "Click, then press the global Show or Hide Katabro Menu shortcut. "
+                    + "Use at least two modifier keys. Press Escape to cancel."
+            )
+
+            Text("Shows or hides Katabro's menu from any app.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } header: {
+            Text("Menu Bar")
+                .accessibilityIdentifier(AccessibilityIdentifier.settingsMenuBarSection)
+        }
+    }
+}

@@ -172,12 +172,24 @@
             defaults: dependencies.globalShortcutDefaults,
             registrar: dependencies.globalHotKeyRegistrar
         )
+        let menuBarShortcutSettings = GlobalShortcutSettings(
+            configuration: .init(
+                identifier: .showKatabroMenu,
+                enabledKey: AppDelegate.menuBarShortcutEnabledKey,
+                shortcutKey: AppDelegate.menuBarShortcutKey,
+                defaultShortcut: .showKatabroMenuDefault,
+                registrationAllowed: true
+            ),
+            defaults: dependencies.globalShortcutDefaults,
+            registrar: dependencies.globalHotKeyRegistrar
+        )
 
         return SettingsView(
             browserDiscovery: dependencies.browserDiscovery,
             browserProfileStore: dependencies.browserProfileStore,
             defaultBrowserClient: dependencies.defaultBrowserClient,
             loginItemClient: dependencies.loginItemClient,
+            menuBarShortcutSettings: menuBarShortcutSettings,
             clipboardURLShortcutSettings: clipboardURLShortcutSettings,
             screenURLCaptureSettings: ScreenURLCaptureSettings(
                 defaults: isolatedPreviewScreenURLDefaults(),

@@ -806,6 +806,7 @@
         let clipboardURLSnapshotStore: ClipboardURLSnapshotStore
         let onboardingCoordinator: OnboardingWindowCoordinator
         let pickerCoordinator: BrowserPickerCoordinator
+        @State private var menuBarShortcutSettings: GlobalShortcutSettings
         @State private var clipboardURLShortcutSettings: GlobalShortcutSettings
         @State private var screenURLCaptureSettings: ScreenURLCaptureSettings
 
@@ -841,12 +842,24 @@
                 clipboardURLSnapshotStore.refresh()
                 pickerCoordinator.openClipboardURL(clipboardURLSnapshotStore.url)
             }
+            let menuBarShortcutSettings = GlobalShortcutSettings(
+                configuration: .init(
+                    identifier: .showKatabroMenu,
+                    enabledKey: AppDelegate.menuBarShortcutEnabledKey,
+                    shortcutKey: AppDelegate.menuBarShortcutKey,
+                    defaultShortcut: .showKatabroMenuDefault,
+                    registrationAllowed: true
+                ),
+                defaults: dependencies.globalShortcutDefaults,
+                registrar: dependencies.globalHotKeyRegistrar
+            )
             if configuration.surface == .menu, configuration.state == .normal {
                 screenURLCaptureSettings.setEnabled(true)
                 clipboardURLShortcutSettings.setEnabled(true)
             }
             _screenURLCaptureSettings = State(initialValue: screenURLCaptureSettings)
             _clipboardURLShortcutSettings = State(initialValue: clipboardURLShortcutSettings)
+            _menuBarShortcutSettings = State(initialValue: menuBarShortcutSettings)
         }
 
         var body: some View {
@@ -858,6 +871,7 @@
                         browserProfileStore: dependencies.browserProfileStore,
                         defaultBrowserClient: dependencies.defaultBrowserClient,
                         loginItemClient: dependencies.loginItemClient,
+                        menuBarShortcutSettings: menuBarShortcutSettings,
                         clipboardURLShortcutSettings: clipboardURLShortcutSettings,
                         screenURLCaptureSettings: screenURLCaptureSettings,
                         screenCaptureClient: dependencies.screenCaptureClient,
