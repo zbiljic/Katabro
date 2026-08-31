@@ -253,6 +253,100 @@ final class KatabroUITests: XCTestCase {
 
     // swiftlint:enable function_body_length
 
+    // swiftlint:disable function_body_length
+    @MainActor
+    func testMenuBarShortcutSettings() {
+        let preferencesSuite = "KatabroUITests.menu-bar-shortcut.\(UUID().uuidString)"
+        var application = launch(
+            surface: "settings",
+            state: "normal",
+            appearance: "light",
+            preferencesSuite: preferencesSuite,
+            resetsPreferences: true
+        )
+        defer { application.terminate() }
+        var form = application.scrollViews["settings.general.form"]
+        assertExists(form)
+        assertExists(application.descendants(matching: .any)["settings.menu-bar.section"])
+        assertExists(application.staticTexts["Shows or hides Katabro's menu from any app."])
+        var toggle = application.descendants(matching: .any)[
+            "settings.menu-bar.shortcut-toggle"
+        ].firstMatch
+        var recorder = application.descendants(matching: .any)[
+            "settings.menu-bar.shortcut-field"
+        ].firstMatch
+        assertExists(toggle)
+        assertExists(recorder)
+        XCTAssertFalse(isControlOn(toggle))
+        XCTAssertEqual(shortcutValue(recorder), "⌥⌘K")
+
+        toggle.click()
+        XCTAssertTrue(isControlOn(toggle))
+        let status = application.descendants(matching: .any)[
+            "settings.menu-bar.shortcut-status"
+        ].firstMatch
+        assertExists(status)
+        XCTAssertEqual(status.value as? String, "Global shortcut is registered.")
+
+        let clipboardToggle = application.descendants(matching: .any)[
+            "settings.clipboard-url.shortcut-toggle"
+        ].firstMatch
+        let clipboardStatus = application.descendants(matching: .any)[
+            "settings.clipboard-url.shortcut-status"
+        ].firstMatch
+        assertExists(clipboardToggle)
+        clipboardToggle.click()
+        XCTAssertTrue(isControlOn(clipboardToggle))
+        assertExists(clipboardStatus)
+        XCTAssertEqual(clipboardStatus.value as? String, "Global shortcut is registered.")
+
+        makeHittable(recorder, in: form, scrolling: .down)
+        recorder.click()
+        XCTAssertEqual(shortcutValue(recorder), "Press keys")
+        recorder.typeKey("b", modifierFlags: [.control, .command])
+        XCTAssertEqual(shortcutValue(recorder), "⌃⌘B")
+        XCTAssertEqual(
+            status.value as? String,
+            "This shortcut is already in use by another app or Katabro command."
+        )
+        XCTAssertTrue(isControlOn(clipboardToggle))
+        XCTAssertEqual(clipboardStatus.value as? String, "Global shortcut is registered.")
+
+        recorder.click()
+        recorder.typeKey("m", modifierFlags: [.option, .command])
+        XCTAssertEqual(shortcutValue(recorder), "⌥⌘M")
+        XCTAssertEqual(status.value as? String, "Global shortcut is registered.")
+        recorder.click()
+        recorder.typeKey(.escape, modifierFlags: [])
+        XCTAssertEqual(shortcutValue(recorder), "⌥⌘M")
+        XCTAssertFalse(application.alerts.firstMatch.exists)
+        attachScreenshot(named: "Settings-menu-bar-shortcut-enabled", from: application)
+
+        application.terminate()
+        application = launch(
+            surface: "settings",
+            state: "normal",
+            appearance: "dark",
+            preferencesSuite: preferencesSuite
+        )
+        form = application.scrollViews["settings.general.form"]
+        toggle = application.descendants(matching: .any)[
+            "settings.menu-bar.shortcut-toggle"
+        ].firstMatch
+        recorder = application.descendants(matching: .any)[
+            "settings.menu-bar.shortcut-field"
+        ].firstMatch
+        assertExists(form)
+        assertExists(toggle)
+        assertExists(recorder)
+        XCTAssertTrue(isControlOn(toggle))
+        XCTAssertEqual(shortcutValue(recorder), "⌥⌘M")
+        XCTAssertFalse(application.alerts.firstMatch.exists)
+        attachScreenshot(named: "Settings-menu-bar-shortcut-persisted-dark", from: application)
+    }
+
+    // swiftlint:enable function_body_length
+
     @MainActor
     func testScreenURLSettings() {
         let preferencesSuite = "KatabroUITests.screen-url-capture.\(UUID().uuidString)"
