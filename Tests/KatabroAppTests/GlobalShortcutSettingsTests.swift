@@ -3,19 +3,21 @@ import Foundation
 @testable import Katabro
 import Testing
 
-// swiftlint:disable force_unwrapping
+// swiftlint:disable force_unwrapping type_body_length
 
 @MainActor
 @Suite("Global shortcut settings")
 struct GlobalShortcutSettingsTests {
     @Test("defaults off with the configured chord")
     func defaultsOff() {
-        let settings = makeSettings(identifier: .openURLFromClipboard)
+        for identifier in commandIdentifiers {
+            let settings = makeSettings(identifier: identifier)
 
-        #expect(!settings.isEnabled)
-        #expect(settings.shortcut == .openURLFromClipboardDefault)
-        #expect(settings.registrationStatus == .disabled)
-        #expect(settings.registeredDisplayValue.isEmpty)
+            #expect(!settings.isEnabled)
+            #expect(settings.shortcut == defaultShortcut(for: identifier))
+            #expect(settings.registrationStatus == .disabled)
+            #expect(settings.registeredDisplayValue.isEmpty)
+        }
     }
 
     @Test("enables, changes, persists, and disables one registration")
@@ -41,6 +43,143 @@ struct GlobalShortcutSettingsTests {
         settings.setEnabled(false)
         #expect(registrar.registeredIdentifiers.isEmpty)
         #expect(settings.registrationStatus == .disabled)
+    }
+
+    @Test("runtime suspension is idempotent and preserves visible and persisted state")
+    func runtimeSuspensionPreservesState() {
+        let defaults = isolatedDefaults()
+        let registrar = KeyedRegistrarFake()
+        let settings = makeSettings(
+            identifier: .showKatabroMenu,
+            defaults: defaults,
+            registrar: registrar
+        )
+        let replacement = GlobalShortcut(keyCode: 8, displayKey: "C", modifiers: [.command, .option])
+        settings.setShortcut(replacement)
+        settings.setEnabled(true)
+        let unregisterCount = registrar.unregisterCalls.count
+
+        settings.suspendRuntimeRegistration()
+        settings.suspendRuntimeRegistration()
+
+        #expect(registrar.unregisterCalls.count == unregisterCount + 1)
+        #expect(registrar.registeredIdentifiers.isEmpty)
+        #expect(settings.isEnabled)
+        #expect(settings.shortcut == replacement)
+        #expect(settings.registrationStatus == .registered)
+        #expect(settings.registeredDisplayValue == replacement.displayValue)
+
+        let reload = makeSettings(
+            identifier: .showKatabroMenu,
+            defaults: defaults,
+            registrar: KeyedRegistrarFake()
+        )
+        #expect(reload.isEnabled)
+        #expect(reload.shortcut == replacement)
+    }
+
+    @Test("runtime resume registers the latest shortcut exactly once")
+    func runtimeResumeRegistersLatestShortcut() {
+        let registrar = KeyedRegistrarFake()
+        let settings = makeSettings(identifier: .showKatabroMenu, registrar: registrar)
+        let replacement = GlobalShortcut(keyCode: 8, displayKey: "C", modifiers: [.command, .option])
+        settings.setEnabled(true)
+        settings.suspendRuntimeRegistration()
+        let registerCount = registrar.registerCalls.count
+
+        settings.setShortcut(replacement)
+        #expect(registrar.registerCalls.count == registerCount)
+        #expect(settings.registrationStatus == .registered)
+
+        settings.resumeRuntimeRegistration()
+        settings.resumeRuntimeRegistration()
+
+        #expect(registrar.registerCalls.count == registerCount + 1)
+        #expect(registrar.shortcuts[.showKatabroMenu] == replacement)
+        #expect(settings.registrationStatus == .registered)
+    }
+
+    @Test("runtime resume exposes a registration conflict")
+    func runtimeResumeExposesConflict() {
+        let registrar = KeyedRegistrarFake()
+        let settings = makeSettings(identifier: .showKatabroMenu, registrar: registrar)
+        settings.setEnabled(true)
+        settings.suspendRuntimeRegistration()
+        registrar.forcedResult = .conflict
+
+        settings.resumeRuntimeRegistration()
+
+        #expect(registrar.registeredIdentifiers.isEmpty)
+        #expect(settings.registrationStatus == .conflict)
+        #expect(settings.registeredDisplayValue.isEmpty)
+    }
+
+    @Test("disabling while runtime suspended cannot re-register on resume")
+    func disableWhileRuntimeSuspended() {
+        let registrar = KeyedRegistrarFake()
+        let settings = makeSettings(identifier: .showKatabroMenu, registrar: registrar)
+        settings.setEnabled(true)
+        settings.suspendRuntimeRegistration()
+        let registerCount = registrar.registerCalls.count
+
+        settings.setEnabled(false)
+        settings.resumeRuntimeRegistration()
+
+        #expect(registrar.registerCalls.count == registerCount)
+        #expect(registrar.registeredIdentifiers.isEmpty)
+        #expect(!settings.isEnabled)
+        #expect(settings.registrationStatus == .disabled)
+    }
+
+    @Test("recording while runtime suspended resumes only after recording ends")
+    func recordingWhileRuntimeSuspended() {
+        let registrar = KeyedRegistrarFake()
+        let settings = makeSettings(identifier: .showKatabroMenu, registrar: registrar)
+        settings.setEnabled(true)
+        settings.suspendRuntimeRegistration()
+        let registerCount = registrar.registerCalls.count
+
+        settings.setShortcutRecording(true)
+        settings.resumeRuntimeRegistration()
+        #expect(registrar.registerCalls.count == registerCount)
+        #expect(settings.registrationStatus == .disabled)
+
+        settings.setShortcutRecording(false)
+        #expect(registrar.registerCalls.count == registerCount + 1)
+        #expect(registrar.registeredIdentifiers == [.showKatabroMenu])
+    }
+
+    @Test("explicit unregister clears runtime suspension")
+    func unregisterClearsRuntimeSuspension() {
+        let registrar = KeyedRegistrarFake()
+        let settings = makeSettings(identifier: .showKatabroMenu, registrar: registrar)
+        settings.setEnabled(true)
+        settings.suspendRuntimeRegistration()
+        let registerCount = registrar.registerCalls.count
+
+        settings.unregister()
+        settings.resumeRuntimeRegistration()
+
+        #expect(registrar.registerCalls.count == registerCount)
+        #expect(registrar.registeredIdentifiers.isEmpty)
+        #expect(settings.registrationStatus == .disabled)
+    }
+
+    @Test("runtime suspension isolates the menu command")
+    func runtimeSuspensionIsolatesMenuCommand() {
+        let registrar = KeyedRegistrarFake()
+        let screen = makeSettings(identifier: .screenURLCapture, registrar: registrar)
+        let clipboard = makeSettings(identifier: .openURLFromClipboard, registrar: registrar)
+        let menu = makeSettings(identifier: .showKatabroMenu, registrar: registrar)
+        screen.setEnabled(true)
+        clipboard.setEnabled(true)
+        menu.setEnabled(true)
+
+        menu.suspendRuntimeRegistration()
+        #expect(registrar.registeredIdentifiers == [.screenURLCapture, .openURLFromClipboard])
+
+        menu.resumeRuntimeRegistration()
+        #expect(registrar.registeredIdentifiers == Set(commandIdentifiers))
     }
 
     @Test("invalid shortcuts are retained and registration errors preserve the chosen chord")
@@ -69,32 +208,55 @@ struct GlobalShortcutSettingsTests {
         let registrar = KeyedRegistrarFake()
         let screen = makeSettings(identifier: .screenURLCapture, registrar: registrar)
         let clipboard = makeSettings(identifier: .openURLFromClipboard, registrar: registrar)
+        let menu = makeSettings(identifier: .showKatabroMenu, registrar: registrar)
         screen.setEnabled(true)
         clipboard.setEnabled(true)
+        menu.setEnabled(true)
 
-        clipboard.setShortcutRecording(true)
-        #expect(registrar.registeredIdentifiers == [.screenURLCapture])
-        clipboard.setShortcutRecording(false)
+        menu.setShortcutRecording(true)
         #expect(registrar.registeredIdentifiers == [.screenURLCapture, .openURLFromClipboard])
+        menu.setShortcutRecording(false)
+        #expect(registrar.registeredIdentifiers == Set(commandIdentifiers))
     }
 
     @Test("distinct commands coexist and callbacks dispatch by identifier")
     func coexistenceAndCallbackIsolation() {
         var screenCalls = 0
         var clipboardCalls = 0
+        var menuCalls = 0
         let registrar = KeyedRegistrarFake()
-        let screen = makeSettings(identifier: .screenURLCapture, registrar: registrar) { screenCalls += 1 }
-        let clipboard = makeSettings(identifier: .openURLFromClipboard, registrar: registrar) { clipboardCalls += 1 }
+        let screen = makeSettings(identifier: .screenURLCapture, registrar: registrar) { _ in screenCalls += 1 }
+        let clipboard = makeSettings(identifier: .openURLFromClipboard, registrar: registrar) { _ in
+            clipboardCalls += 1
+        }
+        let menu = makeSettings(identifier: .showKatabroMenu, registrar: registrar) { _ in menuCalls += 1 }
         screen.setEnabled(true)
         clipboard.setEnabled(true)
+        menu.setEnabled(true)
 
-        registrar.fire(identifier: .openURLFromClipboard)
+        registrar.fire(identifier: .showKatabroMenu)
         #expect(screenCalls == 0)
-        #expect(clipboardCalls == 1)
+        #expect(clipboardCalls == 0)
+        #expect(menuCalls == 1)
 
         screen.setEnabled(false)
         registrar.fire(identifier: .openURLFromClipboard)
-        #expect(clipboardCalls == 2)
+        #expect(clipboardCalls == 1)
+        #expect(menuCalls == 1)
+    }
+
+    @Test("registered callbacks preserve the hotkey invocation timestamp")
+    func preservesInvocationTimestamp() {
+        var receivedInvocation: GlobalHotKeyInvocation?
+        let registrar = KeyedRegistrarFake()
+        let settings = makeSettings(registrar: registrar) { invocation in
+            receivedInvocation = invocation
+        }
+        settings.setEnabled(true)
+
+        registrar.fire(identifier: .openURLFromClipboard, eventTime: 42.5)
+
+        #expect(receivedInvocation == GlobalHotKeyInvocation(eventTime: 42.5))
     }
 
     @Test("duplicate chords conflict on the second command and preserve the first")
@@ -102,13 +264,25 @@ struct GlobalShortcutSettingsTests {
         let registrar = KeyedRegistrarFake()
         let screen = makeSettings(identifier: .screenURLCapture, registrar: registrar)
         let clipboard = makeSettings(identifier: .openURLFromClipboard, registrar: registrar)
+        let menu = makeSettings(identifier: .showKatabroMenu, registrar: registrar)
         screen.setEnabled(true)
-        clipboard.setShortcut(.screenURLCaptureDefault)
         clipboard.setEnabled(true)
+        menu.setShortcut(.screenURLCaptureDefault)
+        menu.setEnabled(true)
 
         #expect(screen.registrationStatus == .registered)
-        #expect(clipboard.registrationStatus == .conflict)
-        #expect(registrar.registeredIdentifiers == [.screenURLCapture])
+        #expect(clipboard.registrationStatus == .registered)
+        #expect(menu.registrationStatus == .conflict)
+        #expect(registrar.registeredIdentifiers == [.screenURLCapture, .openURLFromClipboard])
+
+        var screenCalls = 0
+        var clipboardCalls = 0
+        registrar.replaceHandler(for: .screenURLCapture) { _ in screenCalls += 1 }
+        registrar.replaceHandler(for: .openURLFromClipboard) { _ in clipboardCalls += 1 }
+        registrar.fire(identifier: .screenURLCapture)
+        registrar.fire(identifier: .openURLFromClipboard)
+        #expect(screenCalls == 1)
+        #expect(clipboardCalls == 1)
     }
 
     @Test("availability unregisters only that command without erasing preferences")
@@ -186,41 +360,80 @@ struct GlobalShortcutSettingsTests {
     func callbackRegistryIsolation() {
         var screenCalls = 0
         var clipboardCalls = 0
+        var menuCalls = 0
         var registry = GlobalHotKeyCallbackRegistry()
-        registry.set({ screenCalls += 1 }, for: .screenURLCapture)
-        registry.set({ clipboardCalls += 1 }, for: .openURLFromClipboard)
+        registry.set({ _ in screenCalls += 1 }, for: .screenURLCapture)
+        registry.set({ _ in clipboardCalls += 1 }, for: .openURLFromClipboard)
+        registry.set({ invocation in
+            #expect(invocation == GlobalHotKeyInvocation(eventTime: 12.25))
+            menuCalls += 1
+        }, for: .showKatabroMenu)
 
-        #expect(!registry.dispatch(signature: 0, rawIdentifier: 1))
-        #expect(!registry.dispatch(signature: GlobalHotKeyIdentifier.signature, rawIdentifier: 99))
+        let invocation = GlobalHotKeyInvocation(eventTime: 12.25)
+        #expect(!registry.dispatch(signature: 0, rawIdentifier: 1, invocation: invocation))
+        #expect(!registry.dispatch(
+            signature: GlobalHotKeyIdentifier.signature,
+            rawIdentifier: 99,
+            invocation: invocation
+        ))
         #expect(registry.dispatch(
             signature: GlobalHotKeyIdentifier.signature,
-            rawIdentifier: GlobalHotKeyIdentifier.openURLFromClipboard.rawValue
+            rawIdentifier: GlobalHotKeyIdentifier.showKatabroMenu.rawValue,
+            invocation: invocation
         ))
         #expect(screenCalls == 0)
-        #expect(clipboardCalls == 1)
+        #expect(clipboardCalls == 0)
+        #expect(menuCalls == 1)
+    }
+
+    private var commandIdentifiers: [GlobalHotKeyIdentifier] {
+        [.screenURLCapture, .openURLFromClipboard, .showKatabroMenu]
     }
 
     private func makeSettings(
         identifier: GlobalHotKeyIdentifier = .openURLFromClipboard,
         defaults: UserDefaults? = nil,
         registrar: KeyedRegistrarFake = KeyedRegistrarFake(),
-        onShortcut: @escaping @MainActor () -> Void = {}
+        onShortcut: @escaping @MainActor (GlobalHotKeyInvocation) -> Void = { _ in }
     ) -> GlobalShortcutSettings {
-        let suffix = identifier == .screenURLCapture ? "screen" : "clipboard"
+        let suffix: String
+        let defaultShortcut: GlobalShortcut
+        switch identifier {
+        case .screenURLCapture:
+            suffix = "screen"
+            defaultShortcut = .screenURLCaptureDefault
+        case .openURLFromClipboard:
+            suffix = "clipboard"
+            defaultShortcut = .openURLFromClipboardDefault
+        case .showKatabroMenu:
+            suffix = "menu"
+            defaultShortcut = .showKatabroMenuDefault
+        default:
+            fatalError("Unknown test command identifier")
+        }
         return GlobalShortcutSettings(
             configuration: .init(
                 identifier: identifier,
                 enabledKey: "test.\(suffix).enabled",
                 shortcutKey: "test.\(suffix).shortcut",
-                defaultShortcut: identifier == .screenURLCapture
-                    ? .screenURLCaptureDefault
-                    : .openURLFromClipboardDefault,
+                defaultShortcut: defaultShortcut,
                 registrationAllowed: true
             ),
             defaults: defaults ?? isolatedDefaults(),
             registrar: registrar,
             onShortcut: onShortcut
         )
+    }
+
+    private func defaultShortcut(
+        for identifier: GlobalHotKeyIdentifier
+    ) -> GlobalShortcut {
+        switch identifier {
+        case .screenURLCapture: .screenURLCaptureDefault
+        case .openURLFromClipboard: .openURLFromClipboardDefault
+        case .showKatabroMenu: .showKatabroMenuDefault
+        default: fatalError("Unknown test command identifier")
+        }
     }
 
     private func isolatedDefaults() -> UserDefaults {
@@ -235,7 +448,9 @@ struct GlobalShortcutSettingsTests {
 final class KeyedRegistrarFake: GlobalHotKeyRegistering {
     var forcedResult: GlobalHotKeyRegistrationResult?
     private(set) var shortcuts: [GlobalHotKeyIdentifier: GlobalShortcut] = [:]
-    private var handlers: [GlobalHotKeyIdentifier: @MainActor () -> Void] = [:]
+    private var handlers: [
+        GlobalHotKeyIdentifier: @MainActor (GlobalHotKeyInvocation) -> Void
+    ] = [:]
     private(set) var registerCalls: [GlobalHotKeyIdentifier] = []
     private(set) var unregisterCalls: [GlobalHotKeyIdentifier] = []
 
@@ -246,7 +461,7 @@ final class KeyedRegistrarFake: GlobalHotKeyRegistering {
     func register(
         _ shortcut: GlobalShortcut,
         for identifier: GlobalHotKeyIdentifier,
-        handler: @escaping @MainActor () -> Void
+        handler: @escaping @MainActor (GlobalHotKeyInvocation) -> Void
     ) -> GlobalHotKeyRegistrationResult {
         registerCalls.append(identifier)
         if let forcedResult {
@@ -266,9 +481,16 @@ final class KeyedRegistrarFake: GlobalHotKeyRegistering {
         handlers.removeValue(forKey: identifier)
     }
 
-    func fire(identifier: GlobalHotKeyIdentifier) {
-        handlers[identifier]?()
+    func fire(identifier: GlobalHotKeyIdentifier, eventTime: TimeInterval = 0) {
+        handlers[identifier]?(GlobalHotKeyInvocation(eventTime: eventTime))
+    }
+
+    func replaceHandler(
+        for identifier: GlobalHotKeyIdentifier,
+        with handler: @escaping @MainActor (GlobalHotKeyInvocation) -> Void
+    ) {
+        handlers[identifier] = handler
     }
 }
 
-// swiftlint:enable force_unwrapping
+// swiftlint:enable force_unwrapping type_body_length

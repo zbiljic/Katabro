@@ -36,7 +36,7 @@ struct ScreenURLCaptureSettingsTests {
             onShortcut: { calls += 1 }
         )
         settings.setEnabled(true)
-        registrar.fire(identifier: .screenURLCapture)
+        registrar.fire(identifier: .screenURLCapture, eventTime: 42.5)
         #expect(calls == 1)
         #expect(registrar.registerCount == 1)
 
@@ -179,7 +179,9 @@ private final class RegistrarFake: GlobalHotKeyRegistering {
     var registerCount = 0
     var unregisterCount = 0
     private let result: GlobalHotKeyRegistrationResult
-    private var handlers: [GlobalHotKeyIdentifier: @MainActor () -> Void] = [:]
+    private var handlers: [
+        GlobalHotKeyIdentifier: @MainActor (GlobalHotKeyInvocation) -> Void
+    ] = [:]
 
     init(result: GlobalHotKeyRegistrationResult = .registered) {
         self.result = result
@@ -188,7 +190,7 @@ private final class RegistrarFake: GlobalHotKeyRegistering {
     func register(
         _: GlobalShortcut,
         for identifier: GlobalHotKeyIdentifier,
-        handler: @escaping @MainActor () -> Void
+        handler: @escaping @MainActor (GlobalHotKeyInvocation) -> Void
     ) -> GlobalHotKeyRegistrationResult {
         registerCount += 1
         handlers[identifier] = handler
@@ -200,7 +202,7 @@ private final class RegistrarFake: GlobalHotKeyRegistering {
         handlers.removeValue(forKey: identifier)
     }
 
-    func fire(identifier: GlobalHotKeyIdentifier) {
-        handlers[identifier]?()
+    func fire(identifier: GlobalHotKeyIdentifier, eventTime: TimeInterval = 0) {
+        handlers[identifier]?(GlobalHotKeyInvocation(eventTime: eventTime))
     }
 }

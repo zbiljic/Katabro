@@ -47,6 +47,12 @@ let project = Project(
             wrapsLines: true
         )
     ),
+    packages: [
+        .package(
+            url: "https://github.com/orchetect/MenuBarExtraAccess.git",
+            .upToNextMajor(from: "1.3.1")
+        ),
+    ],
     settings: sharedSettings,
     targets: [
         .target(
@@ -101,6 +107,7 @@ let project = Project(
                     name: "KatabroCLI",
                     status: .none
                 ),
+                .package(product: "MenuBarExtraAccess"),
             ],
             settings: appSettings
         ),
@@ -136,6 +143,7 @@ let project = Project(
                     name: "KatabroCLI",
                     status: .none
                 ),
+                .package(product: "MenuBarExtraAccess"),
             ],
             settings: iCloudAppSettings
         ),

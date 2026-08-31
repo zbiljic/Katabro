@@ -31,9 +31,10 @@ final class GlobalShortcutSettings {
     let configuration: Configuration
     private let defaults: UserDefaults
     private let registrar: any GlobalHotKeyRegistering
-    private let onShortcut: @MainActor () -> Void
+    private let onShortcut: @MainActor (GlobalHotKeyInvocation) -> Void
     private var registrationAllowed: Bool
     private var isShortcutRecording = false
+    private var isRuntimeSuspended = false
     private(set) var isEnabled: Bool
     private(set) var shortcut: GlobalShortcut
     private(set) var registrationStatus: RegistrationStatus = .disabled
@@ -42,11 +43,24 @@ final class GlobalShortcutSettings {
         registrationStatus == .registered ? shortcut.displayValue : ""
     }
 
-    init(
+    convenience init(
         configuration: Configuration,
         defaults: UserDefaults = .standard,
         registrar: any GlobalHotKeyRegistering,
         onShortcut: @escaping @MainActor () -> Void = {}
+    ) {
+        self.init(
+            configuration: configuration,
+            defaults: defaults,
+            registrar: registrar
+        ) { _ in onShortcut() }
+    }
+
+    init(
+        configuration: Configuration,
+        defaults: UserDefaults = .standard,
+        registrar: any GlobalHotKeyRegistering,
+        onShortcut: @escaping @MainActor (GlobalHotKeyInvocation) -> Void
     ) {
         self.configuration = configuration
         self.defaults = defaults
@@ -98,7 +112,20 @@ final class GlobalShortcutSettings {
         registerIfNeeded()
     }
 
+    func suspendRuntimeRegistration() {
+        guard !isRuntimeSuspended, registrationStatus == .registered else { return }
+        isRuntimeSuspended = true
+        registrar.unregister(configuration.identifier)
+    }
+
+    func resumeRuntimeRegistration() {
+        guard isRuntimeSuspended else { return }
+        isRuntimeSuspended = false
+        registerIfNeeded()
+    }
+
     func unregister() {
+        isRuntimeSuspended = false
         registrar.unregister(configuration.identifier)
         registrationStatus = .disabled
     }
@@ -107,6 +134,10 @@ final class GlobalShortcutSettings {
         registrar.unregister(configuration.identifier)
         guard registrationAllowed, isEnabled, !isShortcutRecording else {
             registrationStatus = .disabled
+            return
+        }
+        guard !isRuntimeSuspended else {
+            registrationStatus = .registered
             return
         }
         switch registrar.register(shortcut, for: configuration.identifier, handler: onShortcut) {

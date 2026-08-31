@@ -1,9 +1,14 @@
 import Carbon
 
+struct GlobalHotKeyInvocation: Equatable, Sendable {
+    let eventTime: TimeInterval
+}
+
 struct GlobalHotKeyIdentifier: RawRepresentable, Hashable, Sendable {
     static let signature: UInt32 = 0x4B41_5452
     static let screenURLCapture = Self(rawValue: 1)
     static let openURLFromClipboard = Self(rawValue: 2)
+    static let showKatabroMenu = Self(rawValue: 3)
 
     let rawValue: UInt32
 }
@@ -20,17 +25,17 @@ protocol GlobalHotKeyRegistering: AnyObject {
     func register(
         _ shortcut: GlobalShortcut,
         for identifier: GlobalHotKeyIdentifier,
-        handler: @escaping @MainActor () -> Void
+        handler: @escaping @MainActor (GlobalHotKeyInvocation) -> Void
     ) -> GlobalHotKeyRegistrationResult
     func unregister(_ identifier: GlobalHotKeyIdentifier)
 }
 
 @MainActor
 struct GlobalHotKeyCallbackRegistry {
-    private var callbacks: [GlobalHotKeyIdentifier: @MainActor () -> Void] = [:]
+    private var callbacks: [GlobalHotKeyIdentifier: @MainActor (GlobalHotKeyInvocation) -> Void] = [:]
 
     mutating func set(
-        _ callback: @escaping @MainActor () -> Void,
+        _ callback: @escaping @MainActor (GlobalHotKeyInvocation) -> Void,
         for identifier: GlobalHotKeyIdentifier
     ) {
         callbacks[identifier] = callback
@@ -40,10 +45,14 @@ struct GlobalHotKeyCallbackRegistry {
         callbacks.removeValue(forKey: identifier)
     }
 
-    func dispatch(signature: UInt32, rawIdentifier: UInt32) -> Bool {
+    func dispatch(
+        signature: UInt32,
+        rawIdentifier: UInt32,
+        invocation: GlobalHotKeyInvocation
+    ) -> Bool {
         guard signature == GlobalHotKeyIdentifier.signature else { return false }
         guard let callback = callbacks[GlobalHotKeyIdentifier(rawValue: rawIdentifier)] else { return false }
-        callback()
+        callback(invocation)
         return true
     }
 }
@@ -57,7 +66,7 @@ final class GlobalHotKeyRegistrar: GlobalHotKeyRegistering {
     func register(
         _ shortcut: GlobalShortcut,
         for identifier: GlobalHotKeyIdentifier,
-        handler: @escaping @MainActor () -> Void
+        handler: @escaping @MainActor (GlobalHotKeyInvocation) -> Void
     ) -> GlobalHotKeyRegistrationResult {
         unregister(identifier)
         guard shortcut.isValid else { return .failed }
@@ -136,9 +145,11 @@ final class GlobalHotKeyRegistrar: GlobalHotKeyRegistering {
             &identifier
         )
         guard status == noErr else { return OSStatus(eventNotHandledErr) }
+
         return callbacks.dispatch(
             signature: identifier.signature,
-            rawIdentifier: identifier.id
+            rawIdentifier: identifier.id,
+            invocation: GlobalHotKeyInvocation(eventTime: GetEventTime(event))
         ) ? OSStatus(noErr) : OSStatus(eventNotHandledErr)
     }
 
@@ -161,7 +172,7 @@ final class InertGlobalHotKeyRegistrar: GlobalHotKeyRegistering {
     func register(
         _: GlobalShortcut,
         for _: GlobalHotKeyIdentifier,
-        handler _: @escaping @MainActor () -> Void
+        handler _: @escaping @MainActor (GlobalHotKeyInvocation) -> Void
     ) -> GlobalHotKeyRegistrationResult {
         .failed
     }

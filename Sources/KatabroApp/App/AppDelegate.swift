@@ -4,8 +4,11 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     static let clipboardShortcutEnabledKey = "clipboardURL.globalShortcutEnabled.v1"
     static let clipboardShortcutKey = "clipboardURL.globalShortcut.v1"
+    static let menuBarShortcutEnabledKey = "menuBar.globalShortcutEnabled.v1"
+    static let menuBarShortcutKey = "menuBar.globalShortcut.v1"
 
     let dependencies: AppDependencies
+    let menuBarPresentationState: MenuBarPresentationState
 
     #if DEBUG
         let developmentUIConfiguration: DevelopmentUIConfiguration?
@@ -57,8 +60,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ),
         defaults: dependencies.globalShortcutDefaults,
         registrar: dependencies.globalHotKeyRegistrar
-    ) { [weak self] in
+    ) { [weak self] _ in
         self?.openClipboardURL()
+    }
+
+    lazy var menuBarShortcutSettings = GlobalShortcutSettings(
+        configuration: .init(
+            identifier: .showKatabroMenu,
+            enabledKey: Self.menuBarShortcutEnabledKey,
+            shortcutKey: Self.menuBarShortcutKey,
+            defaultShortcut: .showKatabroMenuDefault,
+            registrationAllowed: true
+        ),
+        defaults: dependencies.globalShortcutDefaults,
+        registrar: dependencies.globalHotKeyRegistrar
+    ) { [weak self] invocation in
+        self?.menuBarPresentationState.toggle(eventTime: invocation.eventTime)
     }
 
     lazy var onboardingCoordinator = OnboardingWindowCoordinator(
@@ -87,9 +104,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     init(
-        dependencies: AppDependencies
+        dependencies: AppDependencies,
+        menuBarPresentationState: MenuBarPresentationState = MenuBarPresentationState()
     ) {
         self.dependencies = dependencies
+        self.menuBarPresentationState = menuBarPresentationState
         #if DEBUG
             developmentUIConfiguration = nil
         #endif
@@ -99,10 +118,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     #if DEBUG
         init(
             dependencies: AppDependencies,
-            developmentUIConfiguration: DevelopmentUIConfiguration?
+            developmentUIConfiguration: DevelopmentUIConfiguration?,
+            menuBarPresentationState: MenuBarPresentationState = MenuBarPresentationState()
         ) {
             self.dependencies = dependencies
             self.developmentUIConfiguration = developmentUIConfiguration
+            self.menuBarPresentationState = menuBarPresentationState
             super.init()
         }
     #endif
@@ -120,6 +141,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #endif
         screenURLCaptureSettings.start()
         clipboardURLShortcutSettings.start()
+        menuBarShortcutSettings.start()
         onboardingCoordinator.presentIfNeeded()
     }
 
@@ -129,6 +151,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         clipboardURLSnapshotStore.stopMonitoring()
         screenURLCaptureSettings.unregister()
         clipboardURLShortcutSettings.unregister()
+        menuBarShortcutSettings.unregister()
+        menuBarPresentationState.disconnect()
         dependencies.routingDecisionLogStore.clear()
     }
 

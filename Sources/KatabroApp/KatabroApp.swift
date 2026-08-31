@@ -1,4 +1,5 @@
 import AppKit
+import MenuBarExtraAccess
 import SwiftUI
 
 @main
@@ -7,6 +8,8 @@ struct KatabroApp: App {
     private var appDelegate
 
     var body: some Scene {
+        @Bindable var menuBarPresentation = appDelegate.menuBarPresentationState
+
         MenuBarExtra {
             MenuBarView(
                 clipboardURLSnapshotStore: appDelegate.clipboardURLSnapshotStore,
@@ -25,6 +28,32 @@ struct KatabroApp: App {
                 .renderingMode(.template)
                 .accessibilityLabel(AppMetadata.displayName)
         }
+        .menuBarExtraAccess(isPresented: $menuBarPresentation.isPresented) { statusItem in
+            guard let menu = statusItem.menu else {
+                menuBarPresentation.disconnect()
+                return
+            }
+            menuBarPresentation.connect(
+                menu: menu,
+                open: { [weak statusItem] in
+                    statusItem?.togglePresented()
+                },
+                close: { [weak menu] in
+                    menu?.cancelTracking()
+                },
+                shortcutProvider: { [weak settings = appDelegate.menuBarShortcutSettings] in
+                    guard settings?.registrationStatus == .registered else { return nil }
+                    return settings?.shortcut
+                },
+                onTrackingBegin: { [weak settings = appDelegate.menuBarShortcutSettings] in
+                    settings?.suspendRuntimeRegistration()
+                },
+                onTrackingEnd: { [weak settings = appDelegate.menuBarShortcutSettings] in
+                    settings?.resumeRuntimeRegistration()
+                }
+            )
+        }
+        .menuBarExtraStyle(.menu)
 
         Settings {
             SettingsView(

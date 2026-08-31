@@ -26,6 +26,11 @@ struct GlobalShortcut: Codable, Equatable, Sendable {
         displayKey: "B",
         modifiers: [.control, .command]
     )
+    static let showKatabroMenuDefault = Self(
+        keyCode: 40,
+        displayKey: "K",
+        modifiers: [.option, .command]
+    )
 
     var isValid: Bool {
         modifiers.rawValue.nonzeroBitCount >= 2

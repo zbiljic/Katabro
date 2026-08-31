@@ -769,13 +769,15 @@
 
     @MainActor
     private final class DevelopmentGlobalHotKeyRegistrar: GlobalHotKeyRegistering {
-        private var handlers: [GlobalHotKeyIdentifier: @MainActor () -> Void] = [:]
+        private var handlers: [
+            GlobalHotKeyIdentifier: @MainActor (GlobalHotKeyInvocation) -> Void
+        ] = [:]
         private var shortcuts: [GlobalHotKeyIdentifier: GlobalShortcut] = [:]
 
         func register(
             _ shortcut: GlobalShortcut,
             for identifier: GlobalHotKeyIdentifier,
-            handler: @escaping @MainActor () -> Void
+            handler: @escaping @MainActor (GlobalHotKeyInvocation) -> Void
         ) -> GlobalHotKeyRegistrationResult {
             if shortcuts.contains(where: { $0.key != identifier && $0.value == shortcut }) {
                 return .conflict
