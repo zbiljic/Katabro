@@ -80,7 +80,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     lazy var onboardingCoordinator = OnboardingWindowCoordinator(
         defaultBrowserClient: dependencies.defaultBrowserClient,
-        preferencesStore: dependencies.preferencesStore
+        preferencesStore: dependencies.preferencesStore,
+        clipboardURLShortcutSettings: clipboardURLShortcutSettings
     )
 
     override convenience init() {

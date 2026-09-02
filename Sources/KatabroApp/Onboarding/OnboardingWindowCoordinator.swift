@@ -13,14 +13,17 @@ enum OnboardingLaunchPolicy {
 final class OnboardingWindowCoordinator: NSObject, NSWindowDelegate {
     private let defaultBrowserClient: DefaultBrowserClient
     private let preferencesStore: PreferencesStore
+    private let clipboardURLShortcutSettings: GlobalShortcutSettings
     private var window: NSWindow?
 
     init(
         defaultBrowserClient: DefaultBrowserClient,
-        preferencesStore: PreferencesStore
+        preferencesStore: PreferencesStore,
+        clipboardURLShortcutSettings: GlobalShortcutSettings
     ) {
         self.defaultBrowserClient = defaultBrowserClient
         self.preferencesStore = preferencesStore
+        self.clipboardURLShortcutSettings = clipboardURLShortcutSettings
     }
 
     func presentIfNeeded() {
@@ -44,7 +47,8 @@ final class OnboardingWindowCoordinator: NSObject, NSWindowDelegate {
 
         let view = OnboardingView(
             defaultBrowserClient: defaultBrowserClient,
-            preferencesStore: preferencesStore
+            preferencesStore: preferencesStore,
+            clipboardURLShortcutSettings: clipboardURLShortcutSettings
         ) { [weak self] in
             self?.window?.close()
         }
@@ -53,7 +57,7 @@ final class OnboardingWindowCoordinator: NSObject, NSWindowDelegate {
                 origin: .zero,
                 size: NSSize(
                     width: 520,
-                    height: 440
+                    height: 360
                 )
             ),
             styleMask: [

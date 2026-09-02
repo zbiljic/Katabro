@@ -857,6 +857,11 @@
                 screenURLCaptureSettings.setEnabled(true)
                 clipboardURLShortcutSettings.setEnabled(true)
             }
+            if configuration.surface != .screenURLs {
+                screenURLCaptureSettings.start()
+                clipboardURLShortcutSettings.start()
+                menuBarShortcutSettings.start()
+            }
             _screenURLCaptureSettings = State(initialValue: screenURLCaptureSettings)
             _clipboardURLShortcutSettings = State(initialValue: clipboardURLShortcutSettings)
             _menuBarShortcutSettings = State(initialValue: menuBarShortcutSettings)
@@ -887,7 +892,8 @@
                 case .onboarding:
                     OnboardingView(
                         defaultBrowserClient: dependencies.defaultBrowserClient,
-                        preferencesStore: dependencies.preferencesStore
+                        preferencesStore: dependencies.preferencesStore,
+                        clipboardURLShortcutSettings: clipboardURLShortcutSettings
                     ) {}
                 case .picker:
                     DevelopmentPickerReviewView(
@@ -1169,7 +1175,7 @@
             case .onboarding:
                 return NSSize(
                     width: 520,
-                    height: 440
+                    height: 360
                 )
             case .picker:
                 let store = DevelopmentUIFixtures.pickerStore(

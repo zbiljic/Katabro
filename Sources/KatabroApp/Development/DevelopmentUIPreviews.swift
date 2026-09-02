@@ -90,10 +90,22 @@
         let dependencies = DevelopmentUIFixtures.dependencies(
             for: .normal
         )
+        let clipboardURLShortcutSettings = GlobalShortcutSettings(
+            configuration: .init(
+                identifier: .openURLFromClipboard,
+                enabledKey: AppDelegate.clipboardShortcutEnabledKey,
+                shortcutKey: AppDelegate.clipboardShortcutKey,
+                defaultShortcut: .openURLFromClipboardDefault,
+                registrationAllowed: true
+            ),
+            defaults: dependencies.globalShortcutDefaults,
+            registrar: dependencies.globalHotKeyRegistrar
+        )
 
         OnboardingView(
             defaultBrowserClient: dependencies.defaultBrowserClient,
-            preferencesStore: dependencies.preferencesStore
+            preferencesStore: dependencies.preferencesStore,
+            clipboardURLShortcutSettings: clipboardURLShortcutSettings
         ) {}
     }
 

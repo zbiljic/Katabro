@@ -53,9 +53,17 @@ scripts/stop
 ## First-time setup
 
 1. Open Katabro from the menu bar and choose **Finish Setup…**.
-2. Choose **Use Katabro as Default Browser…**.
-3. Confirm the HTTP and HTTPS handler changes requested by macOS.
-4. Wait for Katabro to confirm that it is the handler for both schemes.
+2. On **Set Up Katabro**, choose **Use Katabro as Default Browser…** and
+   confirm the HTTP and HTTPS handler changes requested by macOS. You can still
+   continue if the system request needs attention later.
+3. Choose **Continue** after reviewing the live default-browser status.
+4. On **Open Copied Links Faster**, optionally enable the proposed
+   Control-Command-B shortcut. The shortcut is off by default and stays on this
+   Mac.
+5. Choose **Done** to finish setup.
+
+Existing users can reopen both steps from **More > Setup Guide…** without
+changing their completed setup state.
 
 Open Settings (`⌘,`) to change the default-browser status, login item, browser
 order, picker layout, shortcuts, rules, and sync options.

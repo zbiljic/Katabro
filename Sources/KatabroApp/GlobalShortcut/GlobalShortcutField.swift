@@ -58,7 +58,7 @@ struct GlobalShortcutField: NSViewRepresentable {
     }
 
     static func dismantleNSView(_ field: ShortcutTextField, coordinator: Coordinator) {
-        coordinator.stopRecording(in: field)
+        coordinator.cancelRecording(in: field)
     }
 
     private func update(_ field: NSTextField, with shortcut: GlobalShortcut) {
@@ -193,8 +193,8 @@ struct GlobalShortcutField: NSViewRepresentable {
             showRecordingPrompt(in: field)
         }
 
-        func stopRecording(in field: ShortcutTextField) {
-            finishRecording(field)
+        func cancelRecording(in field: ShortcutTextField) {
+            restore(field)
         }
 
         private func installKeyDownMonitor(for field: ShortcutTextField) {
