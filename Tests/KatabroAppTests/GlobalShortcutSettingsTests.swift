@@ -3,7 +3,7 @@ import Foundation
 @testable import Katabro
 import Testing
 
-// swiftlint:disable force_unwrapping type_body_length
+// swiftlint:disable file_length force_unwrapping type_body_length
 
 @MainActor
 @Suite("Global shortcut settings")
@@ -356,6 +356,49 @@ struct GlobalShortcutSettingsTests {
         #expect(!field.isRecording)
     }
 
+    @Test("recorder teardown restores its shortcut registration exactly once")
+    func recorderTeardownRestoresRegistration() {
+        let registrar = KeyedRegistrarFake()
+        let screen = makeSettings(identifier: .screenURLCapture, registrar: registrar)
+        let clipboard = makeSettings(identifier: .openURLFromClipboard, registrar: registrar)
+        let menu = makeSettings(identifier: .showKatabroMenu, registrar: registrar)
+        screen.setEnabled(true)
+        clipboard.setEnabled(true)
+        menu.setEnabled(true)
+        var recordingNotifications: [Bool] = []
+        let field = GlobalShortcutField.ShortcutTextField()
+        let recorder = GlobalShortcutField(
+            shortcut: clipboard.shortcut,
+            isEnabled: clipboard.isEnabled,
+            accessibilityIdentifier: "test.shortcut",
+            onChange: clipboard.setShortcut
+        ) {
+            recordingNotifications.append($0)
+            clipboard.setShortcutRecording($0)
+        }.makeCoordinator()
+        field.delegate = recorder
+        field.stringValue = clipboard.shortcut.displayValue
+
+        field.beginPointerRecording()
+        recorder.beginRecording(in: field)
+        #expect(field.stringValue == GlobalShortcutField.recordingPrompt)
+        #expect(registrar.registeredIdentifiers == [.screenURLCapture, .showKatabroMenu])
+
+        GlobalShortcutField.dismantleNSView(field, coordinator: recorder)
+
+        #expect(field.stringValue == clipboard.shortcut.displayValue)
+        #expect(field.accessibilityValue() == clipboard.shortcut.displayValue)
+        #expect(!field.isRecording)
+        #expect(field.refusesFirstResponder)
+        #expect(recordingNotifications == [true, false])
+        #expect(registrar.registeredIdentifiers == Set(commandIdentifiers))
+
+        GlobalShortcutField.dismantleNSView(field, coordinator: recorder)
+
+        #expect(recordingNotifications == [true, false])
+        #expect(registrar.registeredIdentifiers == Set(commandIdentifiers))
+    }
+
     @Test("callback registry rejects unknown signature and identifier")
     func callbackRegistryIsolation() {
         var screenCalls = 0
@@ -493,4 +536,4 @@ final class KeyedRegistrarFake: GlobalHotKeyRegistering {
     }
 }
 
-// swiftlint:enable force_unwrapping type_body_length
+// swiftlint:enable file_length force_unwrapping type_body_length

@@ -1090,7 +1090,7 @@ final class KatabroUITests: XCTestCase {
     @MainActor
     func testOnboardingAndPickerReviewSurfaces() {
         let surfaces = [
-            ("onboarding", "onboarding.done"),
+            ("onboarding", "onboarding.continue"),
             ("picker", "picker.browser.com.apple.Safari"),
         ]
 
@@ -1130,19 +1130,57 @@ final class KatabroUITests: XCTestCase {
         }
 
         assertOnboardingExplanation(application)
+        let progress = application.staticTexts["onboarding.step-progress"]
+        assertExists(progress)
+        XCTAssertEqual(progress.value as? String, "Step 1 of 2")
+        assertExists(
+            application.descendants(matching: .any)["onboarding.step.default-browser"]
+        )
         assertExists(
             application.staticTexts["onboarding.default-browser.status"]
         )
         assertDoesNotExist(
             application.buttons["onboarding.default-browser.action"]
         )
+        assertExists(application.buttons["onboarding.continue"])
+        assertDoesNotExist(application.buttons["onboarding.done"])
+        attachScreenshot(
+            named: "Onboarding-normal-step-1",
+            from: application
+        )
+
+        application.buttons["onboarding.continue"].click()
+
+        XCTAssertEqual(progress.value as? String, "Step 2 of 2")
+        assertExists(application.staticTexts["Open Copied Links Faster"])
+        assertExists(application.buttons["onboarding.back"])
         assertExists(
             application.buttons["onboarding.done"]
         )
+        let toggle = application.descendants(matching: .any)[
+            "onboarding.clipboard-url.shortcut-toggle"
+        ].firstMatch
+        let recorder = application.descendants(matching: .any)[
+            "onboarding.clipboard-url.shortcut-field"
+        ].firstMatch
+        assertExists(toggle)
+        assertExists(recorder)
+        XCTAssertFalse(isControlOn(toggle))
+        XCTAssertEqual(shortcutValue(recorder), "⌃⌘B")
         attachScreenshot(
-            named: "Onboarding-normal",
+            named: "Onboarding-normal-step-2",
             from: application
         )
+
+        application.buttons["onboarding.back"].click()
+
+        XCTAssertEqual(progress.value as? String, "Step 1 of 2")
+        assertOnboardingExplanation(application)
+        assertExists(application.buttons["onboarding.continue"])
+        assertDoesNotExist(application.buttons["onboarding.back"])
+        assertDoesNotExist(application.buttons["onboarding.done"])
+        assertDoesNotExist(toggle)
+        assertDoesNotExist(recorder)
     }
 
     @MainActor
@@ -1157,10 +1195,12 @@ final class KatabroUITests: XCTestCase {
 
         assertOnboardingExplanation(application)
         for identifier in [
+            "onboarding.step-progress",
+            "onboarding.step.default-browser",
             "onboarding.default-browser.status",
             "onboarding.default-browser.action",
             "onboarding.default-browser.error",
-            "onboarding.done",
+            "onboarding.continue",
         ] {
             assertExists(
                 application.descendants(
@@ -1169,9 +1209,113 @@ final class KatabroUITests: XCTestCase {
             )
         }
         attachScreenshot(
-            named: "Onboarding-service-errors",
+            named: "Onboarding-service-errors-step-1",
             from: application
         )
+
+        application.buttons["onboarding.continue"].click()
+
+        XCTAssertEqual(
+            application.staticTexts["onboarding.step-progress"].value as? String,
+            "Step 2 of 2"
+        )
+        assertExists(application.staticTexts["Open Copied Links Faster"])
+        assertExists(application.buttons["onboarding.back"])
+        assertExists(application.buttons["onboarding.done"])
+        assertExists(
+            application.descendants(matching: .any)[
+                "onboarding.clipboard-url.shortcut-toggle"
+            ]
+        )
+        assertExists(
+            application.descendants(matching: .any)[
+                "onboarding.clipboard-url.shortcut-field"
+            ]
+        )
+    }
+
+    @MainActor
+    func testOnboardingClipboardShortcutPersistence() { // swiftlint:disable:this function_body_length
+        let preferencesSuite = "KatabroUITests.onboarding-shortcut.\(UUID().uuidString)"
+        var application = launch(
+            surface: "onboarding",
+            state: "normal",
+            preferencesSuite: preferencesSuite,
+            resetsPreferences: true
+        )
+        defer { application.terminate() }
+
+        let continueButton = application.buttons["onboarding.continue"]
+        assertExists(continueButton)
+        continueButton.click()
+        var toggle = application.descendants(matching: .any)[
+            "onboarding.clipboard-url.shortcut-toggle"
+        ].firstMatch
+        var recorder = application.descendants(matching: .any)[
+            "onboarding.clipboard-url.shortcut-field"
+        ].firstMatch
+        assertExists(toggle)
+        assertExists(recorder)
+        XCTAssertFalse(isControlOn(toggle))
+        XCTAssertEqual(shortcutValue(recorder), "⌃⌘B")
+
+        toggle.click()
+
+        XCTAssertTrue(isControlOn(toggle))
+        var status = application.descendants(matching: .any)[
+            "onboarding.clipboard-url.shortcut-status"
+        ].firstMatch
+        assertExists(status)
+        XCTAssertEqual(status.value as? String, "Global shortcut is registered.")
+
+        recorder.click()
+        XCTAssertEqual(shortcutValue(recorder), "Press keys")
+        application.buttons["onboarding.back"].click()
+        assertExists(application.buttons["onboarding.continue"])
+        assertDoesNotExist(recorder)
+
+        let restoredContinueButton = application.buttons["onboarding.continue"]
+        assertExists(restoredContinueButton)
+        restoredContinueButton.click()
+        recorder = application.descendants(matching: .any)[
+            "onboarding.clipboard-url.shortcut-field"
+        ].firstMatch
+        status = application.descendants(matching: .any)[
+            "onboarding.clipboard-url.shortcut-status"
+        ].firstMatch
+        assertExists(recorder)
+        assertExists(status)
+        XCTAssertEqual(shortcutValue(recorder), "⌃⌘B")
+        XCTAssertEqual(status.value as? String, "Global shortcut is registered.")
+
+        application.terminate()
+        application = launch(
+            surface: "onboarding",
+            state: "normal",
+            preferencesSuite: preferencesSuite
+        )
+        let relaunchedContinueButton = application.buttons["onboarding.continue"]
+        assertExists(relaunchedContinueButton)
+        relaunchedContinueButton.click()
+        toggle = application.descendants(matching: .any)[
+            "onboarding.clipboard-url.shortcut-toggle"
+        ].firstMatch
+        recorder = application.descendants(matching: .any)[
+            "onboarding.clipboard-url.shortcut-field"
+        ].firstMatch
+        status = application.descendants(matching: .any)[
+            "onboarding.clipboard-url.shortcut-status"
+        ].firstMatch
+        assertExists(toggle)
+        assertExists(recorder)
+        assertExists(status)
+        XCTAssertTrue(isControlOn(toggle))
+        XCTAssertEqual(shortcutValue(recorder), "⌃⌘B")
+        XCTAssertEqual(status.value as? String, "Global shortcut is registered.")
+
+        toggle.click()
+        XCTAssertFalse(isControlOn(toggle))
+        assertDoesNotExist(status)
     }
 
     @MainActor
