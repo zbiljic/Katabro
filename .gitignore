@@ -66,3 +66,6 @@ Derived/
 DerivedData/
 graph.dot
 Tuist/Dependencies/
+
+# Directories
+**/dist
