@@ -25,6 +25,31 @@ Katabro requires macOS 14 or later.
   system-facing preferences under the user's control.
 - Includes a `katabro` command-line helper in the application bundle.
 
+## Installation
+
+Prebuilt [releases](https://github.com/zbiljic/Katabro/releases) are being
+prepared. Once published, install the app and bundled CLI with:
+
+```sh
+brew install --cask zbiljic/tap/katabro
+```
+
+For manual installation, download the release ZIP, unzip it, and move
+`Katabro.app` to `/Applications`.
+
+Initial releases are ad hoc signed and not notarized. If macOS blocks opening
+Katabro, go to **System Settings → Privacy & Security → Open Anyway**, then
+confirm **Open**. See [Apple's guide](https://support.apple.com/en-us/102445).
+
+Alternatively, if you trust the downloaded release, remove its quarantine
+attribute in Terminal, then open Katabro again:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Katabro.app
+```
+
+Local and folder sync work; iCloud sync requires a separate provisioned build.
+
 ## Build and run
 
 Requirements:
@@ -144,6 +169,9 @@ The application bundle contains the helper at:
 Katabro.app/Contents/Helpers/katabro
 ```
 
+The CLI requires the app and is included in the release ZIP. Homebrew puts
+`katabro` on `PATH`.
+
 For a development build, use the wrapper script:
 
 ```sh
@@ -167,6 +195,7 @@ mise run test           # run core and app tests
 mise run fmt            # format Swift and manifest files
 mise run lint           # run SwiftLint in strict mode
 mise run check          # run the complete validation gate
+mise run package        # package the app and bundled CLI
 mise run clean          # remove generated projects and build outputs
 ```
 
@@ -183,6 +212,10 @@ scripts/run picker many-browsers dark
 scripts/run menu normal
 scripts/run --help
 ```
+
+## Packaging
+
+See [RELEASING.md](RELEASING.md) for packaging and publishing releases.
 
 ## License
 
