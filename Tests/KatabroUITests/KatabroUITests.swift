@@ -2903,7 +2903,7 @@ private extension KatabroUITests {
         message: String = "Expected UI element did not become selected"
     ) {
         let expectation = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "selected == true"),
+            predicate: NSPredicate { object, _ in (object as? XCUIElement)?.isSelected == true },
             object: element
         )
         XCTAssertEqual(
@@ -2920,7 +2920,7 @@ private extension KatabroUITests {
         message: String = "Expected UI element to remain selected"
     ) {
         let expectation = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "selected == false"),
+            predicate: NSPredicate { object, _ in (object as? XCUIElement)?.isSelected == false },
             object: element
         )
         expectation.isInverted = true
