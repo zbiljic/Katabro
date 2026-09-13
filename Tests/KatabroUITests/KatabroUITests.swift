@@ -942,7 +942,11 @@ final class KatabroUITests: XCTestCase {
         )
         aboutTab.click()
         assertExists(application.scrollViews["settings.about.content"])
+        assertExists(application.staticTexts["settings.about.version"])
         assertExists(application.links["settings.about.link.repository"])
+        assertExists(application.links["settings.about.link.issues"])
+        assertExists(application.links["settings.about.link.license"])
+        XCTAssertTrue(isControlOn(aboutTab))
         generalTab.click()
         assertExists(application.scrollViews["settings.general.form"])
         assertExists(
@@ -2583,27 +2587,6 @@ extension KatabroUITests {
         XCTAssertEqual(profileTarget.label, "Open in Personal, Google Chrome")
         XCTAssertFalse(application.images["person.crop.circle.fill"].exists)
         XCTAssertFalse(application.images["eye.slash.fill"].exists)
-    }
-
-    @MainActor
-    func testSettingsAboutPane() {
-        let application = launch(
-            surface: "settings",
-            state: "normal"
-        )
-        defer {
-            application.terminate()
-        }
-
-        let aboutTab = application.radioButtons["settings.pane.about"]
-        aboutTab.click()
-
-        assertExists(application.scrollViews["settings.about.content"])
-        assertExists(application.staticTexts["settings.about.version"])
-        assertExists(application.links["settings.about.link.repository"])
-        assertExists(application.links["settings.about.link.issues"])
-        assertExists(application.links["settings.about.link.license"])
-        XCTAssertTrue(isControlOn(aboutTab))
     }
 }
 
