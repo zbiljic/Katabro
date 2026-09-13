@@ -15,7 +15,7 @@ concurrency:
 jobs:
   release:
     name: Package and draft release
-    runs-on: macos-26
+    runs-on: ${{ vars.RUNNER_MACOS || 'macos-26' }}
     timeout-minutes: 30
     permissions:
       contents: write
