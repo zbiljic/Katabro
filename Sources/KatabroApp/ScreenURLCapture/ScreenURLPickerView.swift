@@ -130,6 +130,7 @@ struct ScreenURLPickerView: View {
                 }
             }
             .padding(8)
+            .contentShape(.rect)
             .background(selected ? Color.accentColor.opacity(0.2) : .clear, in: .rect(cornerRadius: 7))
         }
         .buttonStyle(.plain)
@@ -164,6 +165,7 @@ struct ScreenURLPickerView: View {
                 }; Spacer(); Text("0").font(.caption).foregroundStyle(.secondary)
             }
             .padding(8)
+            .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .background(store.selection == .all ? Color.accentColor.opacity(0.2) : .clear, in: .rect(cornerRadius: 7))

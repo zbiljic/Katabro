@@ -91,6 +91,9 @@ final class KatabroUITests: XCTestCase {
         }
 
         var application = launch(surface: "screen-urls", state: "normal")
+        application.typeText("0")
+        application.typeKey(.downArrow, modifierFlags: [])
+        assertSelected(application.descendants(matching: .any)["screen-url-picker.row.0"])
         application.typeKey(.downArrow, modifierFlags: [])
         XCTAssertTrue(application.descendants(matching: .any)["screen-url-picker.row.1"].isSelected)
         application.typeKey(.upArrow, modifierFlags: [])
