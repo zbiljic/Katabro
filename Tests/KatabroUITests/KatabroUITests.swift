@@ -2003,6 +2003,64 @@ extension KatabroUITests {
     // swiftlint:enable function_body_length
 
     @MainActor
+    func testPickerNumericShortcutsActivateOffscreenTargets() {
+        for orientation in ["Vertical", "Horizontal"] {
+            let suite = "picker-offscreen-numbers-\(UUID().uuidString)"
+            var application = launch(
+                surface: "settings",
+                state: "normal",
+                preferencesSuite: suite,
+                resetsPreferences: true
+            )
+            openPickerSettings(in: application)
+            application.radioButtons[orientation].click()
+            setVisibleChoices(3, in: application)
+            selectPickerMenu("Hidden", identifier: "settings.picker.shortcut-hints", in: application)
+            application.terminate()
+
+            for (key, browser) in [("9", "Chromium"), ("5", "Microsoft Edge"), ("1", "Safari")] {
+                application = launch(surface: "picker", state: "many-browsers", preferencesSuite: suite)
+                let picker = application.descendants(matching: .any)["picker.content"]
+                let receipt = application.descendants(matching: .any)["picker.selection-receipt"]
+                assertExists(picker)
+                assertExists(receipt)
+                XCTAssertEqual(picker.value as? String, "\(orientation), 3 visible choices")
+                XCTAssertTrue(application.descendants(matching: .any)["picker.browser.com.apple.Safari"].isHittable)
+                XCTAssertEqual(receipt.value as? String, "No browser selected")
+                application.typeKey(key, modifierFlags: [])
+                assertReceipt(receipt, equals: "\(browser) selected 1 time")
+                let duplicate = XCTNSPredicateExpectation(
+                    predicate: NSPredicate(format: "value != %@", "\(browser) selected 1 time"),
+                    object: receipt
+                )
+                duplicate.isInverted = true
+                XCTAssertEqual(XCTWaiter.wait(for: [duplicate], timeout: 0.5), .completed)
+                application.terminate()
+            }
+
+            application = launch(surface: "picker", state: "many-browsers", preferencesSuite: suite)
+            let receipt = application.descendants(matching: .any)["picker.selection-receipt"]
+            assertExists(receipt)
+            for modifier in [XCUIElement.KeyModifierFlags.command, .option, .control, .shift] {
+                application.typeKey("5", modifierFlags: modifier)
+                XCTAssertEqual(receipt.value as? String, "No browser selected")
+            }
+            application.typeKey("0", modifierFlags: [])
+            XCTAssertEqual(receipt.value as? String, "No browser selected")
+            application.terminate()
+
+            application = launch(surface: "settings", state: "many-browsers", preferencesSuite: suite)
+            openPickerSettings(in: application)
+            application.buttons["settings.picker.preview"].click()
+            let panel = application.windows["Choose a browser"]
+            assertExists(panel)
+            application.typeKey("9", modifierFlags: [])
+            assertDoesNotExist(panel)
+            application.terminate()
+        }
+    }
+
+    @MainActor
     func testPickerCopyLink() { // swiftlint:disable:this function_body_length
         let preferencesSuite = "picker-copy-link-\(UUID().uuidString)"
         var application = launch(

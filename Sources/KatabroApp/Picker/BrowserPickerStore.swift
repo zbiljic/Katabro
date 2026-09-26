@@ -90,12 +90,17 @@ final class BrowserPickerStore {
         forPickerShortcutInput input: String,
         modifiers: EventModifiers
     ) -> BrowserLaunchTarget? {
-        guard
-            modifiers.isDisjoint(with: [.command, .option, .control]),
-            let shortcut = PickerShortcut(input)
-        else {
+        guard modifiers.isDisjoint(with: [.command, .option, .control]) else {
             return nil
         }
+
+        if input.utf8.count == 1, let digit = input.utf8.first, (49 ... 57).contains(digit) {
+            guard !modifiers.contains(.shift) else { return nil }
+            let index = Int(digit - 49)
+            return targets.indices.contains(index) ? targets[index] : nil
+        }
+
+        guard let shortcut = PickerShortcut(input) else { return nil }
 
         return targets.first {
             pickerShortcut(for: $0) == shortcut

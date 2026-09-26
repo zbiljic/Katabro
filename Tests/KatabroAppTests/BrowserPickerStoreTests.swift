@@ -144,6 +144,73 @@ struct BrowserPickerStoreTests {
         )
     }
 
+    @Test("numeric shortcuts follow full target order", arguments: [1, 5, 9])
+    func numericShortcutsUseFullOrder(number: Int) throws {
+        let targets = (1 ... 12).map { index in
+            BrowserLaunchTarget(
+                browser: makeBrowser(identifier: "com.example.\(index)", name: "Browser \(index)"),
+                kind: .standard
+            )
+        }
+        for orderedTargets in [targets, Array(targets.reversed())] {
+            let store = try BrowserPickerStore(
+                destination: IncomingURL("https://example.com"),
+                targets: orderedTargets,
+                pickerPreferences: BrowserPickerPreferences(visibleChoiceCount: 3)
+            )
+            #expect(
+                store.target(forPickerShortcutInput: String(number), modifiers: [])?.id
+                    == orderedTargets[number - 1].id
+            )
+        }
+    }
+
+    @Test("numeric shortcuts distinguish targets sharing one browser")
+    func numericShortcutsDistinguishTargetKinds() throws {
+        let browser = makeBrowser(identifier: "com.google.Chrome", name: "Chrome")
+        let targets = [
+            BrowserLaunchTarget(browser: browser, kind: .standard),
+            BrowserLaunchTarget(browser: browser, kind: .privateWindow(.chromium)),
+            BrowserLaunchTarget(
+                browser: browser,
+                kind: .profile(BrowserProfile(
+                    identifier: "work",
+                    displayName: "Work",
+                    launchValue: "Profile 2",
+                    family: .chromium
+                ))
+            ),
+        ]
+        let store = try BrowserPickerStore(destination: IncomingURL("https://example.com"), targets: targets)
+        for number in 1 ... 3 {
+            #expect(store.target(forPickerShortcutInput: String(number), modifiers: [])?.id == targets[number - 1].id)
+        }
+    }
+
+    @Test("numeric shortcuts ignore hint presentation", arguments: BrowserPickerShortcutHintMode.allCases)
+    func numericShortcutsIgnoreHints(mode: BrowserPickerShortcutHintMode) throws {
+        let store = try BrowserPickerStore(
+            destination: IncomingURL("https://example.com"),
+            browsers: [makeBrowser(identifier: "com.example.browser", name: "Browser")],
+            pickerPreferences: BrowserPickerPreferences(shortcutHintMode: mode)
+        )
+        #expect(store.target(forPickerShortcutInput: "1", modifiers: [])?.id == "com.example.browser")
+    }
+
+    @Test("numeric shortcuts reject unavailable or invalid input")
+    func numericShortcutsRejectInvalidInput() throws {
+        let browser = makeBrowser(identifier: "com.example.browser", name: "Browser")
+        for browsers in [[browser], []] {
+            let store = try BrowserPickerStore(destination: IncomingURL("https://example.com"), browsers: browsers)
+            for input in ["0", "2", "9", "10", "١", "５", ""] {
+                #expect(store.target(forPickerShortcutInput: input, modifiers: []) == nil)
+            }
+            for modifiers in [EventModifiers.command, .option, .control, .shift] {
+                #expect(store.target(forPickerShortcutInput: "1", modifiers: modifiers) == nil)
+            }
+        }
+    }
+
     @Test("selects the first browser initially")
     func selectsFirstBrowser() throws {
         let browsers = [

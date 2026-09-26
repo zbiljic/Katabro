@@ -139,7 +139,10 @@ struct BrowserPickerView: View {
                 copyLink()
                 return .handled
             }
-            .onKeyPress(characters: .letters, phases: .down) { keyPress in
+            .onKeyPress(
+                characters: .letters.union(CharacterSet(charactersIn: "123456789")),
+                phases: .down
+            ) { keyPress in
                 guard
                     let target = store.target(
                         forPickerShortcutInput: keyPress.characters,
@@ -147,6 +150,9 @@ struct BrowserPickerView: View {
                     )
                 else {
                     return .ignored
+                }
+                if let number = Int(keyPress.characters) {
+                    store.select(index: number - 1)
                 }
                 onSelect(target, store.effectiveRememberingSelection)
                 return .handled
@@ -226,7 +232,6 @@ struct BrowserPickerView: View {
                                     }
                                 )
                                 .id(target.id)
-                                .applyNumericShortcut(index: index)
                             }
                         }
                     }
@@ -252,7 +257,6 @@ struct BrowserPickerView: View {
                                         }
                                     )
                                     .id(target.id)
-                                    .applyNumericShortcut(index: index)
                                 }
                             }
                         }
@@ -577,17 +581,6 @@ private struct ShortcutHints: View {
             }
         }
         .accessibilityHidden(true)
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func applyNumericShortcut(index: Int) -> some View {
-        if index < 9 {
-            keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: [])
-        } else {
-            self
-        }
     }
 }
 
