@@ -55,6 +55,87 @@ struct BrowserPickerLayoutTests {
         #expect(Double(horizontal.height) == (testCase.count < 1 ? 168 : 153))
     }
 
+    @Test("screen fitting preserves controls and preferences", arguments: [false, true])
+    func screenFitting(horizontal: Bool) {
+        for count in [0, 1, 12] {
+            for footer in [false, true] {
+                let original = BrowserPickerLayout(
+                    preferences: BrowserPickerPreferences(
+                        orientation: horizontal ? .horizontal : .vertical,
+                        visibleChoiceCount: 8
+                    ),
+                    targetCount: count,
+                    includesRememberFooter: footer
+                )
+                for size in [
+                    CGSize(width: 900, height: 900),
+                    CGSize(width: 240, height: 200),
+                    CGSize(width: 90, height: 60),
+                    CGSize(width: original.width, height: original.height),
+                ] {
+                    let fitted = original.fitting(in: size)
+                    #expect(fitted.width <= size.width)
+                    #expect(fitted.height <= size.height)
+                    #expect(fitted.preferences == original.preferences)
+                    #expect(fitted.targetCount == count)
+                    #expect(fitted.includesRememberFooter == footer)
+                    #expect(fitted.collectionViewportWidth > 0)
+                    #expect(fitted.collectionViewportHeight >= (count == 0 ? 0 : 40))
+                    #expect(fitted.contentWidth >= 196)
+                    #expect(fitted.contentHeight >= fitted.height)
+                    if original.width <= size.width, original.height <= size.height {
+                        #expect(fitted.width == original.width)
+                        #expect(fitted.height == original.height)
+                        #expect(!fitted.requiresContentScrolling)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test("placement contains every edge with global screen origins")
+    func screenEdges() {
+        let original = BrowserPickerLayout(targetCount: 12, includesRememberFooter: true)
+        for origin in [CGPoint.zero, CGPoint(x: -1920, y: -1200), CGPoint(x: 1920, y: 1200)] {
+            for size in [
+                CGSize(width: 1920, height: 1080),
+                CGSize(width: 280, height: 180),
+                CGSize(width: 80, height: 50),
+            ] {
+                let visible = CGRect(origin: origin, size: size)
+                let bounds = original.availableFrame(in: visible)
+                let fitted = original.fitting(in: bounds.size)
+                for pointerX in [visible.minX - 1, visible.minX, visible.midX, visible.maxX, visible.maxX + 1] {
+                    for pointerY in [visible.minY - 30, visible.minY, visible.midY, visible.maxY, visible.maxY + 30] {
+                        let frame = fitted.frame(near: CGPoint(x: pointerX, y: pointerY), in: bounds)
+                        #expect(frame.minX >= visible.minX)
+                        #expect(frame.maxX <= visible.maxX)
+                        #expect(frame.minY >= visible.minY)
+                        #expect(frame.maxY <= visible.maxY)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test("screen choice uses pointer then main then first, with no-screen fallback")
+    func screenChoice() {
+        let frames = [
+            CGRect(x: 0, y: 0, width: 1920, height: 1200),
+            CGRect(x: -1280, y: -200, width: 1280, height: 800),
+            CGRect(x: 0, y: 1200, width: 1000, height: 800),
+        ]
+        for (index, frame) in frames.enumerated() {
+            #expect(BrowserPickerLayout.screenIndex(
+                near: CGPoint(x: frame.midX, y: frame.midY), frames: frames, mainIndex: 0
+            ) == index)
+        }
+        let outside = CGPoint(x: 5000, y: 5000)
+        #expect(BrowserPickerLayout.screenIndex(near: outside, frames: frames, mainIndex: 1) == 1)
+        #expect(BrowserPickerLayout.screenIndex(near: outside, frames: frames, mainIndex: nil) == 0)
+        #expect(BrowserPickerLayout.screenIndex(near: outside, frames: [], mainIndex: nil) == nil)
+    }
+
     @Test("negative target counts use the empty layout")
     func negativeCount() {
         let layout = BrowserPickerLayout(targetCount: -5, includesRememberFooter: true)

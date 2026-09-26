@@ -52,9 +52,10 @@ struct BrowserPickerView: View {
     let onSelect: (BrowserLaunchTarget, Bool) -> Void
     let onCopyLink: () -> Void
     let onCancel: () -> Void
+    var presentationLayout: BrowserPickerLayout?
 
     private var layout: BrowserPickerLayout {
-        BrowserPickerLayout(
+        presentationLayout ?? BrowserPickerLayout(
             preferences: store.pickerPreferences,
             targetCount: store.targets.count,
             includesRememberFooter: store.canRememberSelection
@@ -62,107 +63,94 @@ struct BrowserPickerView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: BrowserPickerLayout.sectionSpacing) {
-            destination
-
-            if store.targets.isEmpty {
-                emptyState
-            } else {
-                choices
-
-                if store.canRememberSelection {
-                    rememberChoice
+        fittedContent
+            .frame(width: layout.width, height: layout.height, alignment: .topLeading)
+            .background {
+                if reduceTransparency {
+                    Color(nsColor: .windowBackgroundColor)
+                } else {
+                    Rectangle().fill(.regularMaterial)
                 }
             }
-        }
-        .padding(BrowserPickerLayout.outerPadding)
-        .frame(width: layout.width, height: layout.height, alignment: .topLeading)
-        .background {
-            if reduceTransparency {
-                Color(nsColor: .windowBackgroundColor)
-            } else {
-                Rectangle().fill(.regularMaterial)
-            }
-        }
-        .compositingGroup()
-        .clipShape(.rect(cornerRadius: 14))
-        .background {
-            Button(
-                action: {},
-                label: {
-                    Color.clear
-                        .frame(width: layout.width, height: layout.height)
-                }
-            )
-            .buttonStyle(.plain)
-            .frame(width: layout.width, height: layout.height)
-            .accessibilityLabel("Browser picker")
-            .accessibilityValue(
-                "\(store.pickerPreferences.orientation.displayName), "
-                    + "\(store.pickerPreferences.visibleChoiceCount) visible choices"
-            )
-            .accessibilityIdentifier(AccessibilityIdentifier.pickerContent)
-            .allowsHitTesting(false)
-        }
-        .focusable()
-        .focused($isFocused)
-        .defaultFocus($isFocused, true)
-        .onKeyPress(.upArrow) {
-            moveSelectionFromKeyboard(by: -1)
-            return .handled
-        }
-        .onKeyPress(.downArrow) {
-            moveSelectionFromKeyboard(by: 1)
-            return .handled
-        }
-        .onKeyPress(.leftArrow) {
-            guard store.pickerPreferences.orientation == .horizontal else { return .ignored }
-            moveSelectionFromKeyboard(by: -1)
-            return .handled
-        }
-        .onKeyPress(.rightArrow) {
-            guard store.pickerPreferences.orientation == .horizontal else { return .ignored }
-            moveSelectionFromKeyboard(by: 1)
-            return .handled
-        }
-        .onKeyPress(.return) { activateSelection() }
-        .onKeyPress(.space) { activateSelection() }
-        .onKeyPress(.escape) {
-            onCancel()
-            return .handled
-        }
-        .onKeyPress(
-            characters: CharacterSet(charactersIn: "rR"),
-            phases: .down
-        ) { keyPress in
-            guard keyPress.modifiers == [.command, .shift], store.canRememberSelection else {
-                return .ignored
-            }
-            store.toggleRememberingSelection()
-            return .handled
-        }
-        .onKeyPress(
-            characters: CharacterSet(charactersIn: "cC"),
-            phases: .down
-        ) { keyPress in
-            guard keyPress.modifiers == [.command] else {
-                return .ignored
-            }
-            copyLink()
-            return .handled
-        }
-        .onKeyPress(characters: .letters, phases: .down) { keyPress in
-            guard
-                let target = store.target(
-                    forPickerShortcutInput: keyPress.characters,
-                    modifiers: keyPress.modifiers
+            .compositingGroup()
+            .clipShape(.rect(cornerRadius: 14))
+            .background {
+                Button(
+                    action: {},
+                    label: {
+                        Color.clear
+                            .frame(width: layout.width, height: layout.height)
+                    }
                 )
-            else {
-                return .ignored
+                .buttonStyle(.plain)
+                .frame(width: layout.width, height: layout.height)
+                .accessibilityLabel("Browser picker")
+                .accessibilityValue(
+                    "\(store.pickerPreferences.orientation.displayName), "
+                        + "\(store.pickerPreferences.visibleChoiceCount) visible choices"
+                )
+                .accessibilityIdentifier(AccessibilityIdentifier.pickerContent)
+                .allowsHitTesting(false)
             }
-            onSelect(target, store.effectiveRememberingSelection)
-            return .handled
-        }
+            .focusable()
+            .focused($isFocused)
+            .defaultFocus($isFocused, true)
+            .onKeyPress(.upArrow) {
+                moveSelectionFromKeyboard(by: -1)
+                return .handled
+            }
+            .onKeyPress(.downArrow) {
+                moveSelectionFromKeyboard(by: 1)
+                return .handled
+            }
+            .onKeyPress(.leftArrow) {
+                guard store.pickerPreferences.orientation == .horizontal else { return .ignored }
+                moveSelectionFromKeyboard(by: -1)
+                return .handled
+            }
+            .onKeyPress(.rightArrow) {
+                guard store.pickerPreferences.orientation == .horizontal else { return .ignored }
+                moveSelectionFromKeyboard(by: 1)
+                return .handled
+            }
+            .onKeyPress(.return) { activateSelection() }
+            .onKeyPress(.space) { activateSelection() }
+            .onKeyPress(.escape) {
+                onCancel()
+                return .handled
+            }
+            .onKeyPress(
+                characters: CharacterSet(charactersIn: "rR"),
+                phases: .down
+            ) { keyPress in
+                guard keyPress.modifiers == [.command, .shift], store.canRememberSelection else {
+                    return .ignored
+                }
+                store.toggleRememberingSelection()
+                return .handled
+            }
+            .onKeyPress(
+                characters: CharacterSet(charactersIn: "cC"),
+                phases: .down
+            ) { keyPress in
+                guard keyPress.modifiers == [.command] else {
+                    return .ignored
+                }
+                copyLink()
+                return .handled
+            }
+            .onKeyPress(characters: .letters, phases: .down) { keyPress in
+                guard
+                    let target = store.target(
+                        forPickerShortcutInput: keyPress.characters,
+                        modifiers: keyPress.modifiers
+                    )
+                else {
+                    return .ignored
+                }
+                onSelect(target, store.effectiveRememberingSelection)
+                return .handled
+            }
     }
 
     @ViewBuilder private var destination: some View {
@@ -356,6 +344,36 @@ struct BrowserPickerView: View {
     private func activate(_ target: BrowserLaunchTarget, at index: Int) {
         store.select(index: index)
         onSelect(target, store.effectiveRememberingSelection)
+    }
+}
+
+private extension BrowserPickerView {
+    @ViewBuilder var fittedContent: some View {
+        if layout.requiresContentScrolling {
+            ScrollView([.horizontal, .vertical]) {
+                pickerContent
+            }
+        } else {
+            pickerContent
+        }
+    }
+
+    var pickerContent: some View {
+        VStack(alignment: .leading, spacing: BrowserPickerLayout.sectionSpacing) {
+            destination
+
+            if store.targets.isEmpty {
+                emptyState
+            } else {
+                choices
+
+                if store.canRememberSelection {
+                    rememberChoice
+                }
+            }
+        }
+        .padding(BrowserPickerLayout.outerPadding)
+        .frame(width: layout.contentWidth, height: layout.contentHeight, alignment: .topLeading)
     }
 }
 

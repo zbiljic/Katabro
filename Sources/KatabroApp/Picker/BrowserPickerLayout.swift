@@ -21,6 +21,7 @@ struct BrowserPickerLayout: Equatable, Sendable {
     let preferences: BrowserPickerPreferences
     let targetCount: Int
     let includesRememberFooter: Bool
+    var availableSize: CGSize?
 
     init(
         preferences: BrowserPickerPreferences = BrowserPickerPreferences(),
@@ -40,7 +41,7 @@ struct BrowserPickerLayout: Equatable, Sendable {
         preferences.destinationDisplay != .hidden
     }
 
-    var width: CGFloat {
+    var preferredWidth: CGFloat {
         switch preferences.orientation {
         case .vertical:
             return preferences.verticalWidth.points
@@ -51,11 +52,27 @@ struct BrowserPickerLayout: Equatable, Sendable {
         }
     }
 
+    var width: CGFloat {
+        min(preferredWidth, max(0, availableSize?.width ?? preferredWidth))
+    }
+
+    var contentWidth: CGFloat {
+        max(min(Self.horizontalMinimumWidth, preferredWidth), width)
+    }
+
     var collectionViewportWidth: CGFloat {
-        width - Self.outerPadding * 2
+        contentWidth - Self.outerPadding * 2
     }
 
     var collectionViewportHeight: CGFloat {
+        guard preferences.orientation == .vertical, targetCount > 0, let availableSize else {
+            return preferredCollectionHeight
+        }
+        let chromeHeight = preferredHeight - preferredCollectionHeight
+        return min(preferredCollectionHeight, max(Self.verticalRowHeight, availableSize.height - chromeHeight))
+    }
+
+    private var preferredCollectionHeight: CGFloat {
         guard targetCount > 0 else { return 0 }
         switch preferences.orientation {
         case .vertical:
@@ -69,6 +86,14 @@ struct BrowserPickerLayout: Equatable, Sendable {
     }
 
     var height: CGFloat {
+        min(contentHeight, max(0, availableSize?.height ?? contentHeight))
+    }
+
+    var contentHeight: CGFloat {
+        preferredHeight - preferredCollectionHeight + collectionViewportHeight
+    }
+
+    private var preferredHeight: CGFloat {
         var result = Self.outerPadding * 2
         if showsDestination {
             result += Self.destinationHeight
@@ -84,7 +109,7 @@ struct BrowserPickerLayout: Equatable, Sendable {
         if showsDestination {
             result += Self.sectionSpacing
         }
-        result += collectionViewportHeight
+        result += preferredCollectionHeight
         if preferences.orientation == .horizontal {
             result += Self.rowSpacing + Self.horizontalSelectedLabelHeight
         }
@@ -92,6 +117,43 @@ struct BrowserPickerLayout: Equatable, Sendable {
             result += Self.sectionSpacing + Self.rememberFooterHeight
         }
         return result
+    }
+
+    var requiresContentScrolling: Bool {
+        contentWidth > width || contentHeight > height
+    }
+
+    func fitting(in size: CGSize) -> Self {
+        var result = self
+        result.availableSize = size
+        return result
+    }
+
+    /// Give up the margin before reducing the requested content size.
+    func availableFrame(in visibleFrame: CGRect) -> CGRect {
+        visibleFrame.insetBy(
+            dx: min(8, max(0, (visibleFrame.width - preferredWidth) / 2)),
+            dy: min(8, max(0, (visibleFrame.height - preferredHeight) / 2))
+        )
+    }
+
+    func frame(near pointer: CGPoint, in bounds: CGRect) -> CGRect {
+        var proposedY = pointer.y - height - 12
+        if proposedY < bounds.minY {
+            proposedY = pointer.y + 12
+        }
+        return CGRect(
+            x: min(max(pointer.x - width / 2, bounds.minX), bounds.maxX - width),
+            y: min(max(proposedY, bounds.minY), bounds.maxY - height),
+            width: width,
+            height: height
+        )
+    }
+
+    static func screenIndex(near pointer: CGPoint, frames: [CGRect], mainIndex: Int?) -> Int? {
+        frames.firstIndex { $0.contains(pointer) }
+            ?? mainIndex.flatMap { frames.indices.contains($0) ? $0 : nil }
+            ?? frames.indices.first
     }
 
     var overflows: Bool {

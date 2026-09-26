@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 // UI fixture coverage intentionally shares launch and assertion helpers.
@@ -2385,6 +2386,69 @@ extension KatabroUITests {
     }
 
     @MainActor
+    func testPickerPanelStaysInsideVisibleScreen() throws {
+        let screen = try XCTUnwrap(NSScreen.screens.first)
+        let visible = screen.visibleFrame
+        // AX uses top-left coordinates, relative to the primary display's top edge.
+        let axVisible = CGRect(
+            x: visible.minX,
+            y: screen.frame.maxY - visible.maxY,
+            width: visible.width,
+            height: visible.height
+        )
+        for edge in ["right", "left", "top", "bottom", "top-left", "top-right", "bottom-left", "bottom-right"] {
+            let application = launch(
+                surface: "settings",
+                state: "many-browsers",
+                appearance: edge.contains("top") ? "dark" : "light",
+                pickerEdge: edge
+            )
+            defer { application.terminate() }
+            openPickerSettings(in: application)
+            setVisibleChoices(8, in: application)
+            if edge.contains("top") {
+                application.radioButtons["Horizontal"].click()
+            }
+            application.buttons["settings.picker.preview"].click()
+            let panel = application.windows["Choose a browser"]
+            let content = application.descendants(matching: .any)["picker.content"]
+            assertExists(panel)
+            assertExists(content)
+            assertContained(panel, in: axVisible)
+            assertContained(content, in: axVisible)
+            // Moving to a late target forces SwiftUI to lay out and scroll again.
+            for _ in 0 ..< 11 {
+                application.typeKey(.downArrow, modifierFlags: [])
+            }
+            let lastTarget = application.descendants(matching: .any)[
+                "picker.browser.com.apple.SafariTechnologyPreview"
+            ]
+            assertSelected(lastTarget)
+            XCTAssertTrue(lastTarget.isHittable)
+            assertContained(panel, in: axVisible)
+            assertContained(content, in: axVisible)
+            application.typeKey(.escape, modifierFlags: [])
+            assertDoesNotExist(panel)
+            application.buttons["settings.picker.preview"].click()
+            assertExists(panel)
+            application.typeKey(.return, modifierFlags: [])
+            assertDoesNotExist(panel)
+        }
+    }
+
+    @MainActor
+    private func assertContained(_ element: XCUIElement, in bounds: CGRect) {
+        let contained = NSPredicate { _, _ in
+            let frame = element.frame
+            return frame.width > 0 && frame.height > 0
+                && frame.minX >= bounds.minX - 1 && frame.maxX <= bounds.maxX + 1
+                && frame.minY >= bounds.minY - 1 && frame.maxY <= bounds.maxY + 1
+        }
+        let expectation = XCTNSPredicateExpectation(predicate: contained, object: element)
+        XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 5), .completed)
+    }
+
+    @MainActor
     func testPickerSettingsPreview() { // swiftlint:disable:this function_body_length
         let application = launch(
             surface: "settings",
@@ -2664,7 +2728,8 @@ private extension KatabroUITests {
         state: String,
         appearance: String = "system",
         preferencesSuite: String? = nil,
-        resetsPreferences: Bool = false
+        resetsPreferences: Bool = false,
+        pickerEdge: String? = nil
     ) -> XCUIApplication {
         let application = XCUIApplication()
         application.launchArguments = [
@@ -2685,6 +2750,9 @@ private extension KatabroUITests {
             application.launchArguments.append(
                 "--ui-reset-preferences"
             )
+        }
+        if let pickerEdge {
+            application.launchArguments += ["--ui-picker-edge", pickerEdge]
         }
         application.launch()
         return application

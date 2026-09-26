@@ -3,14 +3,20 @@ import SwiftUI
 
 @MainActor
 final class BrowserPickerPanel: NSPanel {
+    private let preferredLayout: BrowserPickerLayout
+    private let hostingController: NSHostingController<BrowserPickerView>
+
     override var canBecomeKey: Bool {
         true
     }
 
     init(
-        rootView: some View,
+        rootView: BrowserPickerView,
         layout: BrowserPickerLayout
     ) {
+        preferredLayout = layout
+        hostingController = NSHostingController(rootView: rootView)
+        hostingController.sizingOptions = []
         super.init(
             contentRect: NSRect(
                 origin: .zero,
@@ -24,14 +30,8 @@ final class BrowserPickerPanel: NSPanel {
             defer: false
         )
 
-        contentViewController = NSHostingController(
-            rootView: rootView
-                .frame(
-                    minWidth: layout.width,
-                    minHeight: layout.height,
-                    alignment: .top
-                )
-        )
+        contentViewController = hostingController
+        setContentSize(NSSize(width: layout.width, height: layout.height))
         level = .floating
         collectionBehavior = [
             .transient,
@@ -47,50 +47,46 @@ final class BrowserPickerPanel: NSPanel {
     }
 
     func presentNearPointer() {
-        positionNearPointer()
+        var pointer = NSEvent.mouseLocation
+        #if DEBUG
+            if let configuration = DevelopmentUIConfiguration.current() {
+                switch configuration.appearance {
+                case .light: appearance = NSAppearance(named: .aqua)
+                case .dark: appearance = NSAppearance(named: .darkAqua)
+                case .system: break
+                }
+                if let screen = NSScreen.screens.first {
+                    pointer = configuration.pickerPointer(in: screen.frame) ?? pointer
+                }
+            }
+        #endif
+        let screens = NSScreen.screens
+        let index = BrowserPickerLayout.screenIndex(
+            near: pointer,
+            frames: screens.map(\.frame),
+            mainIndex: screens.firstIndex { $0 == NSScreen.main }
+        )
+        let screen = index.map { screens[$0] }
+        presentNearPointer(pointer: pointer, visibleFrame: screen?.visibleFrame)
+    }
+
+    func presentNearPointer(pointer: NSPoint, visibleFrame: NSRect?) {
+        positionNearPointer(pointer: pointer, visibleFrame: visibleFrame)
         NSApplication.shared.activate(ignoringOtherApps: true)
         makeKeyAndOrderFront(nil)
     }
 
-    private func positionNearPointer() {
-        let pointer = NSEvent.mouseLocation
-        let screen = NSScreen.screens.first { screen in
-            screen.frame.contains(pointer)
-        } ?? NSScreen.main
-
-        guard let visibleFrame = screen?.visibleFrame else {
+    private func positionNearPointer(pointer: NSPoint, visibleFrame: NSRect?) {
+        guard let visibleFrame else {
             center()
             return
         }
 
-        let horizontalInset: CGFloat = 8
-        let verticalInset: CGFloat = 8
-        let maximumX = max(
-            visibleFrame.minX + horizontalInset,
-            visibleFrame.maxX - frame.width - horizontalInset
-        )
-        let maximumY = max(
-            visibleFrame.minY + verticalInset,
-            visibleFrame.maxY - frame.height - verticalInset
-        )
-        let proposedX = pointer.x - frame.width / 2
-        var proposedY = pointer.y - frame.height - 12
-
-        if proposedY < visibleFrame.minY + verticalInset {
-            proposedY = pointer.y + 12
-        }
-
-        setFrameOrigin(
-            NSPoint(
-                x: min(
-                    max(proposedX, visibleFrame.minX + horizontalInset),
-                    maximumX
-                ),
-                y: min(
-                    max(proposedY, visibleFrame.minY + verticalInset),
-                    maximumY
-                )
-            )
-        )
+        let bounds = preferredLayout.availableFrame(in: visibleFrame)
+        let layout = preferredLayout.fitting(in: bounds.size)
+        hostingController.rootView.presentationLayout = layout
+        setContentSize(NSSize(width: layout.width, height: layout.height))
+        contentView?.layoutSubtreeIfNeeded()
+        setFrame(layout.frame(near: pointer, in: bounds), display: false)
     }
 }

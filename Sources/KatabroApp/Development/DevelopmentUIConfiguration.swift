@@ -91,6 +91,7 @@
         var appearance = DevelopmentUIAppearance.system
         var preferencesSuite: String?
         var resetsPreferences = false
+        var pickerEdge: String?
 
         var windowTitle: String {
             "Katabro UI Review — \(surface.rawValue.capitalized)"
@@ -131,8 +132,23 @@
                 preferencesSuite: preferencesSuite,
                 resetsPreferences: arguments.contains(
                     resetPreferencesArgument
-                )
+                ),
+                pickerEdge: value(following: "--ui-picker-edge", in: arguments)
             )
+        }
+
+        func pickerPointer(in frame: CGRect) -> CGPoint? {
+            switch pickerEdge {
+            case "left": CGPoint(x: frame.minX, y: frame.midY)
+            case "right": CGPoint(x: frame.maxX - 1, y: frame.midY)
+            case "top": CGPoint(x: frame.midX, y: frame.maxY - 1)
+            case "bottom": CGPoint(x: frame.midX, y: frame.minY)
+            case "top-left": CGPoint(x: frame.minX, y: frame.maxY - 1)
+            case "top-right": CGPoint(x: frame.maxX - 1, y: frame.maxY - 1)
+            case "bottom-left": CGPoint(x: frame.minX, y: frame.minY)
+            case "bottom-right": CGPoint(x: frame.maxX - 1, y: frame.minY)
+            default: nil
+            }
         }
 
         private static func value(

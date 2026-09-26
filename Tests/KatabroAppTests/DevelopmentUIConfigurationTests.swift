@@ -4,6 +4,19 @@
     import Testing
 
     struct DevelopmentUIConfigurationTests {
+        @Test("picker position overrides require a review launch")
+        func pickerPositionOverride() throws {
+            #expect(DevelopmentUIConfiguration.current(arguments: ["Katabro", "--ui-picker-edge", "right"]) == nil)
+            let configuration = try #require(DevelopmentUIConfiguration.current(arguments: [
+                "Katabro", "--ui-review", "settings", "--ui-picker-edge", "right",
+            ]))
+            let frame = CGRect(x: -1920, y: -300, width: 1920, height: 1200)
+            #expect(configuration.pickerPointer(in: frame) == CGPoint(x: -1, y: 300))
+            var invalid = configuration
+            invalid.pickerEdge = "unknown"
+            #expect(invalid.pickerPointer(in: frame) == nil)
+        }
+
         @Test(
             "parses every review surface",
             arguments: DevelopmentUISurface.allCases
