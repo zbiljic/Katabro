@@ -9,11 +9,15 @@ struct ClipboardURLClientTests {
         let expectedAbsoluteString: String
     }
 
-    @Test("reads web URLs from string representations")
-    func readsStringRepresentation() {
+    @Test("reads web URLs from string representations", arguments: [
+        "https://example.com/string",
+        "[Documentation](<https://example.com/string>)",
+        "The link is \"https://example.com/string\".\nOpen it here.",
+    ])
+    func readsStringRepresentation(rawValue: String) {
         withPasteboard { pasteboard in
             let item = NSPasteboardItem()
-            item.setString("https://example.com/string", forType: .string)
+            item.setString(rawValue, forType: .string)
             #expect(pasteboard.writeObjects([item]))
 
             #expect(
@@ -173,6 +177,47 @@ struct ClipboardURLClientTests {
             rawValue: "file:///Users/example/document.html",
             expectedAbsoluteString: "file:///Users/example/document.html"
         ),
+        AcceptedCase(
+            rawValue: "[https://example.com/documentation/page.html]"
+                + "(<https://example.com/documentation/page.html>)",
+            expectedAbsoluteString: "https://example.com/documentation/page.html"
+        ),
+        AcceptedCase(
+            rawValue: " \n[Documentation](https://example.com/path?query=value#fragment)\t ",
+            expectedAbsoluteString: "https://example.com/path?query=value#fragment"
+        ),
+        AcceptedCase(
+            rawValue: "[A **formatted** label](https://example.com/a_(b) \"Title\")",
+            expectedAbsoluteString: "https://example.com/a_(b)"
+        ),
+        AcceptedCase(
+            rawValue: "<https://example.com/path>",
+            expectedAbsoluteString: "https://example.com/path"
+        ),
+        AcceptedCase(
+            rawValue: "[Local document](file:///Users/example/document.html)",
+            expectedAbsoluteString: "file:///Users/example/document.html"
+        ),
+        AcceptedCase(
+            rawValue: "https://example.com/[label](path)",
+            expectedAbsoluteString: "https://example.com/%5Blabel%5D(path)"
+        ),
+        AcceptedCase(
+            rawValue: "example.com some prose",
+            expectedAbsoluteString: "https://example.com"
+        ),
+        AcceptedCase(
+            rawValue: "Visit example.com/path for details.",
+            expectedAbsoluteString: "https://example.com/path"
+        ),
+        AcceptedCase(
+            rawValue: "Open \"file:///Users/example/document.html\" please.",
+            expectedAbsoluteString: "file:///Users/example/document.html"
+        ),
+        AcceptedCase(
+            rawValue: "Read https://example.com/a_(b)?query=value#fragment.",
+            expectedAbsoluteString: "https://example.com/a_(b)?query=value#fragment"
+        ),
     ])
     func acceptsSupportedURL(
         testCase: AcceptedCase
@@ -180,6 +225,33 @@ struct ClipboardURLClientTests {
         #expect(
             ClipboardURLClient.validatedURL(from: testCase.rawValue)?.absoluteString
                 == testCase.expectedAbsoluteString
+        )
+    }
+
+    @Test("extracts one destination from surrounding text", arguments: [
+        "\"https://example.com/path\"",
+        "'https://example.com/path'",
+        "“https://example.com/path”",
+        "‘https://example.com/path’",
+        "(https://example.com/path)",
+        "Here is https://example.com/path for you.",
+        "https://example.com/path followed by more words",
+        "The documentation:\nhttps://example.com/path\nThanks!",
+        "https://example.com/path\nMore text",
+        "See [Documentation](https://example.com/path) for details.",
+        "\"[Documentation](<https://example.com/path>)\"",
+        "See [https://other.example.com](https://example.com/path) for details.",
+        "https://example.com/path and https://example.com/path",
+        "[Docs](https://example.com/path) or https://example.com/path",
+        "[Documentation](<https://example.com/path>",
+        "`https://example.com/path`",
+        "`[Code](https://example.com/path)`",
+        "📚 Read https://example.com/path today.",
+    ])
+    func extractsURL(rawValue: String) {
+        #expect(
+            ClipboardURLClient.validatedURL(from: rawValue)?.absoluteString
+                == "https://example.com/path"
         )
     }
 
@@ -201,7 +273,19 @@ struct ClipboardURLClientTests {
         "256.1.1.1/path",
         "[gggg::1]/path",
         "[hello]/path",
-        "example.com some prose",
+        "https://example.com/path https://other.example.com/path",
+        "https://example.com/path\nhttps://other.example.com/path",
+        "Choose \"https://example.com\" or \"https://other.example.com\"",
+        "See [Documentation](https://example.com) or https://other.example.com",
+        "[One](https://example.com)[Two](https://other.example.com)",
+        "[One](https://example.com)\n[Two](https://other.example.com)",
+        "[Email](mailto:hello@example.com)",
+        "[FTP](ftp://example.com/file)",
+        "[Script](javascript:alert(1))",
+        "[Remote file](file://remote.example.com/document.html)",
+        "[Relative](docs/index.html)",
+        "![Image](https://example.com/image.png)",
+        "Email hello@example.com or open ftp://example.com/file",
     ])
     func rejectsUnsupportedURL(
         rawValue: String?

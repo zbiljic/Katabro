@@ -72,12 +72,75 @@ struct ClipboardURLClient {
             return nil
         }
 
-        if let incomingURL = try? IncomingURL(rawValue) {
-            return incomingURL.url
+        let trimmedValue = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedValue.contains(where: \.isWhitespace) {
+            if let url = (try? IncomingURL(trimmedValue))?.url ?? inferredHTTPSURL(from: trimmedValue) {
+                return url
+            }
         }
 
-        let trimmedValue = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        return inferredHTTPSURL(from: trimmedValue)
+        return extractedURL(from: trimmedValue)
+    }
+
+    private static func extractedURL(
+        from value: String
+    ) -> URL? {
+        guard
+            let markdown = try? AttributedString(
+                markdown: value,
+                options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+            ),
+            let detector = try? NSDataDetector(
+                types: NSTextCheckingResult.CheckingType.link.rawValue
+            )
+        else {
+            return nil
+        }
+
+        var destinations = Set<URL>()
+        for run in markdown.runs {
+            if let link = run.link {
+                var value = link.absoluteString
+                let prefix = markdown.characters[..<run.range.lowerBound].last
+                let suffix = markdown.characters[run.range].last
+                // Markdown autolinks can include a smart closing quote in the destination.
+                let doubleQuote = prefix == "“" && suffix == "”" && value.hasSuffix("%E2%80%9D")
+                let singleQuote = prefix == "‘" && suffix == "’" && value.hasSuffix("%E2%80%99")
+                if doubleQuote || singleQuote {
+                    value.removeLast(9)
+                }
+                guard let destination = try? IncomingURL(value) else {
+                    return nil
+                }
+                destinations.insert(destination.url)
+                continue
+            }
+
+            let text = String(markdown[run.range].characters)
+            for match in detector.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+                guard
+                    let range = Range(match.range, in: text),
+                    // Do not salvage a hostname from an invalid token such as -example.com.
+                    range.lowerBound == text.startIndex
+                    || text[text.index(before: range.lowerBound)].isWhitespace
+                    || "([{<\"'“‘`".contains(text[text.index(before: range.lowerBound)])
+                else {
+                    continue
+                }
+
+                var token = String(text[range])
+                let prefix = text[..<range.lowerBound].last
+                // NSDataDetector includes smart closing quotes in the matched path.
+                if (prefix == "“" && token.last == "”") || (prefix == "‘" && token.last == "’") {
+                    token.removeLast()
+                }
+                if let destination = (try? IncomingURL(token))?.url ?? inferredHTTPSURL(from: token) {
+                    destinations.insert(destination)
+                }
+            }
+        }
+
+        return destinations.count == 1 ? destinations.first : nil
     }
 
     private static func inferredHTTPSURL(
