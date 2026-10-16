@@ -45,11 +45,13 @@ struct ScreenURLCaptureSettingsView: View {
     }
 
     @ViewBuilder private var permissionStatus: some View {
+        // Separate elements avoid recursive inferred labels when these rows are inserted on macOS 27.
         if settings.screenCaptureAuthorization == .authorized {
             LabeledContent("Screen Recording") {
                 Label("Allowed", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.secondary)
             }
+            .accessibilityElement(children: .ignore)
             .accessibilityLabel("Screen Recording access is enabled.")
             .accessibilityIdentifier(AccessibilityIdentifier.settingsScreenURLPermissionGranted)
         } else {
@@ -57,6 +59,7 @@ struct ScreenURLCaptureSettingsView: View {
                 Text("Required")
                     .foregroundStyle(.secondary)
             }
+            .accessibilityElement(children: .ignore)
             .accessibilityLabel("Screen Recording access is required to capture a display.")
             .accessibilityIdentifier(AccessibilityIdentifier.settingsScreenURLPermissionStatus)
 

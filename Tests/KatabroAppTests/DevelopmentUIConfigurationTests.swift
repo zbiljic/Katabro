@@ -183,9 +183,8 @@
             normalClient.stop()
 
             let errors = DevelopmentUIFixtures.dependencies(for: .serviceErrors)
-            let clock = ContinuousClock()
-            let deadline = clock.now.advanced(by: .seconds(2))
-            while errors.preferencesStore.folderSyncStatus != .unavailable, clock.now < deadline {
+            // Other window tests can occupy the main actor before the fixture's retry tasks run.
+            for _ in 0 ..< 100 where errors.preferencesStore.folderSyncStatus != .unavailable {
                 try await Task.sleep(for: .milliseconds(20))
             }
             #expect(errors.preferencesStore.syncMethod == .folder)

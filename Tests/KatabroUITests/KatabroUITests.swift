@@ -417,11 +417,11 @@ final class KatabroUITests: XCTestCase {
             application.terminate()
         }
 
-        let generalTab = application.radioButtons["settings.pane.general"]
-        let browsersTab = application.radioButtons["settings.pane.browsers"]
-        let pickerTab = application.radioButtons["settings.pane.picker"]
-        let rulesTab = application.radioButtons["settings.pane.rules"]
-        let aboutTab = application.radioButtons["settings.pane.about"]
+        let generalTab = application.descendants(matching: .any)["settings.pane.general"]
+        let browsersTab = application.descendants(matching: .any)["settings.pane.browsers"]
+        let pickerTab = application.descendants(matching: .any)["settings.pane.picker"]
+        let rulesTab = application.descendants(matching: .any)["settings.pane.rules"]
+        let aboutTab = application.descendants(matching: .any)["settings.pane.about"]
 
         assertExists(application.scrollViews["settings.general.form"])
         assertExists(generalTab)
@@ -769,7 +769,7 @@ final class KatabroUITests: XCTestCase {
             )
             XCTAssertTrue(
                 isControlOn(
-                    application.radioButtons["settings.pane.browsers"]
+                    application.descendants(matching: .any)["settings.pane.browsers"]
                 )
             )
             attachScreenshot(
@@ -794,7 +794,7 @@ final class KatabroUITests: XCTestCase {
         assertExists(application.scrollViews["settings.general.form"])
         XCTAssertTrue(
             isControlOn(
-                application.radioButtons["settings.pane.general"]
+                application.descendants(matching: .any)["settings.pane.general"]
             )
         )
         assertExists(
@@ -922,11 +922,11 @@ final class KatabroUITests: XCTestCase {
             application.terminate()
         }
 
-        let generalTab = application.radioButtons["settings.pane.general"]
-        let browsersTab = application.radioButtons["settings.pane.browsers"]
-        let pickerTab = application.radioButtons["settings.pane.picker"]
-        let rulesTab = application.radioButtons["settings.pane.rules"]
-        let aboutTab = application.radioButtons["settings.pane.about"]
+        let generalTab = application.descendants(matching: .any)["settings.pane.general"]
+        let browsersTab = application.descendants(matching: .any)["settings.pane.browsers"]
+        let pickerTab = application.descendants(matching: .any)["settings.pane.picker"]
+        let rulesTab = application.descendants(matching: .any)["settings.pane.rules"]
+        let aboutTab = application.descendants(matching: .any)["settings.pane.about"]
 
         assertExists(application.scrollViews["settings.general.form"])
         browsersTab.click()
@@ -976,19 +976,19 @@ final class KatabroUITests: XCTestCase {
                 named: "Settings-general-normal-\(appearance)",
                 from: application
             )
-            application.radioButtons["settings.pane.browsers"].click()
+            application.descendants(matching: .any)["settings.pane.browsers"].click()
             assertExists(application.scrollViews["settings.browsers.form"])
             attachScreenshot(
                 named: "Settings-browsers-normal-\(appearance)",
                 from: application
             )
-            application.radioButtons["settings.pane.rules"].click()
+            application.descendants(matching: .any)["settings.pane.rules"].click()
             assertExists(application.scrollViews["settings.rules.form"])
             attachScreenshot(
                 named: "Settings-rules-populated-\(appearance)",
                 from: application
             )
-            application.radioButtons["settings.pane.about"].click()
+            application.descendants(matching: .any)["settings.pane.about"].click()
             assertExists(application.scrollViews["settings.about.content"])
             attachScreenshot(
                 named: "Settings-about-normal-\(appearance)",
@@ -1045,7 +1045,7 @@ final class KatabroUITests: XCTestCase {
         )["settings.browser-row.com.google.Chrome.visibility"]
         let showAll = application.buttons["settings.browser-show-all"]
 
-        application.radioButtons["settings.pane.browsers"].click()
+        application.descendants(matching: .any)["settings.pane.browsers"].click()
 
         assertExists(safari)
         assertExists(chrome)
@@ -1447,7 +1447,7 @@ extension KatabroUITests {
             "settings.rule.developer.apple.com"
         ]
 
-        application.radioButtons["settings.pane.rules"].click()
+        application.descendants(matching: .any)["settings.pane.rules"].click()
         assertExists(application.scrollViews["settings.rules.form"])
         assertExists(exampleRow)
         assertExists(developerRow)
@@ -1519,7 +1519,7 @@ extension KatabroUITests {
             let form = application.scrollViews["settings.rules.form"]
             assertExists(form)
             XCTAssertTrue(
-                isControlOn(application.radioButtons["settings.pane.rules"])
+                isControlOn(application.descendants(matching: .any)["settings.pane.rules"])
             )
 
             for requestID in newestIDs {
@@ -1678,7 +1678,7 @@ extension KatabroUITests {
         let form = application.scrollViews["settings.rules.form"]
         assertExists(form)
         XCTAssertTrue(
-            isControlOn(application.radioButtons["settings.pane.rules"])
+            isControlOn(application.descendants(matching: .any)["settings.pane.rules"])
         )
         application.buttons["settings.recent-routes.show-all"].click()
 
@@ -1741,7 +1741,7 @@ extension KatabroUITests {
         assertDoesNotExist(application.staticTexts["com.example.previous"])
         assertExists(form)
         XCTAssertTrue(
-            isControlOn(application.radioButtons["settings.pane.rules"])
+            isControlOn(application.descendants(matching: .any)["settings.pane.rules"])
         )
         assertDoesNotExist(
             application.descendants(matching: .any)["picker.content"]
@@ -1783,7 +1783,7 @@ extension KatabroUITests {
                 resetsPreferences: true
             )
             previousApplication = application
-            application.radioButtons["settings.pane.rules"].click()
+            application.descendants(matching: .any)["settings.pane.rules"].click()
             assertExists(application.scrollViews["settings.rules.form"])
             attachScreenshot(
                 named: "Settings-rules-populated-standalone-\(appearance)",
@@ -1885,7 +1885,7 @@ extension KatabroUITests {
             preferencesSuite: preferencesSuite,
             resetsPreferences: true
         )
-        application.radioButtons["settings.pane.browsers"].click()
+        application.descendants(matching: .any)["settings.pane.browsers"].click()
 
         let safariShortcut = application.descendants(matching: .any)[
             "settings.browser-row.com.apple.Safari.shortcut"
@@ -1914,7 +1914,7 @@ extension KatabroUITests {
             state: "normal",
             preferencesSuite: preferencesSuite
         )
-        application.radioButtons["settings.pane.browsers"].click()
+        application.descendants(matching: .any)["settings.pane.browsers"].click()
         let persistedChromeShortcut = application.descendants(matching: .any)[
             "settings.browser-row.com.google.Chrome.shortcut"
         ]
@@ -2718,7 +2718,7 @@ extension KatabroUITests {
 private extension KatabroUITests {
     @MainActor
     func openPickerSettings(in application: XCUIApplication) {
-        let pickerTab = application.radioButtons["settings.pane.picker"]
+        let pickerTab = application.descendants(matching: .any)["settings.pane.picker"]
         assertExists(pickerTab)
         pickerTab.click()
         assertExists(application.scrollViews["settings.picker.form"])
@@ -3063,7 +3063,8 @@ private extension KatabroUITests {
         in container: XCUIElement,
         scrolling direction: ScrollDirection
     ) {
-        for _ in 0 ..< 5 where !element.isHittable {
+        // A partially clipped control can be hittable while its click point is outside the viewport.
+        for _ in 0 ..< 5 where !element.isHittable || !container.frame.contains(element.frame) {
             switch direction {
             case .up:
                 container.swipeUp()
@@ -3072,7 +3073,10 @@ private extension KatabroUITests {
             }
         }
 
-        XCTAssertTrue(element.isHittable, "Expected UI element to become hittable")
+        XCTAssertTrue(
+            element.isHittable && container.frame.contains(element.frame),
+            "Expected UI element to become fully visible and hittable"
+        )
     }
 
     @MainActor
