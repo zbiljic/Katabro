@@ -1303,6 +1303,114 @@ extension BrowserPickerCoordinatorTests {
         #expect(coordinator.presentedStore?.destination == second.destination)
     }
 
+    @Test("unselected picker expires after five minutes and advances the queue", .timeLimit(.minutes(1)))
+    func expiresUnselectedPicker() async throws {
+        let timeout = ControlledPickerTimeout()
+        let launcher = BrowserLauncherFake()
+        let log = RoutingDecisionLogStore()
+        var presentations: [BrowserPickerPresentationFake] = []
+        let coordinator = makeCoordinator(
+            discovery: BrowserDiscoveryFake(browsers: [makeBrowser()]),
+            launcher: launcher,
+            routingDecisionLogStore: log,
+            panelBuilder: { _, _, _, _ in
+                let presentation = BrowserPickerPresentationFake()
+                presentations.append(presentation)
+                return presentation
+            },
+            waitForPickerTimeout: timeout.wait
+        )
+        let first = try RoutingRequest(destination: IncomingURL("https://first.example"), source: .system)
+        let second = try RoutingRequest(destination: IncomingURL("https://second.example"), source: .system)
+        coordinator.route(first)
+        coordinator.route(second)
+        await coordinator.waitForPendingOperations()
+
+        #expect(coordinator.presentedStore?.destination == first.destination)
+        #expect(presentations.first?.isClosed == false)
+        await timeout.expireNext()
+        await coordinator.waitForPendingOperations()
+
+        #expect(presentations.first?.isClosed == true)
+        #expect(coordinator.presentedStore?.destination == second.destination)
+        #expect(log.entries.map(\.result) == [.cancelled, .pending])
+        await timeout.expireNext()
+
+        #expect(timeout.durations == [.seconds(300), .seconds(300)])
+        #expect(presentations.last?.isClosed == true)
+        #expect(coordinator.presentedStore == nil)
+        #expect(coordinator.pendingRequestCount == 0)
+        #expect(log.entries.map(\.result) == [.cancelled, .cancelled])
+        #expect(launcher.openedRequests.isEmpty)
+        #expect(coordinator.lastError == nil)
+    }
+
+    @Test("preview also expires without launching", .timeLimit(.minutes(1)))
+    func expiresPreview() async {
+        let timeout = ControlledPickerTimeout()
+        let launcher = BrowserLauncherFake()
+        let log = RoutingDecisionLogStore()
+        let coordinator = makeCoordinator(
+            discovery: BrowserDiscoveryFake(browsers: [makeBrowser()]),
+            launcher: launcher,
+            routingDecisionLogStore: log,
+            waitForPickerTimeout: timeout.wait
+        )
+        coordinator.preview()
+        await coordinator.waitForPendingOperations()
+        #expect(coordinator.presentedStore != nil)
+
+        await timeout.expireNext()
+
+        #expect(coordinator.presentedStore == nil)
+        #expect(launcher.openedRequests.isEmpty)
+        #expect(log.entries.isEmpty)
+    }
+
+    @Test("expired timer cannot cancel a launch or a later picker", .timeLimit(.minutes(1)))
+    func ignoresTimeoutAfterSelection() async throws {
+        let timeout = ControlledPickerTimeout()
+        let browser = makeBrowser()
+        let launcher = SuspendedBrowserLauncher()
+        let log = RoutingDecisionLogStore()
+        var selectionHandler: ((BrowserLaunchTarget, Bool) -> Void)?
+        let coordinator = makeCoordinator(
+            discovery: BrowserDiscoveryFake(browsers: [browser]),
+            launcher: launcher,
+            routingDecisionLogStore: log,
+            panelBuilder: { _, onSelect, _, _ in
+                selectionHandler = onSelect
+                return BrowserPickerPresentationFake()
+            },
+            waitForPickerTimeout: timeout.wait
+        )
+        let first = try RoutingRequest(destination: IncomingURL("https://first.example"), source: .system)
+        let second = try RoutingRequest(destination: IncomingURL("https://second.example"), source: .system)
+        coordinator.route(first)
+        coordinator.route(second)
+        await coordinator.waitForPendingOperations()
+
+        let select = try #require(selectionHandler)
+        select(makeTarget(browser), false)
+        await launcher.waitForRequest()
+        await timeout.expireNext()
+        #expect(log.entries.map(\.result) == [.pending, .pending])
+        #expect(coordinator.pendingRequestCount == 1)
+
+        launcher.succeed()
+        await coordinator.waitForPendingOperations()
+        #expect(coordinator.presentedStore?.destination == second.destination)
+        coordinator.cancel()
+        coordinator.preview()
+        await coordinator.waitForPendingOperations()
+        await timeout.expireNext()
+        #expect(coordinator.presentedStore != nil)
+        #expect(log.entries.last?.result == .cancelled)
+
+        await timeout.expireNext()
+        #expect(coordinator.presentedStore == nil)
+    }
+
     private func makeCoordinator(
         discovery: any BrowserDiscovering,
         launcher: any BrowserLaunching,
@@ -1318,6 +1426,9 @@ extension BrowserPickerCoordinatorTests {
         ),
         panelBuilder: @escaping BrowserPickerCoordinator.PanelBuilder = { _, _, _, _ in
             BrowserPickerPresentationFake()
+        },
+        waitForPickerTimeout: @escaping @MainActor (Duration) async throws -> Void = { duration in
+            try await Task.sleep(for: duration)
         }
     ) -> BrowserPickerCoordinator {
         BrowserPickerCoordinator(
@@ -1346,7 +1457,8 @@ extension BrowserPickerCoordinatorTests {
                 userScriptBridge: userScriptBridge
             ),
             menuActionScheduler: menuActionScheduler,
-            panelBuilder: panelBuilder
+            panelBuilder: panelBuilder,
+            waitForPickerTimeout: waitForPickerTimeout
         )
     }
 

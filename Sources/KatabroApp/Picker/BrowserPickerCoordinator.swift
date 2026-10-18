@@ -57,6 +57,8 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
     private let dependencies: AppDependencies
     private let menuActionScheduler: any MenuActionScheduling
     private let panelBuilder: PanelBuilder
+    private let waitForPickerTimeout: @MainActor (Duration) async throws -> Void
+    private var dismissalTask: Task<Void, Error>?
     private var launchTask: Task<Void, Never>?
     private var panel: (any BrowserPickerPresenting)?
     private var presentsPreview = false
@@ -90,11 +92,19 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
                     includesRememberFooter: store.canRememberSelection
                 )
             )
+        },
+        waitForPickerTimeout: @escaping @MainActor (Duration) async throws -> Void = { duration in
+            try await Task.sleep(for: duration)
         }
     ) {
         self.dependencies = dependencies
         self.menuActionScheduler = menuActionScheduler
         self.panelBuilder = panelBuilder
+        self.waitForPickerTimeout = waitForPickerTimeout
+    }
+
+    deinit {
+        dismissalTask?.cancel()
     }
 
     func handle(
@@ -407,6 +417,13 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
         panel.delegate = self
         self.panel = panel
         panel.presentNearPointer()
+
+        let waitForPickerTimeout = waitForPickerTimeout
+        dismissalTask = Task { [weak self] in
+            try await waitForPickerTimeout(.seconds(5 * 60))
+            try Task.checkCancellation()
+            self?.finishCurrentRequest(id: request.id)
+        }
     }
 
     private func copy(
@@ -546,6 +563,8 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
 
         routingTask?.cancel()
         routingTask = nil
+        dismissalTask?.cancel()
+        dismissalTask = nil
         request = nil
         presentsPreview = false
 
@@ -562,6 +581,8 @@ final class BrowserPickerCoordinator: NSObject { // swiftlint:disable:this type_
     }
 
     private func hidePanel() {
+        dismissalTask?.cancel()
+        dismissalTask = nil
         presentedStore = nil
 
         panel?.delegate = nil

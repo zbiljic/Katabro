@@ -3,6 +3,30 @@ import AppKit
 import KatabroCore
 
 @MainActor
+final class ControlledPickerTimeout {
+    private var continuations: [CheckedContinuation<Void, Never>] = []
+    private var completedWaitCount = 0
+    private(set) var durations: [Duration] = []
+
+    func wait(for duration: Duration) async throws {
+        durations.append(duration)
+        await withCheckedContinuation { continuations.append($0) }
+        completedWaitCount += 1
+    }
+
+    func expireNext() async {
+        while continuations.isEmpty {
+            await Task.yield()
+        }
+        let expectedCompletions = completedWaitCount + 1
+        continuations.removeFirst().resume()
+        while completedWaitCount < expectedCompletions {
+            await Task.yield()
+        }
+    }
+}
+
+@MainActor
 final class SuspendedRoutingDecision {
     private var continuation: CheckedContinuation<RoutingDecisionClient.Decision, Never>?
     private(set) var requestCount = 0

@@ -93,6 +93,8 @@ changing their completed setup state.
 Open Settings (`⌘,`) to change the default-browser status, login item, browser
 order, picker layout, shortcuts, rules, and sync options.
 
+The browser picker closes automatically after five minutes without a selection.
+
 ## Optional features
 
 ### Exact-host rules
