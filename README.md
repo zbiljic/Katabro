@@ -115,7 +115,9 @@ Katabro quits.
 - **Clipboard URL:** Choose **Open URL from Clipboard** from the menu, or enable
   the optional Control-Command-B shortcut in
   `Settings → General → Clipboard URL`. Katabro reads the clipboard only when
-  requested and does not keep clipboard history.
+  requested and does not keep clipboard history. Bare HTTP(S) URLs wrapped
+  across lines in their path, query, or fragment are supported. Copy only the
+  URL: a separate single-word line may be treated as part of it.
 - **Screen URL capture:** Choose **Capture URLs from Screen** to capture the
   display under the pointer and recognize web URLs locally with Apple Vision.
   The optional shortcut is Control-Command-X and is configured in

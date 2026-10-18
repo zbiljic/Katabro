@@ -11,6 +11,7 @@ struct ClipboardURLClientTests {
 
     @Test("reads web URLs from string representations", arguments: [
         "https://example.com/string",
+        "https://example.com/str\ning",
         "[Documentation](<https://example.com/string>)",
         "The link is \"https://example.com/string\".\nOpen it here.",
     ])
@@ -238,6 +239,10 @@ struct ClipboardURLClientTests {
         "https://example.com/path followed by more words",
         "The documentation:\nhttps://example.com/path\nThanks!",
         "https://example.com/path\nMore text",
+        "https://example.com/path\n\nmore",
+        "https://example.com/path\r\n \t\r\nmore",
+        "https://example.com/path\nhttps://example.com/path",
+        "https://example.com/path\njavascript:alert(1)",
         "See [Documentation](https://example.com/path) for details.",
         "\"[Documentation](<https://example.com/path>)\"",
         "See [https://other.example.com](https://example.com/path) for details.",
@@ -275,6 +280,10 @@ struct ClipboardURLClientTests {
         "[hello]/path",
         "https://example.com/path https://other.example.com/path",
         "https://example.com/path\nhttps://other.example.com/path",
+        "https://example.com/path\nother.example.com/path",
+        "https://example.com/path\nhello@example.com",
+        "https://example.com/path\nftp://example.com/file",
+        "https://exa\nmple.com/path",
         "Choose \"https://example.com\" or \"https://other.example.com\"",
         "See [Documentation](https://example.com) or https://other.example.com",
         "[One](https://example.com)[Two](https://other.example.com)",
@@ -306,5 +315,84 @@ struct ClipboardURLClientTests {
 
         pasteboard.clearContents()
         try operation(pasteboard)
+    }
+}
+
+extension ClipboardURLClientTests {
+    @Test("reconstructs wrapped URLs and preserves guarded fallback", arguments: [
+        AcceptedCase(
+            rawValue: "https://example.com/documentation/long-\npage.html",
+            expectedAbsoluteString: "https://example.com/documentation/long-page.html"
+        ),
+        AcceptedCase(
+            rawValue: "https://example.com/login?token=abc\ndef&state=123",
+            expectedAbsoluteString: "https://example.com/login?token=abcdef&state=123"
+        ),
+        AcceptedCase(
+            rawValue: "https://example.com?token=ab\ncd",
+            expectedAbsoluteString: "https://example.com?token=abcd"
+        ),
+        AcceptedCase(
+            rawValue: "https://example.com#sec\ntion",
+            expectedAbsoluteString: "https://example.com#section"
+        ),
+        AcceptedCase(
+            rawValue: "https://example.com/path?token=ab\ncd\nef#section",
+            expectedAbsoluteString: "https://example.com/path?token=abcdef#section"
+        ),
+        AcceptedCase(
+            rawValue: "https://example.com/path#sec\ntion",
+            expectedAbsoluteString: "https://example.com/path#section"
+        ),
+        AcceptedCase(
+            rawValue: " \thttps://example.com/long- \t\r\n\tpath\t ",
+            expectedAbsoluteString: "https://example.com/long-path"
+        ),
+        AcceptedCase(
+            rawValue: "https://example.com/login?token=ab\r\tcd \r\nef",
+            expectedAbsoluteString: "https://example.com/login?token=abcdef"
+        ),
+        AcceptedCase(
+            rawValue: "https://example.com/a%\n20b",
+            expectedAbsoluteString: "https://example.com/a%20b"
+        ),
+        AcceptedCase(
+            rawValue: "https://example.com/a%2\n0b",
+            expectedAbsoluteString: "https://example.com/a%20b"
+        ),
+        AcceptedCase(
+            rawValue: "HTTPS://example.com/Some/\nPath?Query=A+B%2Fc#Frag.",
+            expectedAbsoluteString: "HTTPS://example.com/Some/Path?Query=A+B%2Fc#Frag."
+        ),
+        AcceptedCase(
+            rawValue: "http://example.com/path?token=abc&\nstate=\n123",
+            expectedAbsoluteString: "http://example.com/path?token=abc&state=123"
+        ),
+        AcceptedCase(
+            rawValue: "https://example.com/path\nmore",
+            expectedAbsoluteString: "https://example.com/pathmore"
+        ),
+        AcceptedCase(
+            rawValue: "https://example.com/path\nThanks!",
+            expectedAbsoluteString: "https://example.com/pathThanks!"
+        ),
+        AcceptedCase(
+            rawValue: "https://example.com/path%0Aend.",
+            expectedAbsoluteString: "https://example.com/path%0Aend."
+        ),
+        AcceptedCase(
+            rawValue: "https://example.com/path\nopaque\tvalue",
+            expectedAbsoluteString: "https://example.com/path"
+        ),
+        AcceptedCase(
+            rawValue: "https://example.com\nopaque",
+            expectedAbsoluteString: "https://example.com"
+        ),
+    ])
+    func reconstructsWrappedURL(testCase: AcceptedCase) {
+        #expect(
+            ClipboardURLClient.validatedURL(from: testCase.rawValue)?.absoluteString
+                == testCase.expectedAbsoluteString
+        )
     }
 }

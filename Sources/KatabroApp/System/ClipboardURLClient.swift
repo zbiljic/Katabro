@@ -79,7 +79,51 @@ struct ClipboardURLClient {
             }
         }
 
-        return extractedURL(from: trimmedValue)
+        return reconstructedURL(from: trimmedValue) ?? extractedURL(from: trimmedValue)
+    }
+
+    private static func reconstructedURL(
+        from value: String
+    ) -> URL? {
+        let fragments = value
+            .split(omittingEmptySubsequences: false) {
+                $0 == "\n" || $0 == "\r\n" || $0 == "\r"
+            }
+            .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: " \t")) }
+
+        guard
+            fragments.count >= 2,
+            fragments.allSatisfy({ !$0.isEmpty && !$0.contains(where: \.isWhitespace) }),
+            let first = fragments.first,
+            let components = URLComponents(string: first),
+            let scheme = components.scheme?.lowercased(),
+            scheme == "http" || scheme == "https",
+            let host = components.host,
+            !host.isEmpty,
+            !components.path.isEmpty || components.query != nil || components.fragment != nil,
+            let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+        else {
+            return nil
+        }
+
+        for fragment in fragments.dropFirst() {
+            guard
+                !declaresExplicitScheme(fragment),
+                detector.firstMatch(in: fragment, range: NSRange(fragment.startIndex..., in: fragment)) == nil
+            else {
+                return nil
+            }
+        }
+
+        // shortcut: single-token continuation lines are treated as URL fragments; revisit if real prose collisions require an explicit user choice.
+        guard
+            let incomingURL = try? IncomingURL(fragments.joined()),
+            incomingURL.scheme == .http || incomingURL.scheme == .https
+        else {
+            return nil
+        }
+
+        return incomingURL.url
     }
 
     private static func extractedURL(
