@@ -21,11 +21,12 @@ mise exec -- tuist xcodebuild build \
     CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO
 
 app_path="$PWD/DerivedData/Release/Build/Products/Release/Katabro.app"
+helper_path="$app_path/Contents/Helpers/katabro"
 output_directory="$PWD/dist"
 mkdir -p "$output_directory"
 
 codesign --verify --deep --strict "$app_path"
-for binary in "$app_path/Contents/MacOS/Katabro" "$app_path/Contents/Helpers/katabro"; do
+for binary in "$app_path/Contents/MacOS/Katabro" "$helper_path"; do
     codesign --verify --strict "$binary"
     xcrun lipo "$binary" -verify_arch arm64 x86_64
     load_commands=$(xcrun otool -l "$binary")
@@ -36,20 +37,29 @@ for binary in "$app_path/Contents/MacOS/Katabro" "$app_path/Contents/Helpers/kat
 done
 
 codesign --display --entitlements - --xml "$app_path" > DerivedData/Release/entitlements.plist
-python3 -I - "$app_path" DerivedData/Release/entitlements.plist "$version" <<'PY'
+codesign --display --entitlements - --xml "$helper_path" > DerivedData/Release/helper-entitlements.plist
+python3 -I - "$app_path" DerivedData/Release/entitlements.plist \
+    DerivedData/Release/helper-entitlements.plist "$version" <<'PY'
 import pathlib
 import plistlib
 import sys
 
+
+def entitlements_at(path):
+    data = pathlib.Path(path).read_bytes()
+    return plistlib.loads(data) if data else {}
+
+
 app = pathlib.Path(sys.argv[1])
 with (app / "Contents/Info.plist").open("rb") as file:
     info = plistlib.load(file)
-with open(sys.argv[2], "rb") as file:
-    entitlements = plistlib.load(file)
-assert info["CFBundleShortVersionString"] == sys.argv[3], "Release version mismatch"
+entitlements = entitlements_at(sys.argv[2])
+helper_entitlements = entitlements_at(sys.argv[3])
+assert info["CFBundleShortVersionString"] == sys.argv[4], "Release version mismatch"
 assert info["LSUIElement"] is True, "Release must remain menu-bar-only"
 assert entitlements.get("com.apple.security.app-sandbox") is True, "Sandbox missing"
 assert not entitlements.get("com.apple.security.get-task-allow"), "Debug entitlement present"
+assert not helper_entitlements.get("com.apple.security.get-task-allow"), "Debug entitlement present in CLI"
 assert not any("icloud" in key.lower() or "ubiquity" in key for key in entitlements), "iCloud entitlement present"
 assert not (app / "Contents/embedded.provisionprofile").exists(), "Provisioned build selected"
 PY
