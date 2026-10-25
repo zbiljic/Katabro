@@ -55,7 +55,9 @@ assert not (app / "Contents/embedded.provisionprofile").exists(), "Provisioned b
 PY
 
 archive="Katabro-$version-universal.zip"
-ditto -c -k --sequesterRsrc --keepParent "$app_path" "$output_directory/$archive"
+rm -f "$output_directory/$archive" "$output_directory/$archive.sha256"
+# Leave builder-local metadata (com.apple.provenance) out of the archive.
+ditto -c -k --norsrc --keepParent "$app_path" "$output_directory/$archive"
 cp -f DerivedData/Release/SourcePackages/checkouts/MenuBarExtraAccess/LICENSE \
     "$output_directory/MenuBarExtraAccess-LICENSE"
 /usr/bin/zip -j -q "$output_directory/$archive" LICENSE "$output_directory/MenuBarExtraAccess-LICENSE"
