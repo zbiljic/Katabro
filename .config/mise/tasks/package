@@ -1,5 +1,5 @@
 #!/bin/bash
-#MISE description="Package the universal app with its CLI"
+#MISE description="Package the Apple silicon app with its CLI"
 
 set -euo pipefail
 
@@ -16,7 +16,7 @@ mise exec -- tuist xcodebuild build \
     -configuration Release \
     -destination 'generic/platform=macOS' \
     -derivedDataPath DerivedData/Release \
-    'ARCHS=arm64 x86_64' ONLY_ACTIVE_ARCH=NO ENABLE_CODE_COVERAGE=NO \
+    ARCHS=arm64 ONLY_ACTIVE_ARCH=NO ENABLE_CODE_COVERAGE=NO \
     CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
     CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO
 
@@ -28,7 +28,10 @@ mkdir -p "$output_directory"
 codesign --verify --deep --strict "$app_path"
 for binary in "$app_path/Contents/MacOS/Katabro" "$helper_path"; do
     codesign --verify --strict "$binary"
-    xcrun lipo "$binary" -verify_arch arm64 x86_64
+    if [[ "$(xcrun lipo -archs "$binary")" != arm64 ]]; then
+        echo "Release binary must contain only arm64: $binary" >&2
+        exit 1
+    fi
     load_commands=$(xcrun otool -l "$binary")
     if [[ "$load_commands" == *'__llvm_prf_'* ]]; then
         echo "Release binary contains coverage instrumentation: $binary" >&2
@@ -64,7 +67,7 @@ assert not any("icloud" in key.lower() or "ubiquity" in key for key in entitleme
 assert not (app / "Contents/embedded.provisionprofile").exists(), "Provisioned build selected"
 PY
 
-archive="Katabro-$version-universal.zip"
+archive="Katabro-$version-arm64.zip"
 rm -f "$output_directory/$archive" "$output_directory/$archive.sha256"
 # Leave builder-local metadata (com.apple.provenance) out of the archive.
 ditto -c -k --norsrc --keepParent "$app_path" "$output_directory/$archive"

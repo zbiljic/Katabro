@@ -2,9 +2,9 @@
 
 Set the version and build number in `Resources/Info.plist`, then run
 `mise run check` and `mise run package`. This creates
-`dist/Katabro-VERSION-universal.zip` and its SHA-256 checksum for the GitHub
-release tagged `vVERSION`. The ZIP includes the app and CLI, both supporting
-Apple Silicon and Intel.
+`dist/Katabro-VERSION-arm64.zip` and its SHA-256 checksum for the GitHub
+release tagged `vVERSION`. The ZIP includes the app and its bundled CLI for
+Apple silicon Macs running macOS 14 or later; Intel Macs are not supported.
 
 To release on GitHub, commit and push the release changes, then tag that
 commit with the app version (for example, `0.2.0`):

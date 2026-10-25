@@ -50,9 +50,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
-          archive="dist/Katabro-${GITHUB_REF_NAME#v}-universal.zip"
+          archive="dist/Katabro-${GITHUB_REF_NAME#v}-arm64.zip"
           cat > "$RUNNER_TEMP/release-notes.md" <<'EOF'
-          Universal macOS app and bundled CLI for Apple Silicon and Intel; requires macOS 14 or later.
+          macOS app and bundled CLI for Apple silicon Macs; requires macOS 14 or later.
 
           This build is ad hoc signed and not notarized. If you trust this release and macOS blocks it, use System Settings → Privacy & Security → Open Anyway after attempting to open Katabro.
 
