@@ -1,13 +1,17 @@
 # Releasing Katabro
 
 Set the version and build number in `Resources/Info.plist`, then run
-`mise run check` and `mise run package`. This creates
+`mise run check:ci` and `mise run package`. This creates
 `dist/Katabro-VERSION-arm64.zip` and its SHA-256 checksum for the GitHub
 release tagged `vVERSION`. The ZIP includes the app and its bundled CLI for
 Apple silicon Macs running macOS 14 or later; Intel Macs are not supported.
 
-To release on GitHub, commit and push the release changes, then tag that
-commit with the app version (for example, `0.2.0`):
+Commit and push the release changes, then run the manual
+[UI Tests workflow](.github/workflows/ui-tests.yml) for that branch. Confirm that
+both **CI** and **UI Tests** pass for the release commit before tagging it.
+The UI suite has a 60-minute limit and runs separately from routine CI.
+
+Tag the tested commit with the app version (for example, `0.2.0`):
 
 ```sh
 git tag v0.2.0
@@ -18,7 +22,8 @@ The [release workflow](.github/workflows/release.yml) checks the tag against
 `Resources/Info.plist`, runs `mise run package`, and creates a draft release
 with the ZIP, checksum, and a static installation description. It uses ad hoc
 signing; no Apple Developer ID or signing secrets are needed. Review the draft
-and CI results, then click **Publish release** on GitHub.
+and the CI and UI Tests results for the tagged commit, then click **Publish
+release** on GitHub.
 
 After publishing, update `version` and `sha256` in
 `Casks/katabro.rb` in [the Homebrew tap](https://github.com/zbiljic/homebrew-tap)

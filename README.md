@@ -196,15 +196,25 @@ mise tasks              # list all tasks
 mise run generate       # generate the Xcode workspace
 mise run build          # build the core package and app
 mise run test           # run core and app tests
+mise run app:test:unit  # run app unit tests
+mise run app:test:ui    # run the full UI automation suite
 mise run fmt            # format Swift and manifest files
 mise run lint           # run SwiftLint in strict mode
-mise run check          # run the complete validation gate
+mise run check:ci       # run validation without UI automation
+mise run check          # run the complete gate, including UI automation
 mise run package        # package the app and bundled CLI
 mise run clean          # remove generated projects and build outputs
 ```
 
 `Project.swift` and `Tuist.swift` are the source of truth. Do not commit the
 generated `.xcodeproj` or `.xcworkspace` files.
+
+Push and pull-request CI runs `mise run check:ci`. Run the full UI suite locally
+with `mise run app:test:ui`, or select **Actions → UI Tests → Run workflow** on
+GitHub. The [UI Tests workflow](.github/workflows/ui-tests.yml) runs manually with
+a 60-minute limit on the configured macOS runner. It pauses Notification Center
+during automation and restores it afterward so banners cannot cover controls.
+Local UI runs need an uninterrupted desktop.
 
 Debug builds also provide deterministic UI-review surfaces that do not modify
 the real default-browser, login-item, or Launch Services state:
