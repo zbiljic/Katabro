@@ -48,6 +48,16 @@ description = "Test the Katabro application"
 depends = ["app:generate"]
 run = "tuist xcodebuild test -scheme Katabro -configuration Debug -derivedDataPath Derived"
 
+[tasks."app:test:unit"]
+description = "Test the Katabro application without UI automation"
+depends = ["app:generate"]
+run = "tuist xcodebuild test -scheme Katabro -configuration Debug -derivedDataPath Derived -only-testing:KatabroTests"
+
+[tasks."app:test:ui"]
+description = "Run the Katabro UI automation suite"
+depends = ["app:generate"]
+run = "tuist xcodebuild test -scheme Katabro -configuration Debug -derivedDataPath Derived -only-testing:KatabroUITests"
+
 [tasks."app:clean"]
 description = "Remove generated Xcode and app build artifacts"
 run = "rm -rf Derived Katabro.xcodeproj Katabro.xcworkspace"

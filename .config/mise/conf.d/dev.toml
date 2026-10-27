@@ -31,6 +31,10 @@ depends = ["core:test", "app:test"]
 description = "Run the full local validation suite"
 depends = ["fmt:check", "lint", "test"]
 
+[tasks."check:ci"]
+description = "Run validation without UI automation"
+depends = ["fmt:check", "lint", "core:test", "app:test:unit"]
+
 [tasks."pre-commit"]
 description = "Run the full local development gate"
 alias = "prk"
