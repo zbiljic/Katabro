@@ -1,0 +1,40 @@
+name: UI Tests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ui-tests:
+    name: UI Tests
+    runs-on: ${{ vars.RUNNER_MACOS || 'macos-26' }}
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode 27.0
+        run: sudo xcode-select --switch /Applications/Xcode_27.0.app/Contents/Developer
+
+      - name: Install development tools
+        uses: jdx/mise-action@v4
+
+      - name: Suppress notification banners
+        id: notifications
+        run: launchctl bootout "gui/$(id -u)/com.apple.notificationcenterui.agent"
+
+      - name: Run UI tests
+        run: mise run app:test:ui
+
+      - name: Restore Notification Center
+        if: ${{ always() && steps.notifications.outcome == 'success' }}
+        run: launchctl bootstrap "gui/$(id -u)" /System/Library/LaunchAgents/com.apple.notificationcenterui.plist
