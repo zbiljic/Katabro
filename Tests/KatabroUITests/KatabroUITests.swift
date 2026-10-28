@@ -1347,8 +1347,8 @@ final class KatabroUITests: XCTestCase {
     }
 }
 
+@MainActor
 extension KatabroUITests {
-    @MainActor
     func testFilePickerLightAndDark() {
         var previousApplication: XCUIApplication?
 
@@ -1393,7 +1393,6 @@ extension KatabroUITests {
         previousApplication?.terminate()
     }
 
-    @MainActor
     func testPickerRememberHostControl() {
         let application = launch(
             surface: "picker",
@@ -1429,7 +1428,6 @@ extension KatabroUITests {
         XCTAssertTrue(isControlOn(checkbox))
     }
 
-    @MainActor
     func testRulesManagement() {
         let application = launch(
             surface: "settings",
@@ -1475,7 +1473,6 @@ extension KatabroUITests {
         )
     }
 
-    @MainActor
     func testRecentRoutesStates() { // swiftlint:disable:this function_body_length
         var application = launch(
             surface: "settings",
@@ -1664,7 +1661,6 @@ extension KatabroUITests {
         application.terminate()
     }
 
-    @MainActor
     func testRecentRoutesCreateAndReplaceRule() { // swiftlint:disable:this function_body_length
         let application = launch(
             surface: "settings",
@@ -1748,7 +1744,6 @@ extension KatabroUITests {
         )
     }
 
-    @MainActor
     func testPickerAndRulesLightAndDarkScreenshots() {
         var previousApplication: XCUIApplication?
 
@@ -1805,7 +1800,6 @@ extension KatabroUITests {
         previousApplication?.terminate()
     }
 
-    @MainActor
     func testLauncherHelperSetupSheet() {
         let application = launch(
             surface: "settings",
@@ -1840,7 +1834,6 @@ extension KatabroUITests {
         )
     }
 
-    @MainActor
     func testLauncherHelperReplacementSheet() {
         let application = launch(
             surface: "settings",
@@ -1876,7 +1869,6 @@ extension KatabroUITests {
     }
 
     // swiftlint:disable function_body_length
-    @MainActor
     func testPickerLetterShortcuts() {
         let preferencesSuite = "picker-shortcuts-\(UUID().uuidString)"
         var application = launch(
@@ -2002,7 +1994,6 @@ extension KatabroUITests {
 
     // swiftlint:enable function_body_length
 
-    @MainActor
     func testPickerNumericShortcutsActivateOffscreenTargets() {
         for orientation in ["Vertical", "Horizontal"] {
             let suite = "picker-offscreen-numbers-\(UUID().uuidString)"
@@ -2060,7 +2051,6 @@ extension KatabroUITests {
         }
     }
 
-    @MainActor
     func testPickerCopyLink() { // swiftlint:disable:this function_body_length
         let preferencesSuite = "picker-copy-link-\(UUID().uuidString)"
         var application = launch(
@@ -2131,7 +2121,6 @@ extension KatabroUITests {
         application.terminate()
     }
 
-    @MainActor
     func testPickerKeyboardSelection() {
         let application = launch(
             surface: "picker",
@@ -2185,7 +2174,6 @@ extension KatabroUITests {
         )
     }
 
-    @MainActor
     func testManyBrowserPickerKeyboardSelectionScrollsToLateRows() {
         let application = launch(
             surface: "picker",
@@ -2238,7 +2226,6 @@ extension KatabroUITests {
         XCTAssertEqual(receipt.value as? String, "DuckDuckGo Privacy Browser — Long Name Fixture selected 1 time")
     }
 
-    @MainActor
     func testHorizontalManyBrowserPickerKeyboardSelectionScrollsToLateTargets() {
         let suite = "horizontal-many-\(UUID().uuidString)"
         configureHorizontalPicker(preferencesSuite: suite)
@@ -2283,7 +2270,6 @@ extension KatabroUITests {
         XCTAssertEqual(receipt.value as? String, "DuckDuckGo Privacy Browser — Long Name Fixture selected 1 time")
     }
 
-    @MainActor
     func testPickerKeyboardSelectionWinsUntilPointerMoves() {
         let suite = "hover-arbitration-\(UUID().uuidString)"
         let application = launch(
@@ -2331,7 +2317,6 @@ extension KatabroUITests {
         XCTAssertFalse(lateTarget.isSelected)
     }
 
-    @MainActor
     func testPickerSettingsPersistAndAffectPresentation() { // swiftlint:disable:this function_body_length
         let suite = "picker-presentation-\(UUID().uuidString)"
         var application = launch(
@@ -2443,7 +2428,6 @@ extension KatabroUITests {
         )
     }
 
-    @MainActor
     func testPickerPanelStaysInsideVisibleScreen() throws {
         let screen = try XCTUnwrap(NSScreen.screens.first)
         let visible = screen.visibleFrame
@@ -2494,7 +2478,6 @@ extension KatabroUITests {
         }
     }
 
-    @MainActor
     private func assertContained(_ element: XCUIElement, in bounds: CGRect) {
         let contained = NSPredicate { _, _ in
             let frame = element.frame
@@ -2506,7 +2489,6 @@ extension KatabroUITests {
         XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 5), .completed)
     }
 
-    @MainActor
     func testPickerSettingsPreview() { // swiftlint:disable:this function_body_length
         let application = launch(
             surface: "settings",
@@ -2597,7 +2579,6 @@ extension KatabroUITests {
         assertExists(previewButton)
     }
 
-    @MainActor
     func testPickerVerticalWidthPersistsAndAffectsPresentation() {
         let suite = "picker-vertical-width-\(UUID().uuidString)"
         var application = launch(
@@ -2653,7 +2634,6 @@ extension KatabroUITests {
         XCTAssertEqual(picker.frame.width, 320, accuracy: 1)
     }
 
-    @MainActor
     func testHorizontalPickerLightAndDarkScreenshots() {
         for appearance in ["light", "dark"] {
             let suite = "horizontal-screenshot-\(appearance)-\(UUID().uuidString)"
@@ -2676,7 +2656,6 @@ extension KatabroUITests {
         }
     }
 
-    @MainActor
     func testPickerEmptyStateOmitsActionChrome() {
         let application = launch(surface: "picker", state: "no-browsers")
         defer { application.terminate() }
@@ -2696,7 +2675,6 @@ extension KatabroUITests {
         )
     }
 
-    @MainActor
     func testPickerProfileAndPrivateIdentity() {
         let application = launch(surface: "picker", state: "browser-profiles")
         defer { application.terminate() }
@@ -2715,8 +2693,8 @@ extension KatabroUITests {
     }
 }
 
+@MainActor
 private extension KatabroUITests {
-    @MainActor
     func openPickerSettings(in application: XCUIApplication) {
         let pickerTab = application.descendants(matching: .any)["settings.pane.picker"]
         assertExists(pickerTab)
@@ -2724,7 +2702,6 @@ private extension KatabroUITests {
         assertExists(application.scrollViews["settings.picker.form"])
     }
 
-    @MainActor
     func setVisibleChoices(_ count: Int, in application: XCUIApplication) {
         let stepper = application.steppers["settings.picker.visible-choices"]
         assertExists(stepper)
@@ -2741,7 +2718,6 @@ private extension KatabroUITests {
         XCTAssertEqual(integerValue(stepper), count)
     }
 
-    @MainActor
     func integerValue(_ element: XCUIElement) -> Int? {
         if let number = element.value as? NSNumber {
             return number.intValue
@@ -2752,7 +2728,6 @@ private extension KatabroUITests {
         return nil
     }
 
-    @MainActor
     func selectPickerMenu(
         _ value: String,
         identifier: String,
@@ -2767,7 +2742,6 @@ private extension KatabroUITests {
         XCTAssertEqual(picker.value as? String, value)
     }
 
-    @MainActor
     func configureHorizontalPicker(preferencesSuite: String) {
         let application = launch(
             surface: "settings",
@@ -2780,7 +2754,6 @@ private extension KatabroUITests {
         application.terminate()
     }
 
-    @MainActor
     func launch(
         surface: String,
         state: String,
@@ -2816,7 +2789,6 @@ private extension KatabroUITests {
         return application
     }
 
-    @MainActor
     func assertManyURLShortcutPresentation(in application: XCUIApplication, scroll: XCUIElement) {
         let ninthRow = application.descendants(matching: .any)["screen-url-picker.row.8"]
         let tenthRow = application.descendants(matching: .any)["screen-url-picker.row.9"]
@@ -2832,7 +2804,6 @@ private extension KatabroUITests {
         assertDoesNotExist(application.descendants(matching: .any)["screen-url-picker.shortcut.9"])
     }
 
-    @MainActor
     func verifyCaptureFeatureSwitch(
         in application: inout XCUIApplication,
         preferencesSuite: String
@@ -2883,7 +2854,6 @@ private extension KatabroUITests {
         XCTAssertEqual(shortcutValue(recorder), "⌥⌘C")
     }
 
-    @MainActor
     func verifyCapturePermissionAndAvailabilityStates(in application: inout XCUIApplication) {
         application.terminate()
         application = launch(surface: "settings", state: "screen-capture-denied")
@@ -2915,7 +2885,6 @@ private extension KatabroUITests {
         attachScreenshot(named: "Settings-screen-URL-capture-unavailable", from: application)
     }
 
-    @MainActor
     func enterShortcut(
         _ value: String,
         in shortcutField: XCUIElement
@@ -2924,7 +2893,6 @@ private extension KatabroUITests {
         shortcutField.typeText(value)
     }
 
-    @MainActor
     func shortcutValue(
         _ shortcutPicker: XCUIElement
     ) -> String {
@@ -2935,7 +2903,6 @@ private extension KatabroUITests {
         return String(describing: shortcutPicker.value)
     }
 
-    @MainActor
     func assertReceipt(
         _ receipt: XCUIElement,
         equals expectedValue: String
@@ -2952,7 +2919,6 @@ private extension KatabroUITests {
         XCTAssertEqual(receipt.value as? String, expectedValue)
     }
 
-    @MainActor
     func attachScreenshot(
         named name: String,
         from application: XCUIApplication
@@ -2965,7 +2931,6 @@ private extension KatabroUITests {
         add(attachment)
     }
 
-    @MainActor
     func isControlOn(
         _ element: XCUIElement
     ) -> Bool {
@@ -2979,7 +2944,6 @@ private extension KatabroUITests {
         return ["1", "true", "on", "checked"].contains(value)
     }
 
-    @MainActor
     func dialogButton(
         _ application: XCUIApplication,
         identifier: String,
@@ -2995,7 +2959,6 @@ private extension KatabroUITests {
         return labeled.first ?? application.buttons[label]
     }
 
-    @MainActor
     func assertExists(
         _ element: XCUIElement,
         message: String = "Expected UI element did not appear"
@@ -3009,7 +2972,6 @@ private extension KatabroUITests {
         )
     }
 
-    @MainActor
     func assertSelected(
         _ element: XCUIElement,
         message: String = "Expected UI element did not become selected"
@@ -3025,7 +2987,6 @@ private extension KatabroUITests {
         )
     }
 
-    @MainActor
     func assertRemainsSelected(
         _ element: XCUIElement,
         duration: TimeInterval = 1,
@@ -3043,7 +3004,6 @@ private extension KatabroUITests {
         )
     }
 
-    @MainActor
     func assertDoesNotExist(
         _ element: XCUIElement,
         message: String = "Expected UI element not to appear"
@@ -3057,7 +3017,6 @@ private extension KatabroUITests {
         )
     }
 
-    @MainActor
     func makeHittable(
         _ element: XCUIElement,
         in container: XCUIElement,
@@ -3079,7 +3038,6 @@ private extension KatabroUITests {
         )
     }
 
-    @MainActor
     func accessibilityCopy(
         in element: XCUIElement
     ) -> String {
