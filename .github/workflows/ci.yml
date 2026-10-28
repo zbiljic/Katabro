@@ -34,7 +34,7 @@ jobs:
           xcodebuild -version
 
       - name: Install development tools
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@v5
 
       - name: Run validation
         run: mise run check:ci
