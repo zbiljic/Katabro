@@ -35,8 +35,14 @@ jobs:
             exit 1
           fi
 
-      - name: Select Xcode 27.0
-        run: sudo xcode-select --switch /Applications/Xcode_27.0.app/Contents/Developer
+      - name: Select Xcode
+        run: |
+          developer_dir=/Applications/Xcode_27.0.app/Contents/Developer
+          if [[ ! -d "$developer_dir" ]]; then
+            developer_dir=/Applications/Xcode_26.6.app/Contents/Developer
+          fi
+          sudo xcode-select --switch "$developer_dir"
+          xcodebuild -version
 
       - name: Install development tools
         uses: jdx/mise-action@v4
