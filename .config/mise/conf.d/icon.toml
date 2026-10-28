@@ -1,7 +1,7 @@
 [tasks."icon:generate"]
 description = "Regenerate the optimized macOS application icon"
 tools = {
-    rust = "1.97.1",
+    rust = "1.99.1",
     "cargo:pngquant" = "3.0.3",
     oxipng = "10.2.1",
     jq = "1.8.2",
