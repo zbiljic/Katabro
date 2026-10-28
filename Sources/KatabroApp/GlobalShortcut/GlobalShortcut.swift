@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-// swiftlint:disable attributes is_disjoint
+// swiftlint:disable is_disjoint
 
 struct GlobalShortcut: Codable, Equatable, Sendable {
     struct Modifiers: OptionSet, Codable, Sendable {
@@ -64,8 +64,9 @@ struct GlobalShortcut: Codable, Equatable, Sendable {
     }
 }
 
+@MainActor
 extension GlobalShortcut {
-    @MainActor static func from(event: NSEvent) -> Self? {
+    static func from(event: NSEvent) -> Self? {
         let modifiers = Modifiers(
             rawValue: (event.modifierFlags.contains(.command) ? Modifiers.command.rawValue : 0)
                 | (event.modifierFlags.contains(.option) ? Modifiers.option.rawValue : 0)
@@ -78,4 +79,4 @@ extension GlobalShortcut {
     }
 }
 
-// swiftlint:enable attributes is_disjoint
+// swiftlint:enable is_disjoint
