@@ -36,11 +36,18 @@ jobs:
 
       - name: Suppress notification banners
         id: notifications
-        run: launchctl bootout "gui/$(id -u)/com.apple.notificationcenterui.agent"
+        run: |
+          service="gui/$(id -u)/com.apple.notificationcenterui.agent"
+          if launchctl print "$service" >/dev/null 2>&1; then
+            launchctl bootout "$service"
+            echo "stopped=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Notification Center is not running; no banners to suppress."
+          fi
 
       - name: Run UI tests
         run: mise run app:test:ui
 
       - name: Restore Notification Center
-        if: ${{ always() && steps.notifications.outcome == 'success' }}
+        if: ${{ always() && steps.notifications.outputs.stopped == 'true' }}
         run: launchctl bootstrap "gui/$(id -u)" /System/Library/LaunchAgents/com.apple.notificationcenterui.plist
