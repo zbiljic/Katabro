@@ -2428,7 +2428,7 @@ extension KatabroUITests {
         )
     }
 
-    func testPickerPanelStaysInsideVisibleScreen() throws {
+    func testPickerPanelStaysInsideVisibleScreen() throws { // swiftlint:disable:this function_body_length
         let screen = try XCTUnwrap(NSScreen.screens.first)
         let visible = screen.visibleFrame
         // AX uses top-left coordinates, relative to the primary display's top edge.
@@ -2438,43 +2438,99 @@ extension KatabroUITests {
             width: visible.width,
             height: visible.height
         )
+        let navigationTargets = [
+            "picker.browser.com.apple.Safari",
+            "picker.browser.com.google.Chrome",
+            "picker.browser.org.mozilla.firefox",
+            "picker.browser.company.thebrowser.Browser",
+            "picker.browser.com.microsoft.edgemac",
+            "picker.browser.com.brave.Browser",
+            "picker.browser.com.operasoftware.Opera",
+            "picker.browser.com.vivaldi.Vivaldi",
+            "picker.browser.org.chromium.Chromium",
+            "picker.browser.com.kagi.kagimacOS",
+            "picker.browser.com.duckduckgo.macos.browser",
+            "picker.browser.com.apple.SafariTechnologyPreview",
+        ]
         for edge in ["right", "left", "top", "bottom", "top-left", "top-right", "bottom-left", "bottom-right"] {
-            let application = launch(
-                surface: "settings",
-                state: "many-browsers",
-                appearance: edge.contains("top") ? "dark" : "light",
-                pickerEdge: edge
-            )
-            defer { application.terminate() }
-            openPickerSettings(in: application)
-            setVisibleChoices(8, in: application)
-            if edge.contains("top") {
-                application.radioButtons["Horizontal"].click()
+            XCTContext.runActivity(named: "Picker screen edge: \(edge)") { _ in
+                let application = launch(
+                    surface: "settings",
+                    state: "many-browsers",
+                    appearance: edge.contains("top") ? "dark" : "light",
+                    pickerEdge: edge
+                )
+                let panel = application.windows["Choose a browser"]
+                let content = application.descendants(matching: .any)["picker.content"]
+                let initialFailureCount = testRun?.failureCount ?? 0
+                defer {
+                    if (testRun?.failureCount ?? 0) > initialFailureCount {
+                        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+                        screenshot.name = "Picker-\(edge)-failure"
+                        screenshot.lifetime = .keepAlways
+                        add(screenshot)
+                        let selected = application.buttons
+                            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "picker.browser."))
+                            .allElementsBoundByIndex
+                            .filter(\.isSelected)
+                            .map(\.identifier)
+                        let panelFrame = panel.exists ? "\(panel.frame)" : "absent"
+                        let contentFrame = content.exists ? "\(content.frame)" : "absent"
+                        let details = XCTAttachment(string: """
+                        Edge: \(edge)
+                        Selected: \(selected)
+                        Screen: \(axVisible), panel: \(panelFrame), content: \(contentFrame)
+                        \(application.debugDescription)
+                        """)
+                        details.name = "Picker-\(edge)-state"
+                        details.lifetime = .keepAlways
+                        add(details)
+                    }
+                    application.terminate()
+                }
+                openPickerSettings(in: application)
+                setVisibleChoices(8, in: application)
+                if edge.contains("top") {
+                    application.radioButtons["Horizontal"].click()
+                }
+                application.buttons["settings.picker.preview"].click()
+                assertExists(panel)
+                assertExists(content)
+                assertContained(panel, in: axVisible)
+                assertContained(content, in: axVisible)
+                let firstTarget = application.buttons[navigationTargets[0]]
+                assertExists(firstTarget)
+                firstTarget.hover()
+                guard assertSelected(firstTarget, message: "\(edge): Safari must be selected before navigation") else {
+                    return
+                }
+                // Confirm each move before sending the next key so missed input cannot cascade.
+                for identifier in navigationTargets.dropFirst() {
+                    application.typeKey(.downArrow, modifierFlags: [])
+                    guard assertSelected(application.buttons[identifier], message: "\(edge): expected \(identifier)")
+                    else {
+                        return
+                    }
+                }
+                let lastTarget = application.descendants(matching: .any)[
+                    "picker.browser.com.apple.SafariTechnologyPreview"
+                ]
+                let hittable = XCTNSPredicateExpectation(
+                    predicate: NSPredicate { _, _ in lastTarget.isHittable },
+                    object: lastTarget
+                )
+                let scrollCompleted = XCTWaiter.wait(for: [hittable], timeout: 5)
+                XCTAssertEqual(scrollCompleted, .completed, "\(edge): last browser must be visible and hittable")
+                guard scrollCompleted == .completed else { return }
+                assertContained(panel, in: axVisible)
+                assertContained(content, in: axVisible)
+                application.typeKey(.escape, modifierFlags: [])
+                assertDoesNotExist(panel)
+                application.buttons["settings.picker.preview"].click()
+                assertExists(panel)
+                application.typeKey(.return, modifierFlags: [])
+                assertDoesNotExist(panel)
             }
-            application.buttons["settings.picker.preview"].click()
-            let panel = application.windows["Choose a browser"]
-            let content = application.descendants(matching: .any)["picker.content"]
-            assertExists(panel)
-            assertExists(content)
-            assertContained(panel, in: axVisible)
-            assertContained(content, in: axVisible)
-            // Moving to a late target forces SwiftUI to lay out and scroll again.
-            for _ in 0 ..< 11 {
-                application.typeKey(.downArrow, modifierFlags: [])
-            }
-            let lastTarget = application.descendants(matching: .any)[
-                "picker.browser.com.apple.SafariTechnologyPreview"
-            ]
-            assertSelected(lastTarget)
-            XCTAssertTrue(lastTarget.isHittable)
-            assertContained(panel, in: axVisible)
-            assertContained(content, in: axVisible)
-            application.typeKey(.escape, modifierFlags: [])
-            assertDoesNotExist(panel)
-            application.buttons["settings.picker.preview"].click()
-            assertExists(panel)
-            application.typeKey(.return, modifierFlags: [])
-            assertDoesNotExist(panel)
         }
     }
 
@@ -2972,19 +3028,22 @@ private extension KatabroUITests {
         )
     }
 
+    @discardableResult
     func assertSelected(
         _ element: XCUIElement,
         message: String = "Expected UI element did not become selected"
-    ) {
+    ) -> Bool {
         let expectation = XCTNSPredicateExpectation(
             predicate: NSPredicate { object, _ in (object as? XCUIElement)?.isSelected == true },
             object: element
         )
+        let result = XCTWaiter.wait(for: [expectation], timeout: 5)
         XCTAssertEqual(
-            XCTWaiter.wait(for: [expectation], timeout: 5),
+            result,
             .completed,
             message
         )
+        return result == .completed
     }
 
     func assertRemainsSelected(

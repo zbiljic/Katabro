@@ -46,7 +46,16 @@ jobs:
           fi
 
       - name: Run UI tests
-        run: mise run app:test:ui
+        run: mise run check
+
+      - name: Upload failed UI test results
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ui-test-results
+          path: ~/.cache/tuist/Runs/*.xcresult
+          include-hidden-files: true
+          if-no-files-found: warn
 
       - name: Restore Notification Center
         if: ${{ always() && steps.notifications.outputs.stopped == 'true' }}
