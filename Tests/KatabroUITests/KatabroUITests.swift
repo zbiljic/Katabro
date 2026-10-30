@@ -2504,6 +2504,8 @@ extension KatabroUITests {
                 guard assertSelected(firstTarget, message: "\(edge): Safari must be selected before navigation") else {
                     return
                 }
+                // Keep pointer hover out of the rows while keyboard navigation scrolls them.
+                application.descendants(matching: .any)["picker.destination"].hover()
                 // Confirm each move before sending the next key so missed input cannot cascade.
                 for identifier in navigationTargets.dropFirst() {
                     application.typeKey(.downArrow, modifierFlags: [])
@@ -2515,13 +2517,9 @@ extension KatabroUITests {
                 let lastTarget = application.descendants(matching: .any)[
                     "picker.browser.com.apple.SafariTechnologyPreview"
                 ]
-                let hittable = XCTNSPredicateExpectation(
-                    predicate: NSPredicate { _, _ in lastTarget.isHittable },
-                    object: lastTarget
-                )
-                let scrollCompleted = XCTWaiter.wait(for: [hittable], timeout: 5)
-                XCTAssertEqual(scrollCompleted, .completed, "\(edge): last browser must be visible and hittable")
-                guard scrollCompleted == .completed else { return }
+                let scrollCompleted = lastTarget.wait(for: \.isHittable, toEqual: true, timeout: 5)
+                XCTAssertTrue(scrollCompleted, "\(edge): last browser must be visible and hittable")
+                guard scrollCompleted else { return }
                 assertContained(panel, in: axVisible)
                 assertContained(content, in: axVisible)
                 application.typeKey(.escape, modifierFlags: [])
@@ -3034,16 +3032,12 @@ private extension KatabroUITests {
         message: String = "Expected UI element did not become selected"
     ) -> Bool {
         let expectation = XCTNSPredicateExpectation(
-            predicate: NSPredicate { object, _ in (object as? XCUIElement)?.isSelected == true },
+            predicate: NSPredicate { _, _ in element.exists && element.isSelected },
             object: element
         )
-        let result = XCTWaiter.wait(for: [expectation], timeout: 5)
-        XCTAssertEqual(
-            result,
-            .completed,
-            message
-        )
-        return result == .completed
+        let selected = XCTWaiter.wait(for: [expectation], timeout: 5) == .completed
+        XCTAssertTrue(selected, message)
+        return selected
     }
 
     func assertRemainsSelected(
