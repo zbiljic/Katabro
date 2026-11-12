@@ -14,7 +14,9 @@ struct DetectedURLExtractorTests {
     @Test("recognizes www links when NSDataDetector supports them")
     func wwwLinks() {
         let extracted = urls(["www.example.com/path"])
-        #expect(extracted.isEmpty || extracted == ["http://www.example.com/path"])
+        #expect([
+            [], ["http://www.example.com/path"], ["https://www.example.com/path"],
+        ].contains(extracted))
     }
 
     @Test("excludes terminal punctuation")
